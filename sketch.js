@@ -2,6 +2,7 @@
 let wH 
 let wW 
 let selectedNotes = []
+let liveNotes = []
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -9,7 +10,7 @@ const scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 let pitch;
 let audioContext;
 let mic;
-let volumeThreshold = 0.01
+let volumeThreshold = 0.001
 let noteFrequency
 let noteVolume 
 
@@ -27,7 +28,7 @@ function setup() {
     });
 
     // Création d'un manche de guitare
-    guitar = new Guitar(6);
+    guitar = new Guitar(12);
 } 
 
 function windowResized() {
@@ -131,4 +132,34 @@ function gotPitch(error, frequency){
 function modelLoaded(){
 console.log('model loaded!');
 pitch.getPitch(gotPitch);
+}
+
+
+
+// gestion du midi
+
+function notePressed(midiNote) {
+    let index = liveNotes.findIndex(item => 
+        item.note === midiNumberToNoteName(midiNote) 
+      );
+  
+      if (index === -1) {
+        // Si la note n'est déjà dans le tableau
+        // ajouter la note au tableau
+        liveNotes.push({note:midiNumberToNoteName(midiNote)});
+      }
+      console.log(liveNotes)
+    guitar.setMidiNotes(liveNotes)
+}
+  
+function noteReleased(midiNote) { 
+    // retirer la note relachee
+    let index = liveNotes.findIndex(item => 
+        item.note === midiNumberToNoteName(midiNote) 
+      );
+  
+      if (index !== -1) 
+        liveNotes.splice(index, 1)   
+
+      guitar.setMidiNotes(liveNotes)
 }
