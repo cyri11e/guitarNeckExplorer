@@ -11,7 +11,7 @@ class Guitar{
         this.neckHeight = this.canvasWidth/6
         this.markerDiameter = this.neckHeight/10
         this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
-
+        this.textSize = 0.8*this.noteMarkerDiameter
         this.markerPositions = [3, 5, 7, 9, 12];
         this.openStringNotes = ['E', 'A', 'D', 'G', 'B', 'E'];
         this.stringThickness = [1, 1.5, 2, 2.5, 3, 4]; // Épaisseurs des cordes du Mi aigu au Mi grave
@@ -24,24 +24,37 @@ class Guitar{
         this.tonic = null
 
         this.noteColors = [
-            color(255, 0, 0),          // Do (C) - Rouge
+            color(255, 10, 10),          // Do (C) - Rouge
             color(255, 82, 90),        // Do# (C#) / Réb (Db) - Intermédiaire entre rouge et orange
-            color(255, 165, 0),        // Ré (D) - Orange
-            color(255, 210, 0),        // Ré# (D#) / Mib (Eb) - Intermédiaire entre orange et jaune
-            color(200, 200, 0),        // Mi (E) - Jaune
+            color(255, 165, 10),        // Ré (D) - Orange
+            color(255, 210, 10),        // Ré# (D#) / Mib (Eb) - Intermédiaire entre orange et jaune
+            color(200, 200, 10),        // Mi (E) - Jaune
             color(144, 238, 144),      // Fa (F) - Vert clair
             color(72, 169, 127),       // Fa# (F#) / Solb (Gb) - Intermédiaire entre vert clair et bleu
             color(20, 20, 255),          // Sol (G) - Bleu
             color(68, 103, 192),       // Sol# (G#) / Lab (Ab) - Intermédiaire entre bleu et indigo
-            color(75, 0, 130),         // La (A) - Indigo
+            color(75, 10, 130),         // La (A) - Indigo
             color(111, 21, 168),       // La# (A#) / Sib (Bb) - Intermédiaire entre indigo et violet
-            color(148, 0, 211)         // Si (B) - Violet foncé
+            color(148, 10, 211)         // Si (B) - Violet foncé
           ];
-          
-          
+          this.anim =this.fade(10)
+
     }
 
+    fade(speed) {
+        let value = speed > 0 ? 0 : 100; // Initialiser en fonction de la direction de l'animation
+        if (!speed) speed = 1; // Utiliser la valeur par défaut si non spécifiée
+        return () => {
+            if (speed > 0 && value < 100) {
+                value += speed;
+            } else if (speed < 0 && value > 0) {
+                value += speed;
+            }
+            return value;
+        };
+    }
     
+
     setPlayedNote(note){
         //console.log('recu',note)
         this.playedNoteName = {note :note} 
@@ -54,6 +67,7 @@ class Guitar{
         this.neckHeight = this.canvasWidth/6
         this.markerDiameter = this.neckHeight/10
         this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
+        this.textSize = this.noteMarkerDiameter
    }
 
     display() {
@@ -107,7 +121,7 @@ class Guitar{
       
         // Ajouter les noms des cordes à vide
         fill(0);
-        textSize(18);
+        textSize(this.textSize);
         textAlign(CENTER, CENTER);
         for (let i = 0; i < this.stringCount; i++) {
           let y = this.neckY + i * (this.neckHeight / (this.stringCount - 1));
@@ -137,9 +151,9 @@ class Guitar{
             fill(color(noteColor)) 
 
             if (this.octaveMode)
-                this.drawAllOctaves(this.hoveredNote); 
+                this.drawAllOctaves(this.hoveredNote,null,true); 
             else
-                this.drawAllOccurrences(this.hoveredNote); 
+                this.drawAllOccurrences(this.hoveredNote,null,true); 
 
         }
         
@@ -214,12 +228,11 @@ class Guitar{
     getNoteIndex(note) {
       const notesOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
       if (note.note) {
-        console.log(note.note!=null)
           const noteName = note.note.match(/[A-G]#?/)[0]; // Extraire le nom de la note sans l'octave
           const octave = parseInt(note.note.match(/\d+/)[0]); // Extraire l'octave
           return notesOrder.indexOf(noteName) + (octave * 12);
+      } else return 0
 
-      }
     }
     
     calculateSemitoneDistance(note1, note2) {
@@ -229,36 +242,90 @@ class Guitar{
     }
     
     calculeDegreeChromatique(tonic, note) {
-      const semitoneDistance = this.calculateSemitoneDistance(tonic, note);
-      return (semitoneDistance + 12) % 12; // Assure que le résultat est toujours positif
+      if (tonic){
+          const semitoneDistance = this.calculateSemitoneDistance(tonic, note);
+          return (semitoneDistance + 12) % 12; // Assure que le résultat est toujours positif
+      } else 
+        return 0
     }
     
+    chromaticToDiatonic(degreeChromatic) {
+        const conversionTable = {
+            0: '1',
+            1: 'b2',
+            2: '2',
+            3: 'b3',
+            4: '3',
+            5: '4',
+            6: 'b5',
+            7: '5',
+            8: 'b6',
+            9: '6',
+            10: 'b7',
+            11: '7'
+        };
+    
+        return conversionTable[degreeChromatic % 12];
+    }
 
     // AFFICHAGE
+    animated(drawFunction,targetDiameter,growthRate) {
+        if (diameter < targetDiameter) {
+            diameter += growthRate;
+            drawFunction(circleX, circleY, diameter, fillColor);
+        } else {
+            diameter = targetDiameter; // Fixer la taille au diamètre cible
+        }
+    }
 
-
-    drawNoteOnFretboard(note, string, fret, vibre) {
+    drawNoteOnFretboard(note, string, fret, vibre, hover) {
         // Couleur doit etre definie avant l'appel
         push()
         noStroke();
         let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
         let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
-        let pulse 
-        if (vibre)
+        let pulse, noteLabel
+
+        if (vibre){
+            stroke(255); // Définir la couleur du pourtour en blanc 
+            strokeWeight(4); // Définir l'épaisseur du pourtour
             pulse = sin(frameCount*0.8) * 5
-        else 
+        }
+        else {
+            noStroke()
             pulse = 0
-        ellipse(x, y, this.noteMarkerDiameter + pulse, this.noteMarkerDiameter + pulse);
-        textSize(18);
+        }
+
+        let offset = 0
+        if (hover){
+            offset =  5
+            push()
+            fill(40,100)
+            ellipse(x+offset, y+offset, 2*this.noteMarkerDiameter , this.noteMarkerDiameter );
+            pop()
+            ellipse(x-offset, y-offset, 2*this.noteMarkerDiameter , this.noteMarkerDiameter );
+        
+        } else      
+            ellipse(x, y, 2*this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
+        
+        textSize(this.textSize);
         textAlign(CENTER, CENTER);
+        blendMode(BLEND);
+        noStroke()
         fill(25); // Couleur grise pour l ombre
-        text(note, x+2, y+2);
+        if (this.degreMode)
+            noteLabel = this.chromaticToDiatonic(this.calculeDegreeChromatique(this.tonic,{note : note}),)
+        else
+            noteLabel = note
+
+        text(noteLabel, x+2-offset, y+2-offset);
         fill(255); // Couleur blanche pour le texte
-        text(note, x, y);
+        text(noteLabel, x-offset, y-offset);
+        
         pop()
       }
 
-      drawAllOccurrences(note, pulse) {
+      drawAllOccurrences(note, pulse, hover) {
         push()
         // Dessiner toutes les occurrences de la note
         noStroke();
@@ -266,7 +333,7 @@ class Guitar{
         for (let string = 0; string < this.stringCount; string++) {
           for (let fret = 0; fret < this.fretCount+1; fret++) {
             if (this.getNoteFromCoordinates(string, fret) === note.note) {
-              this.drawNoteOnFretboard(note.note, string, fret, pulse);          
+              this.drawNoteOnFretboard(note.note, string, fret, pulse, hover);          
             }
           }
         }
@@ -329,12 +396,17 @@ class Guitar{
             this.clickedNotes.push(this.clickedNote);
           }
         }
-        if (this.clickedNotes.length>0) this.tonic = this.clickedNotes[0]
+        if (this.clickedNotes.length>0) 
+            this.tonic = this.clickedNotes[0]
+        else 
+            this.tonic = null
       }
       
       keyPressed(){
-        // toutche "O" changement de mode unisson / octave
+        // touche "O" changement de mode unisson / octave
         if (keyCode == 79) this.octaveMode = !this.octaveMode
+        if (keyCode == 68) this.degreMode = !this.degreMode
+        
         if (keyCode == 80) this.setPlayedNote ('C3')
       }
 

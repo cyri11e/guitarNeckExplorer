@@ -61,7 +61,7 @@ function keyReleased(){
 function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
-    displayTuner(noteFrequency,200,200,50)
+    displayTuner(noteFrequency,100,300,50)
 }
 
 function midiNumberToNoteName(midiNumber) {
