@@ -438,13 +438,16 @@ class Guitar{
       mousePressed() {
         if (this.hoveredNote) {
           let index = this.clickedNotes.findIndex(item => 
-            item.note === this.hoveredNote.note 
+            item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
           );
       
           if (index !== -1) {
             // Si la note est déjà dans le tableau, la supprimer
             this.clickedNotes.splice(index, 1);
-            if (this.clickedNote && this.clickedNote.note === this.hoveredNote.note) {
+            if (this.clickedNote 
+                && this.clickedNote.note === this.hoveredNote.note
+                && this.clickedNote.string === this.hoveredNote.string
+            ) {
               this.clickedNote = null;
             }
           } else {

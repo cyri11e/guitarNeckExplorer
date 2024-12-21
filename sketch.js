@@ -3,6 +3,8 @@ let wH
 let wW 
 let selectedNotes = []
 let liveNotes = []
+let micMuted = false;
+let muteButton;
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -18,7 +20,10 @@ function setup() {
     wH = windowHeight;
     wW = windowWidth;
     createCanvas(wW, wH);
-
+    muteButton = createButton('Mute Microphone');
+    muteButton.position(10, 10);
+    muteButton.mousePressed(toggleMic);
+  
     // Démarrer l'AudioContext lorsque la page est chargée
     userStartAudio().then(() => {
         // Initialiser le contexte audio et le micro après que l'utilisateur ait interagi
@@ -31,6 +36,19 @@ function setup() {
     guitar = new Guitar(12);
     detector = new MultiPitchDetector();
 } 
+
+function toggleMic() {
+    micMuted = !micMuted;
+    if (micMuted) {
+      muteButton.html('Unmute Microphone');
+      // Arrêter le micro
+      detector.mic.stop();
+    } else {
+      muteButton.html('Mute Microphone');
+      // Démarrer le micro
+      detector.mic.start();
+    }
+  }
 
 function windowResized() {
     // gestion reponsive
@@ -64,12 +82,20 @@ function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
     displayTuner(noteFrequency,400,400,100)
-    let result = detector.analyze();
-    let notes = detector.getPitches()
-    text('Notes des 6 premiers pics: ' + result.notePeaks.join(', '), 10, height - 30);
-    text('3 notes les plus graves: ' + detector.getPitches().join(', '), 10, height - 50);
-    if (notes.length > 0)
-        guitar.setPlayedNote(notes)
+    if (!micMuted) {
+        // Autres logiques liées à l'analyse du micro
+        let result = detector.analyze();
+        let notes = detector.getPitches()
+        //text('Notes des 6 premiers pics: ' + result.notePeaks.join(', '), 10, height - 30);
+        //text('3 notes les plus graves: ' + detector.getPitches().join(', '), 10, height - 50);
+        if (notes.length > 0)
+            guitar.setPlayedNote(notes)
+        else
+            guitar.setPlayedNote(null)
+    }
+
+
+    
 }
 
 function midiNumberToNoteName(midiNumber) {
@@ -129,9 +155,11 @@ function gotPitch(error, frequency){
           midiNote = freqToMidi(frequency);
           if (midiNote>30) 
             guitar.setPlayedNote(midiNumberToNoteName(midiNote)) 
-        } 
-      } else
-            guitar.setPlayedNote(null)       
+        } else
+            guitar.setPlayedNote(null) 
+      }    
+            
+            
     pitch.getPitch(gotPitch); // Demande la prochaine fréquence
   }
 }
