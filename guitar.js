@@ -1,7 +1,7 @@
 class Guitar{
     constructor(fretCount){
         this.neckX = 50; // offset
-        this.neckY = 20;
+        this.neckY = 100;
         this.fretCount = fretCount;
         this.stringCount = 6;
 
@@ -21,6 +21,7 @@ class Guitar{
         this.playedNoteName = null;
         this.clickedNotes =[]
         this.midiPlayedNotes = []
+        this.playedNotes = []
         this.octaveMode = false
         this.tonic = null
 
@@ -56,13 +57,11 @@ class Guitar{
     }
     
     setMidiNotes(notes){
-        console.log('recu',notes)
         this.midiPlayedNotes = notes
     }
 
-    setPlayedNote(note){
-        //console.log('recu',note)
-        this.playedNoteName = {note :note} 
+    setPlayedNote(notes){
+        this.playedNotes = notes
     }
 
     resize(){
@@ -131,6 +130,17 @@ class Guitar{
             if (noteColor)
                 fill(color(noteColor));
             this.drawAllOccurrences(this.playedNoteName, true);
+        }
+
+        for ( let playedNote of this.playedNotes){
+            let noteColor;
+            if (this.tonic)
+                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, playedNote)];
+            else
+                noteColor = 'red';
+            if (noteColor)
+                fill(color(noteColor));
+            this.drawAllOccurrences({ note :playedNote}, true);
         }
 
         for ( let midiPlayedNote of this.midiPlayedNotes){

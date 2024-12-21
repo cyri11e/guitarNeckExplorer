@@ -24,11 +24,12 @@ function setup() {
         // Initialiser le contexte audio et le micro après que l'utilisateur ait interagi
         audioContext = getAudioContext();
         mic = new p5.AudioIn();
-        mic.start(listening);
+        mic.start();
     });
 
     // Création d'un manche de guitare
     guitar = new Guitar(12);
+    detector = new MultiPitchDetector();
 } 
 
 function windowResized() {
@@ -62,7 +63,13 @@ function keyReleased(){
 function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
-    displayTuner(noteFrequency,100,300,50)
+    displayTuner(noteFrequency,400,400,100)
+    let result = detector.analyze();
+    let notes = detector.getPitches()
+    text('Notes des 6 premiers pics: ' + result.notePeaks.join(', '), 10, height - 30);
+    text('3 notes les plus graves: ' + detector.getPitches().join(', '), 10, height - 50);
+    if (notes.length > 0)
+        guitar.setPlayedNote(notes)
 }
 
 function midiNumberToNoteName(midiNumber) {
@@ -73,14 +80,14 @@ function midiNumberToNoteName(midiNumber) {
   }
   
 
-function listening(){
-    console.log('listening');
-    pitch = ml5.pitchDetection(
-        model_url,
-        audioContext,
-        mic.stream,
-        modelLoaded);
-  }
+// function listening(){
+//     console.log('listening');
+//     pitch = ml5.pitchDetection(
+//         model_url,
+//         audioContext,
+//         mic.stream,
+//         modelLoaded);
+//   }
   
 function displayTuner(frequency, x, y, s) {
     let midiNote, accurateNoteFrequency, centOffset, noteName;
@@ -129,10 +136,10 @@ function gotPitch(error, frequency){
   }
 }
 
-function modelLoaded(){
-console.log('model loaded!');
-pitch.getPitch(gotPitch);
-}
+// function modelLoaded(){
+// console.log('model loaded!');
+// pitch.getPitch(gotPitch);
+// }
 
 
 
