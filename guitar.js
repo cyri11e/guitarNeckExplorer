@@ -132,16 +132,17 @@ class Guitar{
             this.drawAllOccurrences(this.playedNoteName, true);
         }
 
-        for ( let playedNote of this.playedNotes){
-            let noteColor;
-            if (this.tonic)
-                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, playedNote)];
-            else
-                noteColor = 'red';
-            if (noteColor)
-                fill(color(noteColor));
-            this.drawAllOccurrences({ note :playedNote}, true);
-        }
+        if (this.playedNotes)
+            for ( let playedNote of this.playedNotes){
+                let noteColor;
+                if (this.tonic)
+                    noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, playedNote)];
+                else
+                    noteColor = 'red';
+                if (noteColor)
+                    fill(color(noteColor));
+                this.drawAllOccurrences({ note :playedNote}, true);
+            }
 
         for ( let midiPlayedNote of this.midiPlayedNotes){
             let noteColor;
