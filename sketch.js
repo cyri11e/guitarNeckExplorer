@@ -3,7 +3,7 @@ let wH
 let wW 
 let selectedNotes = []
 let liveNotes = []
-let micMuted = false;
+let micMuted = true;
 let muteButton;
 
 // pitch detection

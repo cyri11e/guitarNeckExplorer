@@ -18,6 +18,9 @@ class MultiPitchDetector {
     }
   
     analyze() {
+        if (!this.mic.enabled) {
+          return;
+        }
         this.spectrum = this.fft.analyze();
         this.findPeaks();
       
@@ -71,6 +74,7 @@ class MultiPitchDetector {
     }
   
     noteToFrequency(note) {
+      if (note === null) return null;
       let noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
       let noteName = note.slice(0, -1);
       let octave = parseInt(note.slice(-1));
