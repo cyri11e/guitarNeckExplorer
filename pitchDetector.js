@@ -76,15 +76,21 @@ class MultiPitchDetector {
     noteToFrequency(note) {
       if (note === null) return null;
       let noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      let noteName = note.slice(0, -1);
-      let octave = parseInt(note.slice(-1));
-      let midiNote = noteNames.indexOf(noteName) + (octave + 1) * 12;
-      return 440 * Math.pow(2, (midiNote - 69) / 12);
+      if (typeof note === 'string') {
+          let noteName = note.slice(0, -1);
+          let octave = parseInt(note.slice(-1));
+          let midiNote = noteNames.indexOf(noteName) + (octave + 1) * 12;
+          return 440 * Math.pow(2, (midiNote - 69) / 12);
+      }
+      return null;
     }
   
     // Méthode pour obtenir les notes les plus graves
     getPitches() {
       return this.lowestNotes;
     }
+
+    setSensitivity(threshold) {
+        this.mic.amp(threshold);
+    }
   }
-  

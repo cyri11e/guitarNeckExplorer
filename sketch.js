@@ -1,10 +1,11 @@
-
 let wH 
 let wW 
 let selectedNotes = []
 let liveNotes = []
 let micMuted = true;
 let muteButton;
+let guitar
+let sensitivitySlider;
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -23,6 +24,14 @@ function setup() {
     muteButton = createButton('Mute Microphone');
     muteButton.position(10, 10);
     muteButton.mousePressed(toggleMic);
+    sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
+    sensitivitySlider.position(10, 40);
+    sensitivitySlider.style('width', '200px');
+    sensitivitySlider.input(() => {
+        let value = sensitivitySlider.value();
+        console.log('Sensitivity Slider Value:', value);
+        detector.setSensitivity(value);
+    });
   
     // Démarrer l'AudioContext lorsque la page est chargée
     userStartAudio().then(() => {
@@ -60,22 +69,28 @@ function windowResized() {
 }
 
 function mouseMoved(){
-    guitar.mouseMoved()
+    if (guitar) {
+        guitar.mouseMoved();
+    }
 }
 
 function mousePressed(){
-    guitar.mousePressed()
+    if (guitar) {
+        guitar.mousePressed();
+    }
 }
 
 function keyPressed(){
-    guitar.keyPressed()
-    if (keyCode == 81) guitar.setPlayedNote ('E4')
-    
-
+    if (guitar) {
+        guitar.keyPressed();
+    }
+    if (keyCode == 81) guitar.setPlayedNote ('E4');
 }
 
 function keyReleased(){
-    guitar.keyReleased()
+    if (guitar) {
+        guitar.keyReleased();
+    }
 }
 
 function draw() {
@@ -93,9 +108,6 @@ function draw() {
         else
             guitar.setPlayedNote(null)
     }
-
-
-    
 }
 
 function midiNumberToNoteName(midiNumber) {
