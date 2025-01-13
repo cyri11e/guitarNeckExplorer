@@ -6,6 +6,8 @@ let micMuted = true;
 let muteButton;
 let guitar
 let sensitivitySlider;
+let volumeLevel = 0;
+let volumeControl;
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -21,11 +23,11 @@ function setup() {
     wH = windowHeight;
     wW = windowWidth;
     createCanvas(wW, wH);
-    muteButton = createButton('Mute Microphone');
+    muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
     muteButton.position(10, 10);
     muteButton.mousePressed(toggleMic);
     sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
-    sensitivitySlider.position(10, 40);
+    sensitivitySlider.position(10, 60);
     sensitivitySlider.style('width', '200px');
     sensitivitySlider.input(() => {
         let value = sensitivitySlider.value();
@@ -44,16 +46,17 @@ function setup() {
     // Création d'un manche de guitare
     guitar = new Guitar(12);
     detector = new MultiPitchDetector();
+    volumeControl = new VolumeControl(detector);
 } 
 
 function toggleMic() {
     micMuted = !micMuted;
     if (micMuted) {
-      muteButton.html('Unmute Microphone');
+      muteButton.html('<i class="fas fa-microphone"></i>');
       // Arrêter le micro
       detector.mic.stop();
     } else {
-      muteButton.html('Mute Microphone');
+      muteButton.html('<i class="fas fa-microphone-slash"></i>');
       // Démarrer le micro
       detector.mic.start();
     }
@@ -97,6 +100,11 @@ function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
     displayTuner(noteFrequency,400,400,100)
+    
+    // Mettre à jour et afficher le vumètre
+    volumeControl.updateVolumeLevel(mic);
+    volumeControl.display();
+    
     if (!micMuted) {
         // Autres logiques liées à l'analyse du micro
         let result = detector.analyze();

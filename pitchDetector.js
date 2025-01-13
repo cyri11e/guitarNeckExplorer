@@ -19,7 +19,16 @@ class MultiPitchDetector {
   
     analyze() {
         if (!this.mic.enabled) {
-          return;
+          this.notePeaks = [];
+          this.lowestNotes = [];
+          return { notePeaks: [], lowestNotes: [] };
+        } 
+
+        let volume = this.mic.getLevel();
+        if (volume < this.volumeThreshold) {
+          this.notePeaks = [];
+          this.lowestNotes = [];
+          return { notePeaks: [], lowestNotes: [] };
         }
         this.spectrum = this.fft.analyze();
         this.findPeaks();
@@ -91,6 +100,6 @@ class MultiPitchDetector {
     }
 
     setSensitivity(threshold) {
-        this.mic.amp(threshold);
+        this.volumeThreshold = threshold/10;
     }
   }

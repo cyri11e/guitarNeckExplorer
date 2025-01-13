@@ -206,10 +206,10 @@ class Guitar{
         for (let i of this.markerPositions) {
             let x = this.neckX + i * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
             if (i === 12) {
-                ellipse(x, this.neckY + this.neckHeight / 3, this.markerDiameter, this.markerDiameter);
-                ellipse(x, this.neckY + 2 * this.neckHeight / 3, this.markerDiameter, this.markerDiameter);
+                ellipse(x, this.neckY + 0.9 * this.neckHeight , this.markerDiameter, this.markerDiameter);
+                ellipse(x, this.neckY + 0.7 *  this.neckHeight , this.markerDiameter, this.markerDiameter);
             } else {
-                ellipse(x, this.neckY + this.neckHeight / 2, this.markerDiameter, this.markerDiameter);
+                ellipse(x, this.neckY + 0.9 * this.neckHeight , this.markerDiameter, this.markerDiameter);
             }
         }
     }
@@ -351,19 +351,18 @@ class Guitar{
             pulse = 0
         }
 
-        let offset = 0
+        let offset = this.textSize / 20
         let hoverPulse = 0
         if (hover){
             hoverPulse = sin(frameCount*0.1) * 2
-            offset =  5
             push()
             fill(40,100)
-            ellipse(x+offset-hoverPulse, y+offset-hoverPulse, 2*this.noteMarkerDiameter , this.noteMarkerDiameter );
+            ellipse(x+offset-hoverPulse, y+offset-hoverPulse, 1.5*this.noteMarkerDiameter , this.noteMarkerDiameter );
             pop()
-            ellipse(x-offset, y-offset+hoverPulse, 2*this.noteMarkerDiameter , this.noteMarkerDiameter );
+            ellipse(x-offset, y-offset+hoverPulse, 1.5*this.noteMarkerDiameter , this.noteMarkerDiameter );
         
         } else      
-            ellipse(x, y, 2*this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
+            ellipse(x, y, 1.5*this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
         
         textSize(this.textSize);
         textAlign(CENTER, CENTER);
@@ -375,12 +374,42 @@ class Guitar{
         else
             noteLabel = note
 
-        text(noteLabel, x+2-offset, y+2-offset+hoverPulse);
-        fill(255); // Couleur blanche pour le texte
-        text(noteLabel, x-offset, y-offset+hoverPulse);
+        this.renderNoteLabel(noteLabel, x, offset, y, hoverPulse);
         
         pop()
       }
+
+    renderNoteLabel(noteLabel, x, offset, y, hoverPulse) {
+        let noteName = noteLabel.slice(0, -1);
+        let octave = noteLabel.slice(-1);
+        let alteration = '';
+        
+        if (noteName.includes('#')) {
+            noteName = noteName.replace('#', '');
+            alteration = '♯';
+        } else if (noteName.includes('b')) {
+            noteName = noteName.replace('b', '');
+            alteration = '♭';
+        }
+        
+        textSize(this.textSize);
+        textAlign(CENTER, CENTER);
+        blendMode(BLEND);
+        noStroke();
+        fill(25); // Couleur grise pour l'ombre
+        text(noteName, x + offset , y + offset + hoverPulse);
+        textSize(this.textSize * 0.6);
+        text(octave, x + offset + this.textSize * 0.4, y + offset + hoverPulse + this.textSize * 0.4);
+        textSize(this.textSize * 0.8);
+        text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.4);
+        fill(255); // Couleur blanche pour le texte
+        textSize(this.textSize);
+        text(noteName, x, y + hoverPulse);
+        textSize(this.textSize * 0.6);
+        text(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
+        textSize(this.textSize * 0.8);
+        text(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.4);
+    }
 
       drawAllOccurrences(note, pulse, hover) {
         push()
