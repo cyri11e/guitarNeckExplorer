@@ -397,18 +397,18 @@ class Guitar{
         blendMode(BLEND);
         noStroke();
         fill(25); // Couleur grise pour l'ombre
-        text(noteName, x + offset , y + offset + hoverPulse);
-        textSize(this.textSize * 0.6);
-        text(octave, x + offset + this.textSize * 0.4, y + offset + hoverPulse + this.textSize * 0.4);
+        text(noteName, x  - offset * 3 , y + offset + hoverPulse);
+        textSize(this.textSize * 0.7);
+        text(octave, x + offset + this.textSize * 0.4, y + offset * 2 + hoverPulse + this.textSize * 0.4);
         textSize(this.textSize * 0.8);
-        text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.4);
+        text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         fill(255); // Couleur blanche pour le texte
         textSize(this.textSize);
-        text(noteName, x, y + hoverPulse);
-        textSize(this.textSize * 0.6);
+        text(noteName, x - offset * 4 , y + hoverPulse);
+        textSize(this.textSize * 0.7);
         text(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
         textSize(this.textSize * 0.8);
-        text(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.4);
+        text(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
 
       drawAllOccurrences(note, pulse, hover) {
