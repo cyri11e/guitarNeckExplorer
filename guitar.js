@@ -24,6 +24,7 @@ class Guitar{
         this.playedNotes = []
         this.octaveMode = false
         this.tonic = null
+        this.highlightedNotes = [];
 
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
@@ -364,6 +365,12 @@ class Guitar{
         } else      
             ellipse(x, y, 1.5*this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
         
+        // Vérifiez si la note est surlignée
+        if (this.highlightedNotes.some(highlightedNote => highlightedNote.note === note && highlightedNote.string === string && highlightedNote.fret === fret)) {
+            fill(255, 255, 0, 100); // Jaune fluo transparent
+            rect(x - this.noteMarkerDiameter, y - this.noteMarkerDiameter / 2, 2 * this.noteMarkerDiameter, this.noteMarkerDiameter);
+        }
+
         textSize(this.textSize);
         textAlign(CENTER, CENTER);
         blendMode(BLEND);
@@ -493,8 +500,8 @@ class Guitar{
             let index = this.clickedNotes.findIndex(item => 
                 item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
             );
-        
-            if (!keyIsDown(SHIFT))
+
+            if (!keyIsDown(SHIFT) && !keyIsDown(CONTROL)) {
                 if (index !== -1) {
                     // Si la note est déjà dans le tableau, la supprimer
                     this.clickedNotes.splice(index, 1);
@@ -504,15 +511,59 @@ class Guitar{
                     ) {
                         this.clickedNote = null;
                     }
+                    // Retirer la note de la surbrillance si elle est désélectionnée
+                    let highlightIndex = this.highlightedNotes.findIndex(item =>
+                        item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
+                    );
+                    if (highlightIndex !== -1) {
+                        this.highlightedNotes.splice(highlightIndex, 1);
+                    }
                 } else {
                     // Sinon, ajouter la note au tableau
                     this.clickedNote = { note: this.hoveredNote.note, string: this.hoveredNote.string, fret: this.hoveredNote.fret };
                     this.clickedNotes.push(this.clickedNote);
                 }
+            }
 
             // Si la tonique n'est pas encore définie ou si shift est enfoncé, la définir comme la première note cliquée
             if (!this.tonic || keyIsDown(SHIFT)) {
                 this.tonic = this.hoveredNote;
+            }
+
+            // Gestion de la surbrillance avec CTRL + clic
+            if (keyIsDown(CONTROL)) {
+                let highlightIndex = this.highlightedNotes.findIndex(item =>
+                    item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
+                );
+
+                if (highlightIndex !== -1) {
+                    // Si la note est déjà surlignée, la supprimer de la surbrillance
+                    this.highlightedNotes.splice(highlightIndex, 1);
+                } else {
+                    // Sinon, ajouter la note à la surbrillance
+                    this.highlightedNotes.push({ note: this.hoveredNote.note, string: this.hoveredNote.string, fret: this.hoveredNote.fret });
+                }
+
+                // Vérifier et surligner les cases entourées
+                this.highlightSurroundedNotes();
+            }
+        }
+    }
+
+    highlightSurroundedNotes() {
+        for (let string = 0; string < this.stringCount; string++) {
+            for (let fret = 1; fret < this.fretCount; fret++) {
+                let prevNote = this.getNoteFromCoordinates(string, fret - 1);
+                let nextNote = this.getNoteFromCoordinates(string, fret + 1);
+                let currentNote = this.getNoteFromCoordinates(string, fret);
+
+                let prevHighlighted = this.highlightedNotes.some(note => note.note === prevNote && note.string === string && note.fret === fret - 1);
+                let nextHighlighted = this.highlightedNotes.some(note => note.note === nextNote && note.string === string && note.fret === fret + 1);
+                let currentHighlighted = this.highlightedNotes.some(note => note.note === currentNote && note.string === string && note.fret === fret);
+
+                if (prevHighlighted && nextHighlighted && !currentHighlighted) {
+                    this.highlightedNotes.push({ note: currentNote, string: string, fret: fret });
+                }
             }
         }
     }
