@@ -374,7 +374,10 @@ class Guitar{
         else
             noteLabel = note
 
-        this.renderNoteLabel(noteLabel, x, offset, y, hoverPulse);
+        if (this.degreMode)
+            this.renderDegreLabel(noteLabel, x, offset, y, hoverPulse);
+        else
+            this.renderNoteLabel(noteLabel, x, offset, y, hoverPulse);
         
         pop()
       }
@@ -409,6 +412,27 @@ class Guitar{
         text(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
         textSize(this.textSize * 0.8);
         text(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
+    }
+
+    renderDegreLabel(degreLabel, x, offset, y, hoverPulse) {
+        let degreeName = degreLabel.slice(-1);
+        let alteration = degreLabel.slice(0, -1);
+        
+        textSize(this.textSize);
+        textAlign(CENTER, CENTER);
+        blendMode(BLEND);
+        noStroke();
+
+        fill(25); // Couleur grise pour l'ombre
+        text(degreeName, x + offset * 4 , y + hoverPulse + offset);
+        textSize(this.textSize );
+        text(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
+        
+        fill(255); // Couleur blanche pour le texte
+        textSize(this.textSize);
+        text(degreeName, x + offset * 3, y + hoverPulse);
+        textSize(this.textSize );
+        text(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
 
       drawAllOccurrences(note, pulse, hover) {
