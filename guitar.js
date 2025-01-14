@@ -424,13 +424,13 @@ class Guitar{
         noStroke();
 
         fill(25); // Couleur grise pour l'ombre
-        text(degreeName, x + offset * 4 , y + hoverPulse + offset);
+        text(degreeName, x + offset * 3 , y + hoverPulse + offset);
         textSize(this.textSize );
         text(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         
         fill(255); // Couleur blanche pour le texte
         textSize(this.textSize);
-        text(degreeName, x + offset * 3, y + hoverPulse);
+        text(degreeName, x + offset * 2, y + hoverPulse);
         textSize(this.textSize );
         text(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
@@ -488,32 +488,34 @@ class Guitar{
         }
       }  
 
-      mousePressed() {
+    mousePressed() {
         if (this.hoveredNote) {
-          let index = this.clickedNotes.findIndex(item => 
-            item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
-          );
-      
-          if (index !== -1) {
-            // Si la note est déjà dans le tableau, la supprimer
-            this.clickedNotes.splice(index, 1);
-            if (this.clickedNote 
-                && this.clickedNote.note === this.hoveredNote.note
-                && this.clickedNote.string === this.hoveredNote.string
-            ) {
-              this.clickedNote = null;
+            let index = this.clickedNotes.findIndex(item => 
+                item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
+            );
+        
+            if (!keyIsDown(SHIFT))
+                if (index !== -1) {
+                    // Si la note est déjà dans le tableau, la supprimer
+                    this.clickedNotes.splice(index, 1);
+                    if (this.clickedNote 
+                        && this.clickedNote.note === this.hoveredNote.note
+                        && this.clickedNote.string === this.hoveredNote.string
+                    ) {
+                        this.clickedNote = null;
+                    }
+                } else {
+                    // Sinon, ajouter la note au tableau
+                    this.clickedNote = { note: this.hoveredNote.note, string: this.hoveredNote.string, fret: this.hoveredNote.fret };
+                    this.clickedNotes.push(this.clickedNote);
+                }
+
+            // Si la tonique n'est pas encore définie ou si shift est enfoncé, la définir comme la première note cliquée
+            if (!this.tonic || keyIsDown(SHIFT)) {
+                this.tonic = this.hoveredNote;
             }
-          } else {
-            // Sinon, ajouter la note au tableau
-            this.clickedNote = { note: this.hoveredNote.note, string: this.hoveredNote.string, fret: this.hoveredNote.fret };
-            this.clickedNotes.push(this.clickedNote);
-          }
         }
-        if (this.clickedNotes.length>0) 
-            this.tonic = this.clickedNotes[0]
-        else 
-            this.tonic = null
-      }
+    }
       
       keyPressed(){
         // touche "O" changement de mode unisson / octave
