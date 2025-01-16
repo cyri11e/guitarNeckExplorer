@@ -177,8 +177,8 @@ class Guitar{
             fill(color(noteColor));
 
             if (this.octaveMode)
-                this.drawAllOctaves(this.hoveredNote, null, true);
-
+               // this.drawAllOctaves(this.hoveredNote, null, true);
+                this.drawIntervals(this.hoveredNote, [ 0, 4 , 7], null, true);
             else
                 this.drawAllOccurrences(this.hoveredNote, null, true);
 
@@ -494,6 +494,24 @@ class Guitar{
         pop()
       }
     
+    drawIntervals(note, intervals = [0, 4, 7], pulse, hover) {
+        push();
+        // Dessiner toutes les occurrences de la note et des intervalles
+        noStroke();
+        // Parcourir toutes les cordes et frettes pour dessiner les occurrences de la note et des intervalles
+        for (let string = 0; string < this.stringCount; string++) {
+            for (let fret = 0; fret < this.fretCount + 1; fret++) {
+                let currentNote = this.getNoteFromCoordinates(string, fret);
+                if (currentNote === note.note || (intervals && intervals.some(interval => {
+                    let transposedNote = this.transpose(note.note, interval);
+                    return this.getNoteName(currentNote) === this.getNoteName(transposedNote);
+                }))) {
+                    this.drawNoteOnFretboard(currentNote, string, fret, pulse, hover);
+                }
+            }
+        }
+        pop();
+    }
 
     //  INTERACTIONS
     mouseMoved() {
@@ -607,13 +625,41 @@ class Guitar{
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
         if (keyCode == 80) this.setPlayedNote ('C3')
+
+        // Exemples d'utilisation de drawIntervals
+        if (keyCode == 73) { // touche "I" pour afficher les intervalles
+            let intervals = [4, 7]; // Exemple pour note + quinte + tierce majeure
+            this.drawIntervals({ note: 'C3' }, intervals, true, true);
+        }
+        if (keyCode == 87) { // touche "W" pour afficher les power chords
+            let powerChord = ['G', 'D']; // Exemple pour power chord
+            this.drawIntervals({ note: 'C3' }, powerChord, true, true);
+        }
       }
 
       keyReleased(){
         this.setPlayedNote(null)
       }
 
-
+    transpose(note, semitones) {
+        const notesOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        let noteName = note.slice(0, -1);
+        let octave = parseInt(note.slice(-1));
+        let noteIndex = notesOrder.indexOf(noteName);
+        let newIndex = noteIndex + semitones;
+        
+        while (newIndex < 0) {
+            newIndex += 12;
+            octave -= 1;
+        }
+        
+        while (newIndex >= 12) {
+            newIndex -= 12;
+            octave += 1;
+        }
+        
+        return notesOrder[newIndex] + octave;
+    }
     
     
 }
