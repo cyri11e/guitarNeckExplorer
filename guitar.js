@@ -125,8 +125,10 @@ class Guitar{
     drawPlayedNotes() {
         if (this.playedNoteName != null) {
             let noteColor;
-            if (this.tonic)
-                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, this.playedNoteName)];
+            if (this.tonic) {
+
+                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, { note : this.playedNoteName } )];
+            }
             else
                 noteColor = 'red';
             if (noteColor)
@@ -137,8 +139,13 @@ class Guitar{
         if (this.playedNotes)
             for ( let playedNote of this.playedNotes){
                 let noteColor;
-                if (this.tonic)
-                    noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, playedNote)];
+                if (this.tonic) {
+
+                    let dc = this.calculeDegreeChromatique(this.tonic, { note : playedNote } )
+                    console.log(this.tonic, playedNote, dc)
+
+                    noteColor = this.noteColors[dc];
+                }
                 else
                     noteColor = 'red';
                 if (noteColor)
