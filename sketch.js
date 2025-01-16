@@ -77,7 +77,7 @@ function mouseMoved(){
     }
 }
 
-function mousePressed(){
+function mouseReleased(){
     if (guitar) {
         guitar.mousePressed();
     }

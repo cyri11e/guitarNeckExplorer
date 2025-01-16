@@ -25,6 +25,7 @@ class Guitar{
         this.octaveMode = false
         this.tonic = null
         this.highlightedNotes = [];
+        this.flatMode = false;
 
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
@@ -282,11 +283,12 @@ class Guitar{
     
     
     getNoteIndex(note) {
-      const notesOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const notesOrderFlat = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
       if (note.note) {
           const noteName = note.note.match(/[A-G]#?/)[0]; // Extraire le nom de la note sans l'octave
           const octave = parseInt(note.note.match(/\d+/)[0]); // Extraire l'octave
-          return notesOrder.indexOf(noteName) + (octave * 12);
+          return notesOrderSharp.indexOf(noteName) + (octave * 12);
       } else return 0
 
     }
@@ -389,11 +391,24 @@ class Guitar{
         pop()
       }
 
+    swapEnharmonics(note) {
+        const enharmonics = {
+            'C#': 'Db',
+            'D#': 'Eb',
+            'F#': 'Gb',
+            'G#': 'Ab',
+            'A#': 'Bb'
+        };
+        return this.flatMode && enharmonics[note] ? enharmonics[note] : note;
+    }
+
     renderNoteLabel(noteLabel, x, offset, y, hoverPulse) {
         let noteName = noteLabel.slice(0, -1);
         let octave = noteLabel.slice(-1);
         let alteration = '';
-        
+
+        if (this.flatMode) noteName = this.swapEnharmonics(noteName);
+
         if (noteName.includes('#')) {
             noteName = noteName.replace('#', '');
             alteration = '♯';
@@ -401,7 +416,7 @@ class Guitar{
             noteName = noteName.replace('b', '');
             alteration = '♭';
         }
-        
+
         textSize(this.textSize);
         textAlign(CENTER, CENTER);
         blendMode(BLEND);
@@ -567,11 +582,22 @@ class Guitar{
             }
         }
     }
+
+    getHighlightedNotesMatrix() {
+        let highlightedMatrix = [];
+
+        for (let note of this.highlightedNotes) {
+            highlightedMatrix.push([note.string, note.fret, note.note]);
+        }
+
+        return highlightedMatrix;
+    }
       
       keyPressed(){
         // touche "O" changement de mode unisson / octave
         if (keyCode == 79) this.octaveMode = !this.octaveMode
         if (keyCode == 68) this.degreMode = !this.degreMode
+        if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
         if (keyCode == 80) this.setPlayedNote ('C3')
       }
