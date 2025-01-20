@@ -26,7 +26,7 @@ class Guitar{
         this.tonic = null
         this.highlightedNotes = [];
         this.flatMode = false;
-
+        this.intervals = [12] // par defaut mode octave
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
             color(255, 82, 90),        // Do# (C#) / Réb (Db) - Intermédiaire entre rouge et orange
@@ -178,7 +178,7 @@ class Guitar{
 
             if (this.octaveMode)
                // this.drawAllOctaves(this.hoveredNote, null, true);
-                this.drawIntervals(this.hoveredNote, [ 0, 4 , 7], null, true);
+                this.drawIntervals(this.hoveredNote,this.intervals, null, true);
             else
                 this.drawAllOccurrences(this.hoveredNote, null, true);
 
@@ -634,6 +634,32 @@ class Guitar{
         if (keyCode == 87) { // touche "W" pour afficher les power chords
             let powerChord = ['G', 'D']; // Exemple pour power chord
             this.drawIntervals({ note: 'C3' }, powerChord, true, true);
+        }
+
+        // Gestion des touches 2 à 8 pour les intervalles
+        const intervalMap = {
+            50: [2, 1], // touche "2" pour seconde majeure et mineure
+            51: [4, 3], // touche "3" pour tierce majeure et mineure
+            52: [5, 4], // touche "4" pour quarte juste et diminuée
+            53: [7, 6], // touche "5" pour quinte juste et diminuée
+            54: [9, 8], // touche "6" pour sixte majeure et mineure
+            55: [11, 10], // touche "7" pour septième majeure et mineure
+            56: [12] // touche "8" pour octave
+        };
+
+        if (intervalMap[keyCode]) {
+            let intervals = intervalMap[keyCode];
+            let currentInterval = intervals[0];
+            let minorInterval = intervals[1];
+
+            if (!this.intervals.includes(currentInterval) && (!minorInterval || !this.intervals.includes(minorInterval))) {
+                this.intervals.push(currentInterval);
+            } else if (this.intervals.includes(currentInterval)) {
+                this.intervals = this.intervals.filter(interval => interval !== currentInterval);
+                if (minorInterval) this.intervals.push(minorInterval);
+            } else if (minorInterval && this.intervals.includes(minorInterval)) {
+                this.intervals = this.intervals.filter(interval => interval !== minorInterval);
+            }
         }
       }
 
