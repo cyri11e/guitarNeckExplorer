@@ -22,7 +22,7 @@ class Guitar{
         this.clickedNotes =[]
         this.midiPlayedNotes = []
         this.playedNotes = []
-        this.octaveMode = false
+        this.showIntervals = false
         this.tonic = null
         this.highlightedNotes = [];
         this.flatMode = false;
@@ -42,6 +42,13 @@ class Guitar{
             color(148, 10, 211)         // Si (B) - Violet foncé
           ];
           this.anim =this.fade(10)
+          this.showIntervalsControl = new ScaleControl(['Off', 'On'], windowWidth - 110, 10);
+          this.showIntervalsControl.nextState = () => {
+              this.showIntervalsControl.currentIndex = (this.showIntervalsControl.currentIndex + 1) % this.showIntervalsControl.labels.length;
+              this.showIntervalsControl.updateSwitch();
+              this.showIntervals = this.showIntervalsControl.labels[this.showIntervalsControl.currentIndex] === 'On';
+          };
+          this.showIntervals = this.showIntervalsControl.labels[this.showIntervalsControl.currentIndex] === 'On';
 
     }
 
@@ -100,6 +107,8 @@ class Guitar{
         // Dessiner la note survolée et ses variantes
         this.drawHoveredNote();
         
+        // Afficher le showIntervalsControl
+        this.showIntervalsControl.display();
     }
 
     drawNeckBackground() {
@@ -171,12 +180,11 @@ class Guitar{
             let noteColor;
             if (this.tonic)
                 noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, this.hoveredNote)];
-
             else
                 noteColor = 'red';
             fill(color(noteColor));
 
-            if (this.octaveMode)
+            if (this.showIntervals)
                // this.drawAllOctaves(this.hoveredNote, null, true);
                 this.drawIntervals(this.hoveredNote,this.intervals, null, true);
             else
@@ -588,6 +596,10 @@ class Guitar{
                 this.highlightSurroundedNotes();
             }
         }
+
+        // Gérer le clic sur le showIntervalsControl
+        this.showIntervalsControl.handleMousePressed(mouseX, mouseY);
+        this.showIntervals = this.showIntervalsControl.labels[this.showIntervalsControl.currentIndex] === 'On';
     }
 
     highlightSurroundedNotes() {
@@ -618,9 +630,13 @@ class Guitar{
         return highlightedMatrix;
     }
       
-      keyPressed(){
+    keyPressed(){
         // touche "O" changement de mode unisson / octave
-        if (keyCode == 79) this.octaveMode = !this.octaveMode
+        if (keyCode == 79) {
+            this.showIntervals = !this.showIntervals;
+            this.showIntervalsControl.currentIndex = this.showIntervals ? 1 : 0;
+            this.showIntervalsControl.updateSwitch();
+        }
         if (keyCode == 68) this.degreMode = !this.degreMode
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
@@ -686,6 +702,5 @@ class Guitar{
         
         return notesOrder[newIndex] + octave;
     }
-    
     
 }

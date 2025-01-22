@@ -8,6 +8,7 @@ let guitar
 let sensitivitySlider;
 let volumeLevel = 0;
 let volumeControl;
+let scaleControl;
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -47,6 +48,9 @@ function setup() {
     guitar = new Guitar(12);
     detector = new MultiPitchDetector();
     volumeControl = new VolumeControl(detector);
+
+    // Création d'un objet ScaleControl pour tester
+    scaleControl = new ScaleControl(['3m', 'Off', '3M'], 200, 50);
 } 
 
 function toggleMic() {
@@ -116,6 +120,16 @@ function draw() {
         else
             guitar.setPlayedNote(null)
     }
+
+    // Afficher le ScaleControl
+    scaleControl.display();
+}
+
+function mousePressed() {
+    if (guitar) {
+        guitar.mousePressed();
+    }
+    scaleControl.handleMousePressed(mouseX, mouseY);
 }
 
 function midiNumberToNoteName(midiNumber) {
