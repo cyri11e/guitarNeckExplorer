@@ -42,13 +42,6 @@ class Guitar{
             color(148, 10, 211)         // Si (B) - Violet foncé
           ];
           this.anim =this.fade(10)
-          this.showIntervalsControl = new ScaleControl(['Off', 'On'], windowWidth - 110, 10);
-          this.showIntervalsControl.nextState = () => {
-              this.showIntervalsControl.currentIndex = (this.showIntervalsControl.currentIndex + 1) % this.showIntervalsControl.labels.length;
-              this.showIntervalsControl.updateSwitch();
-              this.showIntervals = this.showIntervalsControl.labels[this.showIntervalsControl.currentIndex] === 'On';
-          };
-          this.showIntervals = this.showIntervalsControl.labels[this.showIntervalsControl.currentIndex] === 'On';
 
     }
 
@@ -107,8 +100,6 @@ class Guitar{
         // Dessiner la note survolée et ses variantes
         this.drawHoveredNote();
         
-        // Afficher le showIntervalsControl
-        this.showIntervalsControl.display();
     }
 
     drawNeckBackground() {
@@ -596,10 +587,6 @@ class Guitar{
                 this.highlightSurroundedNotes();
             }
         }
-
-        // Gérer le clic sur le showIntervalsControl
-        this.showIntervalsControl.handleMousePressed(mouseX, mouseY);
-        this.showIntervals = this.showIntervalsControl.labels[this.showIntervalsControl.currentIndex] === 'On';
     }
 
     highlightSurroundedNotes() {
@@ -630,13 +617,34 @@ class Guitar{
         return highlightedMatrix;
     }
       
+    handleCheckboxChange(interval) {
+        const intervalMap = {
+            2: [2, 1], // seconde majeure et mineure
+            3: [4, 3], // tierce majeure et mineure
+            4: [5, 4], // quarte juste et diminuée
+            5: [7, 6], // quinte juste et diminuée
+            6: [9, 8], // sixte majeure et mineure
+            7: [11, 10], // septième majeure et mineure
+            8: [12] // octave
+        };
+
+        let intervals = intervalMap[interval];
+        let currentInterval = intervals[0];
+        let minorInterval = intervals[1];
+
+        if (!this.intervals.includes(currentInterval) && (!minorInterval || !this.intervals.includes(minorInterval))) {
+            this.intervals.push(currentInterval);
+        } else if (this.intervals.includes(currentInterval)) {
+            this.intervals = this.intervals.filter(interval => interval !== currentInterval);
+            if (minorInterval) this.intervals.push(minorInterval);
+        } else if (minorInterval && this.intervals.includes(minorInterval)) {
+            this.intervals = this.intervals.filter(interval => interval !== minorInterval);
+        }
+    }
+
     keyPressed(){
         // touche "O" changement de mode unisson / octave
-        if (keyCode == 79) {
-            this.showIntervals = !this.showIntervals;
-            this.showIntervalsControl.currentIndex = this.showIntervals ? 1 : 0;
-            this.showIntervalsControl.updateSwitch();
-        }
+        if (keyCode == 79) this.showIntervals = !this.showIntervals
         if (keyCode == 68) this.degreMode = !this.degreMode
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         

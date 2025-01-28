@@ -8,7 +8,7 @@ let guitar
 let sensitivitySlider;
 let volumeLevel = 0;
 let volumeControl;
-let scaleControl;
+let intervalCheckboxes = [];
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -45,12 +45,22 @@ function setup() {
     });
 
     // Création d'un manche de guitare
-    guitar = new Guitar(12);
+    guitar = new Guitar(13);
     detector = new MultiPitchDetector();
     volumeControl = new VolumeControl(detector);
 
-    // Création d'un objet ScaleControl pour tester
-    scaleControl = new ScaleControl(['3m', 'Off', '3M'], 200, 50);
+    // Création des cases à cocher pour les intervalles
+    const intervalLabels = ['Show Intervals', '2', '3', '4', '5', '6', '7', '8'];
+    for (let i = 0; i < intervalLabels.length; i++) {
+        let checkbox = createCheckbox(intervalLabels[i], false);
+        checkbox.position(windowWidth - 150, 10 + i * 30);
+        if (i === 0) {
+            checkbox.changed(() => guitar.showIntervals = checkbox.checked());
+        } else {
+            checkbox.changed(() => guitar.handleCheckboxChange(i + 1));
+        }
+        intervalCheckboxes.push(checkbox);
+    }
 } 
 
 function toggleMic() {
@@ -120,16 +130,7 @@ function draw() {
         else
             guitar.setPlayedNote(null)
     }
-
-    // Afficher le ScaleControl
-    scaleControl.display();
-}
-
-function mousePressed() {
-    if (guitar) {
-        guitar.mousePressed();
-    }
-    scaleControl.handleMousePressed(mouseX, mouseY);
+    drawCircleOfFifths()
 }
 
 function midiNumberToNoteName(midiNumber) {
@@ -203,7 +204,29 @@ function gotPitch(error, frequency){
 // pitch.getPitch(gotPitch);
 // }
 
+function drawCircleOfFifths() {
+    textSize(32);    
+    let radius = (wH - textSize()) / 4;
+    let centerX = wW / 2;
+    let centerY = wH * 3 / 4;
+    let notes = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
 
+    fill(255);
+    stroke(0);
+    strokeWeight(2);
+
+
+    textAlign(CENTER, CENTER);
+
+    fill(0);
+
+    for (let i = 0; i < notes.length; i++) {
+        let angle = TWO_PI * i / notes.length - HALF_PI;
+        let x = centerX + cos(angle) * radius;
+        let y = centerY + sin(angle) * radius;
+        text(notes[i], x, y);
+    }
+}
 
 // gestion du midi
 
@@ -231,4 +254,29 @@ function noteReleased(midiNote) {
         liveNotes.splice(index, 1)   
 
       guitar.setMidiNotes(liveNotes)
+}
+
+function handleCheckboxChange(interval) {
+    const intervalMap = {
+        2: [2, 1], // seconde majeure et mineure
+        3: [4, 3], // tierce majeure et mineure
+        4: [5, 4], // quarte juste et diminuée
+        5: [7, 6], // quinte juste et diminuée
+        6: [9, 8], // sixte majeure et mineure
+        7: [11, 10], // septième majeure et mineure
+        8: [12] // octave
+    };
+
+    let intervals = intervalMap[interval];
+    let currentInterval = intervals[0];
+    let minorInterval = intervals[1];
+
+    if (!guitar.intervals.includes(currentInterval) && (!minorInterval || !guitar.intervals.includes(minorInterval))) {
+        guitar.intervals.push(currentInterval);
+    } else if (guitar.intervals.includes(currentInterval)) {
+        guitar.intervals = guitar.intervals.filter(interval => interval !== currentInterval);
+        if (minorInterval) guitar.intervals.push(minorInterval);
+    } else if (minorInterval && guitar.intervals.includes(minorInterval)) {
+        guitar.intervals = guitar.intervals.filter(interval => interval !== minorInterval);
+    }
 }
