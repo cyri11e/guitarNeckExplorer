@@ -206,14 +206,14 @@ function gotPitch(error, frequency){
 
 function drawCircleOfFifths() {
     textSize(32);    
-    let radius = (wH - textSize()) / 4;
+    let radius = (wH - textSize()*2) / 4;
     let centerX = wW / 2;
     let centerY = wH * 3 / 4;
     let notes = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
 
     fill(255);
     stroke(0);
-    strokeWeight(2);
+    strokeWeight(1);
 
 
     textAlign(CENTER, CENTER);

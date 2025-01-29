@@ -42,6 +42,14 @@ class Guitar{
             color(148, 10, 211)         // Si (B) - Violet foncé
           ];
           this.anim =this.fade(10)
+          this.majorChord = [0, 4, 7];
+          this.minorChord = [0, 3, 7];
+          this.majorScale = [0, 2, 4, 5, 7, 9, 11];
+          this.minorScale = [0, 2, 3, 5, 7, 8, 10];
+          this.pentatonicScale = [0, 2, 4, 7, 9];
+          this.isMajor = true;
+          this.isTriad = true;
+          this.currentIntervals = this.majorChord;
 
     }
 
@@ -385,7 +393,7 @@ class Guitar{
         noStroke()
         fill(25); // Couleur grise pour l ombre
         if (this.degreMode)
-            noteLabel = this.chromaticToDiatonic(this.calculeDegreeChromatique(this.tonic,{note : note}),)
+            noteLabel = this.chromaticToDiatonic(this.calculeDegreeChromatique(this.tonic||this.hoveredNote,{note : note}),)
         else
             noteLabel = note
 
@@ -684,6 +692,39 @@ class Guitar{
             } else if (minorInterval && this.intervals.includes(minorInterval)) {
                 this.intervals = this.intervals.filter(interval => interval !== minorInterval);
             }
+        }
+
+        // Gestion des touches pour les accords et les gammes
+        if (keyCode == 67 || keyCode == 65) { // touche "C" ou "A" pour accords majeurs
+            this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
+        }
+        if (keyCode == 83 || keyCode == 71) { // touche "S" ou "G" pour gammes majeures
+            this.currentIntervals = this.isMajor ? this.majorScale : this.minorScale;
+        }
+        if (keyCode == 80) { // touche "P" pour gamme pentatonique
+            this.currentIntervals = this.pentatonicScale;
+        }
+        if (keyCode == 77) { // touche "M" pour basculer entre majeur et mineur
+            this.isMajor = !this.isMajor;
+            this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
+        }
+        if (keyCode == 84) { // touche "T" pour basculer de triade à tétrade
+            this.isTriad = !this.isTriad;
+            if (this.isTriad) {
+                this.majorChord = [0, 4, 7];
+                this.minorChord = [0, 3, 7];
+            } else {
+                this.majorChord = [0, 4, 7, 11];
+                this.minorChord = [0, 3, 7, 10];
+            }
+            this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
+        }
+
+        // Gestion de la touche Backspace pour vider les notes sélectionnées
+        if (keyCode == 8) { // touche "Backspace"
+            this.clickedNotes = [];
+            this.playedNotes = [];
+            this.midiPlayedNotes = [];
         }
       }
 
