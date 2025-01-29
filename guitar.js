@@ -725,6 +725,7 @@ class Guitar{
             this.clickedNotes = [];
             this.playedNotes = [];
             this.midiPlayedNotes = [];
+            this.tonic = null;
         }
       }
 
