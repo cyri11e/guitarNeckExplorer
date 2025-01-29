@@ -22,7 +22,6 @@ class Guitar{
         this.clickedNotes =[]
         this.midiPlayedNotes = []
         this.playedNotes = []
-        this.showIntervals = false
         this.tonic = null
         this.highlightedNotes = [];
         this.flatMode = false;
@@ -50,6 +49,8 @@ class Guitar{
           this.isMajor = true;
           this.isTriad = true;
           this.currentIntervals = this.majorChord;
+          this.intervalTable = new IntervalTable((windowWidth - 6 * 100 - 2 * 50) / 2, 10, 8, this);
+          this.updateTableFromIntervals(); // Synchroniser l'état du tableau après l'initialisation
 
     }
 
@@ -107,6 +108,10 @@ class Guitar{
         
         // Dessiner la note survolée et ses variantes
         this.drawHoveredNote();
+        
+        // Afficher le tableau interactif des intervalles
+        this.intervalTable.display();
+        text(this.intervals, 100, 600)
         
     }
 
@@ -183,11 +188,11 @@ class Guitar{
                 noteColor = 'red';
             fill(color(noteColor));
 
-            if (this.showIntervals)
+               // if (this.showIntervals)
                // this.drawAllOctaves(this.hoveredNote, null, true);
-                this.drawIntervals(this.hoveredNote,this.intervals, null, true);
-            else
-                this.drawAllOccurrences(this.hoveredNote, null, true);
+            this.drawIntervals(this.hoveredNote,this.intervals, null, true);
+              // else
+              //  this.drawAllOccurrences(this.hoveredNote, null, true);
 
         }
     }
@@ -264,10 +269,13 @@ class Guitar{
       }
     
     getNoteName(noteString) {
-        // Cette fonction extrait le nom de la note sans l'octave à partir d'une chaîne de caractères
-        let match = noteString.match(/([A-G]#?)/);
-        return match ? match[1] : null;
-      }     
+        // Vérifiez que noteString est une chaîne de caractères avant d'appeler match
+        if (typeof noteString === 'string') {
+            let match = noteString.match(/([A-G]#?)/);
+            return match ? match[1] : null;
+        }
+        return null;
+    }     
       
     getOctavesCoordinates(note) {
         let coordinates = [];
@@ -542,7 +550,7 @@ class Guitar{
         }
       }  
 
-    mousePressed() {
+    mouseClicked() {
         if (this.hoveredNote) {
             let index = this.clickedNotes.findIndex(item => 
                 item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
@@ -595,24 +603,13 @@ class Guitar{
                 this.highlightSurroundedNotes();
             }
         }
+        if (this.intervalTable) {
+            this.intervalTable.handleMousePressed(mouseX, mouseY);
+        }
     }
 
-    highlightSurroundedNotes() {
-        for (let string = 0; string < this.stringCount; string++) {
-            for (let fret = 1; fret < this.fretCount; fret++) {
-                let prevNote = this.getNoteFromCoordinates(string, fret - 1);
-                let nextNote = this.getNoteFromCoordinates(string, fret + 1);
-                let currentNote = this.getNoteFromCoordinates(string, fret);
-
-                let prevHighlighted = this.highlightedNotes.some(note => note.note === prevNote && note.string === string && note.fret === fret - 1);
-                let nextHighlighted = this.highlightedNotes.some(note => note.note === nextNote && note.string === string && note.fret === fret + 1);
-                let currentHighlighted = this.highlightedNotes.some(note => note.note === currentNote && note.string === string && note.fret === fret);
-
-                if (prevHighlighted && nextHighlighted && !currentHighlighted) {
-                    this.highlightedNotes.push({ note: currentNote, string: string, fret: fret });
-                }
-            }
-        }
+    mousePressed() {
+        // Ajoutez ici le code que vous souhaitez exécuter lors de l'événement mousePressed
     }
 
     getHighlightedNotesMatrix() {
@@ -651,22 +648,10 @@ class Guitar{
     }
 
     keyPressed(){
-        // touche "O" changement de mode unisson / octave
-        if (keyCode == 79) this.showIntervals = !this.showIntervals
-        if (keyCode == 68) this.degreMode = !this.degreMode
+        if (keyCode == 68) this.degreMode = !this.degreMode // touche "D" pour basculer entre les
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
-        if (keyCode == 80) this.setPlayedNote ('C3')
-
-        // Exemples d'utilisation de drawIntervals
-        if (keyCode == 73) { // touche "I" pour afficher les intervalles
-            let intervals = [4, 7]; // Exemple pour note + quinte + tierce majeure
-            this.drawIntervals({ note: 'C3' }, intervals, true, true);
-        }
-        if (keyCode == 87) { // touche "W" pour afficher les power chords
-            let powerChord = ['G', 'D']; // Exemple pour power chord
-            this.drawIntervals({ note: 'C3' }, powerChord, true, true);
-        }
+        if (keyCode == 80) this.setPlayedNote ('C3') // 80 = p
 
         // Gestion des touches 2 à 8 pour les intervalles
         const intervalMap = {
@@ -692,6 +677,8 @@ class Guitar{
             } else if (minorInterval && this.intervals.includes(minorInterval)) {
                 this.intervals = this.intervals.filter(interval => interval !== minorInterval);
             }
+
+            this.updateTableFromIntervals();
         }
 
         // Gestion des touches pour les accords et les gammes
@@ -704,7 +691,7 @@ class Guitar{
         if (keyCode == 80) { // touche "P" pour gamme pentatonique
             this.currentIntervals = this.pentatonicScale;
         }
-        if (keyCode == 77) { // touche "M" pour basculer entre majeur et mineur
+        if (keyCode == 77) { // touche "M"i pour basculer entre majeur et mineur
             this.isMajor = !this.isMajor;
             this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
         }
@@ -752,5 +739,14 @@ class Guitar{
         
         return notesOrder[newIndex] + octave;
     }
+
+    updateIntervalsFromTable() {
+        this.intervals = this.intervalTable.getIntervals();
+    }
+
+    updateTableFromIntervals() {
+        this.intervalTable.setIntervals(this.intervals);
+    }
     
 }
+
