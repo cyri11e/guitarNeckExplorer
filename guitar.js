@@ -45,13 +45,12 @@ class Guitar{
           this.minorChord = [0, 3, 7];
           this.majorScale = [0, 2, 4, 5, 7, 9, 11];
           this.minorScale = [0, 2, 3, 5, 7, 8, 10];
-          this.pentatonicScale = [0, 2, 4, 7, 9];
+          this.majorPentatonicScale = [0, 2, 4, 7, 9];
+          this.minorPentatonicScale = [0, 3, 5, 7, 10];
           this.isMajor = true;
           this.isTriad = true;
           this.currentIntervals = this.majorChord;
-          this.intervalTable = new IntervalTable((windowWidth - 6 * 100 - 2 * 50) / 2, 10, 8, this);
-          this.updateTableFromIntervals(); // Synchroniser l'état du tableau après l'initialisation
-
+ 
     }
 
     fade(speed) {
@@ -109,9 +108,7 @@ class Guitar{
         // Dessiner la note survolée et ses variantes
         this.drawHoveredNote();
         
-        // Afficher le tableau interactif des intervalles
-        this.intervalTable.display();
-        text(this.intervals, 100, 600)
+
         
     }
 
@@ -183,7 +180,7 @@ class Guitar{
         if (this.hoveredNote) {
             let noteColor;
             if (this.tonic)
-                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, this.hoveredNote)];
+                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic||this.hoveredNote, this.hoveredNote)];
             else
                 noteColor = 'red';
             fill(color(noteColor));
@@ -513,6 +510,8 @@ class Guitar{
         push();
         // Dessiner toutes les occurrences de la note et des intervalles
         noStroke();
+
+        
         // Parcourir toutes les cordes et frettes pour dessiner les occurrences de la note et des intervalles
         for (let string = 0; string < this.stringCount; string++) {
             for (let fret = 0; fret < this.fretCount + 1; fret++) {
@@ -521,6 +520,8 @@ class Guitar{
                     let transposedNote = this.transpose(note.note, interval);
                     return this.getNoteName(currentNote) === this.getNoteName(transposedNote);
                 }))) {
+                    fill(color(this.noteColors[this.calculeDegreeChromatique(this.tonic||this.hoveredNote, {note : currentNote })]));
+
                     this.drawNoteOnFretboard(currentNote, string, fret, pulse, hover);
                 }
             }
@@ -603,9 +604,7 @@ class Guitar{
                 this.highlightSurroundedNotes();
             }
         }
-        if (this.intervalTable) {
-            this.intervalTable.handleMousePressed(mouseX, mouseY);
-        }
+
     }
 
     mousePressed() {
@@ -655,6 +654,7 @@ class Guitar{
 
         // Gestion des touches 2 à 8 pour les intervalles
         const intervalMap = {
+            49: [0], // touche "1" pour tonique
             50: [2, 1], // touche "2" pour seconde majeure et mineure
             51: [4, 3], // touche "3" pour tierce majeure et mineure
             52: [5, 4], // touche "4" pour quarte juste et diminuée
@@ -678,22 +678,20 @@ class Guitar{
                 this.intervals = this.intervals.filter(interval => interval !== minorInterval);
             }
 
-            this.updateTableFromIntervals();
         }
 
         // Gestion des touches pour les accords et les gammes
         if (keyCode == 67 || keyCode == 65) { // touche "C" ou "A" pour accords majeurs
-            this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
+            this.isMajor = !this.isMajor;
+            this.intervals = this.isMajor ? this.majorChord : this.minorChord;
         }
         if (keyCode == 83 || keyCode == 71) { // touche "S" ou "G" pour gammes majeures
-            this.currentIntervals = this.isMajor ? this.majorScale : this.minorScale;
+            this.isMajor = !this.isMajor;
+            this.intervals = this.isMajor ? this.majorScale : this.minorScale;
         }
         if (keyCode == 80) { // touche "P" pour gamme pentatonique
-            this.currentIntervals = this.pentatonicScale;
-        }
-        if (keyCode == 77) { // touche "M"i pour basculer entre majeur et mineur
             this.isMajor = !this.isMajor;
-            this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
+            this.intervals = this.isMajor ? this.majorPentatonicScale : this.minorPentatonicScale;
         }
         if (keyCode == 84) { // touche "T" pour basculer de triade à tétrade
             this.isTriad = !this.isTriad;
@@ -704,7 +702,7 @@ class Guitar{
                 this.majorChord = [0, 4, 7, 11];
                 this.minorChord = [0, 3, 7, 10];
             }
-            this.currentIntervals = this.isMajor ? this.majorChord : this.minorChord;
+            this.intervals = this.isMajor ? this.majorChord : this.minorChord;
         }
 
         // Gestion de la touche Backspace pour vider les notes sélectionnées
@@ -713,6 +711,7 @@ class Guitar{
             this.playedNotes = [];
             this.midiPlayedNotes = [];
             this.tonic = null;
+            this.intervals = []
         }
       }
 
@@ -740,13 +739,7 @@ class Guitar{
         return notesOrder[newIndex] + octave;
     }
 
-    updateIntervalsFromTable() {
-        this.intervals = this.intervalTable.getIntervals();
-    }
 
-    updateTableFromIntervals() {
-        this.intervalTable.setIntervals(this.intervals);
-    }
     
 }
 
