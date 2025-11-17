@@ -10,12 +10,15 @@ class Guitar{
         this.neckWidth = 12/14*this.canvasWidth;
         this.neckHeight = this.canvasWidth/6
         this.markerDiameter = this.neckHeight/10
-        this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
+        this.noteMarkerDiameter = this.neckHeight/6 // Diamètre des pastilles de note
         this.textSize = 0.8*this.noteMarkerDiameter
         this.markerPositions = [3, 5, 7, 9, 12];
         this.openStringNotes = ['E', 'A', 'D', 'G', 'B', 'E'];
         this.stringThickness = [1, 1.5, 2, 2.5, 3, 4]; // Épaisseurs des cordes du Mi aigu au Mi grave
         this.noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const startIndex = this.noteNames.indexOf('F');
+        this.ENoteNames = this.noteNames.slice(startIndex)
+                                          .concat(this.noteNames.slice(0, startIndex));
         this.hoveredNote = null;
         this.clickedNote = null;
         this.playedNoteName = null;
@@ -79,7 +82,7 @@ class Guitar{
         this.canvasHeight = windowHeight;
         this.neckWidth = 12/14*this.canvasWidth;
         this.neckHeight = this.canvasWidth/6
-        this.markerDiameter = this.neckHeight/10
+        this.markerDiameter = this.neckHeight/12
         this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
         this.textSize = this.noteMarkerDiameter
    }
@@ -98,6 +101,7 @@ class Guitar{
       
         // Ajouter les noms des cordes à vide
         this.drawOpenNotes();
+        this.drawENotes();
         
         // Dessiner les notes selectionées
         this.drawSelectedNotes();
@@ -113,22 +117,23 @@ class Guitar{
     }
 
     drawNeckBackground() {
-        fill(89, 69, 19); // Couleur marron pour le manche
-        rect(this.neckX, this.neckY, this.neckWidth, this.neckHeight);
+
+        fill(250, 255, 219); // Couleur marron pour le manche
+        rect(this.neckX, this.neckY -10, this.neckWidth, this.neckHeight +20);
 
         // Dessiner le sillet
         fill(0); // Couleur noire pour le sillet
-        rect(this.neckX - 5, this.neckY, 5, this.neckHeight);
+        rect(this.neckX - 5, this.neckY -10 , 5, this.neckHeight +20);
 
         // Dessiner les frettes avec un effet métallique
         for (let i = 0; i <= this.fretCount; i++) {
             let x = this.neckX + i * (this.neckWidth / this.fretCount);
             let gradient = drawingContext.createLinearGradient(x, this.neckY, x + (this.neckWidth / this.fretCount), this.neckY + this.neckHeight);
-            gradient.addColorStop(0, '#D3D3D3'); // Gris clair
-            gradient.addColorStop(0.5, '#FFFFFF'); // Blanc pour le reflet
-            gradient.addColorStop(1, '#A9A9A9'); // Gris foncé
+            gradient.addColorStop(0, '#706464ff'); // Gris clair
+            gradient.addColorStop(0.5, '#8b8484ff'); // Blanc pour le reflet
+            gradient.addColorStop(1, '#222221ff'); // Gris foncé
             drawingContext.fillStyle = gradient;
-            rect(x, this.neckY, 2, this.neckHeight);
+            rect(x, this.neckY-10, 4, this.neckHeight+20);
         }
     }
 
@@ -218,6 +223,17 @@ class Guitar{
         }
     }
 
+    drawENotes() {
+        fill(150);
+        textSize(this.textSize);
+        textAlign(CENTER, CENTER);
+        for (let i = 0; i < this.fretCount -1; i++) {
+            let x = this.neckX + i * (this.neckWidth / (this.fretCount ));
+            if (!this.ENoteNames[i].includes('#'))
+                text(this.ENoteNames[i], x + 30, this.neckY +this.neckHeight + 30);
+        }
+    }
+
     drawMarkers() {
         fill(200);
         noStroke();
@@ -238,7 +254,7 @@ class Guitar{
             { // Appliquer l'effet métallique 
                 let gradient = drawingContext.createLinearGradient(this.neckX, y, this.neckX + this.neckWidth, y);
                 gradient.addColorStop(0, '#C0C0C0'); // Argenté
-                gradient.addColorStop(0.5, '#FFFFFF'); // Blanc pour le reflet
+                gradient.addColorStop(0.5, '#080808ff'); // Blanc pour le reflet
                 gradient.addColorStop(1, '#808080'); // Gris foncé
                 drawingContext.fillStyle = gradient;
                 noStroke();
@@ -375,16 +391,19 @@ class Guitar{
 
         let offset = this.textSize / 20
         let hoverPulse = 0
+            strokeWeight(4)
+            stroke(0)        
         if (hover){
             hoverPulse = sin(frameCount*0.1) * 2
             push()
             fill(40,100)
-            ellipse(x+offset-hoverPulse, y+offset-hoverPulse, 1.5*this.noteMarkerDiameter , this.noteMarkerDiameter );
+            ellipse(x+offset-hoverPulse, y+offset-hoverPulse, this.noteMarkerDiameter , this.noteMarkerDiameter );
             pop()
-            ellipse(x-offset, y-offset+hoverPulse, 1.5*this.noteMarkerDiameter , this.noteMarkerDiameter );
+
+            ellipse(x-offset, y-offset+hoverPulse, this.noteMarkerDiameter , this.noteMarkerDiameter );
         
         } else      
-            ellipse(x, y, 1.5*this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
+            ellipse(x, y, this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
         
         // Vérifiez si la note est surlignée
         if (this.highlightedNotes.some(highlightedNote => highlightedNote.note === note && highlightedNote.string === string && highlightedNote.fret === fret)) {
@@ -436,7 +455,7 @@ class Guitar{
             alteration = '♭';
         }
 
-        textSize(this.textSize);
+        textSize(this.textSize* 0.8);
         textAlign(CENTER, CENTER);
         blendMode(BLEND);
         noStroke();
@@ -447,7 +466,7 @@ class Guitar{
         textSize(this.textSize * 0.8);
         text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         fill(255); // Couleur blanche pour le texte
-        textSize(this.textSize);
+        textSize(this.textSize*0.8);
         text(noteName, x - offset * 4 , y + hoverPulse);
         textSize(this.textSize * 0.7);
         text(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
@@ -459,7 +478,8 @@ class Guitar{
         let degreeName = degreLabel.slice(-1);
         let alteration = degreLabel.slice(0, -1);
         
-        textSize(this.textSize);
+        textSize(this.textSize * 0.8);
+        textStyle(BOLD);
         textAlign(CENTER, CENTER);
         blendMode(BLEND);
         noStroke();
@@ -470,9 +490,9 @@ class Guitar{
         text(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         
         fill(255); // Couleur blanche pour le texte
-        textSize(this.textSize);
+        textSize(this.textSize * 0.8);
         text(degreeName, x + offset * 2, y + hoverPulse);
-        textSize(this.textSize );
+        textSize(this.textSize *0.8 );
         text(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
 
@@ -533,7 +553,7 @@ class Guitar{
     mouseMoved() {
         if (mouseX > this.neckX - this.neckWidth 
             && mouseX < this.neckX + this.neckWidth 
-            && mouseY > this.neckY - this.neckHeight/10
+            && mouseY > this.neckY - this.neckHeight/12
             && mouseY < this.neckY + this.neckHeight+ this.neckHeight/10) {
           let fretWidth = this.neckWidth / this.fretCount;
           let stringHeight = this.neckHeight / (this.stringCount - 1);
