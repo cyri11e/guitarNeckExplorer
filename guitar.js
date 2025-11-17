@@ -21,7 +21,8 @@ class Guitar{
                                           .concat(this.noteNames.slice(0, startIndex));
         this.hoveredNote = null;
         this.clickedNote = null;
-        this.segments = null;
+        this.segments = [];           // <-- stocke les paires de notes [{string,fret},{string,fret}]
+        this._segmentBuffer = [];     // <-- buffer temporaire pour construire une paire
         this.segmentMode = false;
         this.playedNoteName = null;
         this.clickedNotes =[]
@@ -100,22 +101,22 @@ class Guitar{
            
         // Dessiner les marqueurs de position pour les cases 3, 5, 7, 9 et 12
         this.drawMarkers();
-      
-        // Ajouter les noms des cordes à vide
-        this.drawOpenNotes();
-        this.drawENotes();
-        
-        // Dessiner les notes selectionées
-        this.drawSelectedNotes();
-        
-        // afficher la note jouée
-        this.drawPlayedNotes();
-        
-        // Dessiner la note survolée et ses variantes
-        this.drawHoveredNote();
-        
 
-        
+        // Afficher les segments (au-dessus du manche, sous les pastilles)
+        this.drawSegments(); // <-- nouveau rendu des segments
+		
+		// Ajouter les noms des cordes à vide
+		this.drawOpenNotes();
+		this.drawENotes();
+		
+		// Dessiner les notes selectionées
+		this.drawSelectedNotes();
+		
+		// afficher la note jouée
+		this.drawPlayedNotes();
+		
+		// Dessiner la note survolée et ses variantes
+		this.drawHoveredNote();
     }
 
     drawNeckBackground() {
@@ -578,6 +579,17 @@ class Guitar{
       }  
 
     mouseClicked() {
+        // Si on est en mode segment : ne pas commuter/sélectionner les notes,
+        // uniquement enregistrer la paire et sortir.
+        if (this.segmentMode && this.hoveredNote) {
+            this._segmentBuffer.push({ string: this.hoveredNote.string, fret: this.hoveredNote.fret });
+            if (this._segmentBuffer.length === 2) {
+                this.segments.push([ this._segmentBuffer[0], this._segmentBuffer[1] ]);
+                this._segmentBuffer = [];
+            }
+            return; // important : ne pas exécuter le code de sélection des notes
+        }
+
         if (this.hoveredNote) {
             let index = this.clickedNotes.findIndex(item => 
                 item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
@@ -631,6 +643,9 @@ class Guitar{
             }
         }
 
+        // --- garder ancienne logique de segment non-active --- 
+        // (le code d'ajout au buffer était déplacé au début et ne s'exécutera
+        //  que si segmentMode est false)
     }
 
     mousePressed() {
@@ -772,7 +787,29 @@ class Guitar{
         return notesOrder[newIndex] + octave;
     }
 
-
-    
+    // Dessine les segments (noir, épais) sur le manche, sous les pastilles (notes)
+    drawSegments() {
+        if (!this.segments || this.segments.length === 0) return;
+        push();
+        stroke(0);
+        strokeWeight(6);
+        strokeCap(SQUARE);
+        noFill();
+        for (let seg of this.segments) {
+            if (!seg || seg.length < 2) continue;
+            const a = seg[0], b = seg[1];
+            // x comme pour drawNoteOnFretboard
+            const xOf = (pt) => (pt.fret === 0) 
+                ? this.neckX - 20 
+                : this.neckX + pt.fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
+            // y au centre de la corde
+            const yOf = (pt) => this.neckY + pt.string * (this.neckHeight / (this.stringCount - 1));
+            let x1 = xOf(a), y1 = yOf(a);
+            let x2 = xOf(b), y2 = yOf(b);
+            // tracer la ligne entre les deux notes (sous les pastilles car appelée avant le rendu des notes)
+            line(x1, y1, x2, y2);
+        }
+        pop();
+    }
 }
 
