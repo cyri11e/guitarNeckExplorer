@@ -21,6 +21,8 @@ class Guitar{
                                           .concat(this.noteNames.slice(0, startIndex));
         this.hoveredNote = null;
         this.clickedNote = null;
+        this.segments = null;
+        this.segmentMode = false;
         this.playedNoteName = null;
         this.clickedNotes =[]
         this.midiPlayedNotes = []
@@ -131,7 +133,7 @@ class Guitar{
             let gradient = drawingContext.createLinearGradient(x, this.neckY, x + (this.neckWidth / this.fretCount), this.neckY + this.neckHeight);
             gradient.addColorStop(0, '#706464ff'); // Gris clair
             gradient.addColorStop(0.5, '#8b8484ff'); // Blanc pour le reflet
-            gradient.addColorStop(1, '#222221ff'); // Gris foncé
+            gradient.addColorStop(1, '#494947ff'); // Gris foncé
             drawingContext.fillStyle = gradient;
             rect(x, this.neckY-10, 4, this.neckHeight+20);
         }
@@ -230,7 +232,7 @@ class Guitar{
         for (let i = 0; i < this.fretCount -1; i++) {
             let x = this.neckX + i * (this.neckWidth / (this.fretCount ));
             if (!this.ENoteNames[i].includes('#'))
-                text(this.ENoteNames[i], x + 30, this.neckY +this.neckHeight + 30);
+                text(this.ENoteNames[i], x + (this.neckWidth / (this.fretCount )/2), this.neckY +this.neckHeight + 30);
         }
     }
 
@@ -254,7 +256,7 @@ class Guitar{
             { // Appliquer l'effet métallique 
                 let gradient = drawingContext.createLinearGradient(this.neckX, y, this.neckX + this.neckWidth, y);
                 gradient.addColorStop(0, '#C0C0C0'); // Argenté
-                gradient.addColorStop(0.5, '#080808ff'); // Blanc pour le reflet
+                gradient.addColorStop(0.5, '#585757ff'); // Blanc pour le reflet
                 gradient.addColorStop(1, '#808080'); // Gris foncé
                 drawingContext.fillStyle = gradient;
                 noStroke();
@@ -458,17 +460,19 @@ class Guitar{
         textSize(this.textSize* 0.8);
         textAlign(CENTER, CENTER);
         blendMode(BLEND);
-        noStroke();
-        fill(25); // Couleur grise pour l'ombre
-        text(noteName, x  - offset * 3 , y + offset + hoverPulse);
-        textSize(this.textSize * 0.7);
-        text(octave, x + offset + this.textSize * 0.4, y + offset * 2 + hoverPulse + this.textSize * 0.4);
-        textSize(this.textSize * 0.8);
-        text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
-        fill(255); // Couleur blanche pour le texte
+        strokeWeight(2);
+        stroke(0)
+        fill(255)
+        // fill(25); // Couleur grise pour l'ombre
+        // text(noteName, x  - offset * 3 , y + offset + hoverPulse);
+        // textSize(this.textSize * 0.7);
+        // text(octave, x + offset + this.textSize * 0.4, y + offset * 2 + hoverPulse + this.textSize * 0.4);
+        // textSize(this.textSize * 0.8);
+        // text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
+        // fill(255); // Couleur blanche pour le texte
         textSize(this.textSize*0.8);
-        text(noteName, x - offset * 4 , y + hoverPulse);
-        textSize(this.textSize * 0.7);
+        text(noteName, x  , y + hoverPulse);
+        textSize(this.textSize * 0.5);
         text(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
         textSize(this.textSize * 0.8);
         text(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
@@ -484,14 +488,16 @@ class Guitar{
         blendMode(BLEND);
         noStroke();
 
-        fill(25); // Couleur grise pour l'ombre
-        text(degreeName, x + offset * 3 , y + hoverPulse + offset);
-        textSize(this.textSize );
-        text(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
+        // fill(25); // Couleur grise pour l'ombre
+        // text(degreeName, x + offset * 3 , y + hoverPulse + offset);
+        // textSize(this.textSize );
+        // text(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         
+        stroke(0)
+        strokeWeight(2)
         fill(255); // Couleur blanche pour le texte
         textSize(this.textSize * 0.8);
-        text(degreeName, x + offset * 2, y + hoverPulse);
+        text(degreeName, x  , y + hoverPulse);
         textSize(this.textSize *0.8 );
         text(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
@@ -654,7 +660,7 @@ class Guitar{
 
         let intervals = intervalMap[interval];
         let currentInterval = intervals[0];
-        let minorInterval = intervals[1];
+        let minorInterval = intervals[1];       
 
         if (!this.intervals.includes(currentInterval) && (!minorInterval || !this.intervals.includes(minorInterval))) {
             this.intervals.push(currentInterval);
@@ -670,7 +676,7 @@ class Guitar{
         if (keyCode == 68) this.degreMode = !this.degreMode // touche "D" pour basculer entre les
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
-        if (keyCode == 80) this.setPlayedNote ('C3') // 80 = p
+        //if (keyCode == 80) this.setPlayedNote ('C3') // 80 = p
 
         // Gestion des touches 2 à 8 pour les intervalles
         const intervalMap = {
@@ -725,6 +731,9 @@ class Guitar{
             this.intervals = this.isMajor ? this.majorChord : this.minorChord;
         }
 
+        if (keyCode == 58) { // 0 vide le buffer de selection
+            this.intervals = []
+        }
         // Gestion de la touche Backspace pour vider les notes sélectionnées
         if (keyCode == 8) { // touche "Backspace"
             this.clickedNotes = [];
@@ -733,6 +742,10 @@ class Guitar{
             this.tonic = null;
             this.intervals = []
         }
+        if (keyCode == 76 ) { // touche "L"
+            this.segmentMode = !this.segmentMode 
+        }    
+
       }
 
       keyReleased(){
