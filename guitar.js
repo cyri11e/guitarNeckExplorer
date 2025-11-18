@@ -56,7 +56,8 @@ class Guitar{
           this.isMajor = true;
           this.isTriad = true;
           this.currentIntervals = this.majorChord;
- 
+          // mode d'affichage des occurrences : 'all' | 'exact' | 'single'
+          this.selectionMode = 'all';
     }
 
     fade(speed) {
@@ -193,11 +194,11 @@ class Guitar{
                 noteColor = 'red';
             fill(color(noteColor));
 
-               // if (this.showIntervals)
-               // this.drawAllOctaves(this.hoveredNote, null, true);
+           // if (this.showIntervals)
+            this.drawAllOctaves(this.hoveredNote, null, true);
             this.drawIntervals(this.hoveredNote,this.intervals, null, true);
               // else
-              //  this.drawAllOccurrences(this.hoveredNote, null, true);
+            this.drawAllOccurrences(this.hoveredNote, null, true);
 
         }
     }
@@ -375,62 +376,110 @@ class Guitar{
     }
 
     drawNoteOnFretboard(note, string, fret, vibre, hover) {
-        // Couleur doit etre definie avant l'appel
-        push()
-        noStroke();
-        let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
-        let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
-        let pulse, noteLabel
+	// Couleur doit etre definie avant l'appel
+	push()
+	// sauvegarde alpha précédent
+	const prevAlpha = drawingContext.globalAlpha || 1;
 
-        if (vibre){
-            stroke(255); // Définir la couleur du pourtour en blanc 
-            strokeWeight(2); // Définir l'épaisseur du pourtour
-            pulse = sin(frameCount*0.8) * 3
-        }
-        else {
-            noStroke()
-            pulse = 0
-        }
+	// Si une note est survolée, appliquer le filtre d'affichage selon selectionMode,
+	// sauf si cette position est déjà sélectionnée (clickedNotes) -> toujours visible.
+	if (this.hoveredNote) {
+		const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
+		const isSelected = this.clickedNotes.some(n => n.note === note && n.string === string && n.fret === fret);
+		// décider si on doit afficher cette occurrence
+		let display = true;
+		if (!isSamePosition && !isSelected) {
+			if (this.selectionMode === 'single') {
+				display = false; // n'afficher que la note sous le curseur
+			} else if (this.selectionMode === 'exact') {
+				// n'afficher que exactement la même note (même nom+octave)
+				display = (note === this.hoveredNote.note);
+			} else if (this.selectionMode === 'all') {
+				// afficher toutes les versions (mêmes noms, toutes octaves)
+				display = (this.getNoteName(note) === this.getNoteName(this.hoveredNote.note));
+			}
+		}
+		if (!display) {
+			// ne rien dessiner pour cette occurrence
+			pop();
+			return;
+		}
+	}
 
-        let offset = this.textSize / 20
-        let hoverPulse = 0
-            strokeWeight(4)
-            stroke(0)        
-        if (hover){
-            hoverPulse = sin(frameCount*0.1) * 2
-            push()
-            fill(40,100)
-            ellipse(x+offset-hoverPulse, y+offset-hoverPulse, this.noteMarkerDiameter , this.noteMarkerDiameter );
-            pop()
+		// déterminer opacité :
+		// - si aucune note n'est survolée => opacity 1
+		// - si une note est survolée :
+		//     * la note sous le curseur -> opacity 1
+		//     * les notes déjà sélectionnées -> opacity 1
+		//     * toutes les autres -> opacity 0.5
+		let alpha = 1;
+		if (this.hoveredNote) {
+			const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
+			const isSelected = this.clickedNotes.some(n => n.note === note && n.string === string && n.fret === fret);
+			if (!isSamePosition && !isSelected) {
+				alpha = 0.3;
+			}
+		}
+		drawingContext.globalAlpha = alpha;
 
-            ellipse(x-offset, y-offset+hoverPulse, this.noteMarkerDiameter , this.noteMarkerDiameter );
-        
-        } else      
-            ellipse(x, y, this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
-        
-        // Vérifiez si la note est surlignée
-        if (this.highlightedNotes.some(highlightedNote => highlightedNote.note === note && highlightedNote.string === string && highlightedNote.fret === fret)) {
-            fill(255, 255, 0, 100); // Jaune fluo transparent
-            rect(x - this.noteMarkerDiameter, y - this.noteMarkerDiameter / 2, 2 * this.noteMarkerDiameter, this.noteMarkerDiameter);
-        }
+	noStroke();
+	let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
+	let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
+	let pulse, noteLabel
 
-        textSize(this.textSize);
-        textAlign(CENTER, CENTER);
-        blendMode(BLEND);
-        noStroke()
-        fill(25); // Couleur grise pour l ombre
-        if (this.degreMode)
-            noteLabel = this.chromaticToDiatonic(this.calculeDegreeChromatique(this.tonic||this.hoveredNote,{note : note}),)
-        else
-            noteLabel = note
+	if (vibre){
+		stroke(255); // Définir la couleur du pourtour en blanc 
+		strokeWeight(2); // Définir l'épaisseur du pourtour
+		pulse = sin(frameCount*0.8) * 3
+	}
+	else {
+		noStroke()
+		pulse = 0
+	}
 
-        if (this.degreMode)
-            this.renderDegreLabel(noteLabel, x, offset, y, hoverPulse);
-        else
-            this.renderNoteLabel(noteLabel, x, offset, y, hoverPulse);
-        
-        pop()
-      }
+	let offset = this.textSize / 20
+	let hoverPulse = 0
+      
+	if (hover){
+		hoverPulse = sin(frameCount*0.1) * 2
+		push()
+		fill(40,100)
+		ellipse(x+offset-hoverPulse, y+offset-hoverPulse, this.noteMarkerDiameter*1.1 , this.noteMarkerDiameter*1.1 );
+		pop()
+	    strokeWeight(4)
+	    stroke(0)     
+		ellipse(x-offset, y-offset+hoverPulse, this.noteMarkerDiameter , this.noteMarkerDiameter );
+	
+	} else  {  
+	    strokeWeight(4)
+	    stroke(0)            
+		ellipse(x, y, this.noteMarkerDiameter +pulse, this.noteMarkerDiameter + pulse);
+    }
+	// Vérifiez si la note est surlignée
+	if (this.highlightedNotes.some(highlightedNote => highlightedNote.note === note && highlightedNote.string === string && highlightedNote.fret === fret)) {
+		fill(255, 255, 0, 100); // Jaune fluo transparent
+		rect(x - this.noteMarkerDiameter, y - this.noteMarkerDiameter / 2, 2 * this.noteMarkerDiameter, this.noteMarkerDiameter);
+	}
+
+	textSize(this.textSize);
+	textAlign(CENTER, CENTER);
+	blendMode(BLEND);
+	noStroke()
+	fill(25); // Couleur grise pour l ombre
+	if (this.degreMode)
+		noteLabel = this.chromaticToDiatonic(this.calculeDegreeChromatique(this.tonic||this.hoveredNote,{note : note}),)
+	else
+		noteLabel = note
+
+	if (this.degreMode)
+		this.renderDegreLabel(noteLabel, x, offset, y, hoverPulse);
+	else
+		this.renderNoteLabel(noteLabel, x, offset, y, hoverPulse);
+	
+	// restaurer alpha précédent
+	drawingContext.globalAlpha = prevAlpha;
+	pop()
+}
 
     swapEnharmonics(note) {
         const enharmonics = {
@@ -750,13 +799,19 @@ class Guitar{
             this.intervals = []
         }
         // Gestion de la touche Backspace pour vider les notes sélectionnées
-        if (keyCode == 8) { // touche "Backspace"
-            this.clickedNotes = [];
-            this.playedNotes = [];
-            this.midiPlayedNotes = [];
-            this.tonic = null;
-            this.intervals = []
-        }
+        if (keyCode == 8) 
+            if (!this.segmentMode){ // touche "Backspace"
+                this.clickedNotes = [];
+                this.playedNotes = [];
+                this.midiPlayedNotes = [];
+                this.tonic = null;
+                this.intervals = []
+                
+            } else
+                this.segments = []
+
+
+
         if (keyCode == 76 ) { // touche "L"
             this.segmentMode = !this.segmentMode 
         }    
@@ -792,8 +847,9 @@ class Guitar{
         if (!this.segments || this.segments.length === 0) return;
         push();
         stroke(0);
-        strokeWeight(6);
-        strokeCap(SQUARE);
+        strokeWeight(8);
+        strokeCap(ROUND)
+
         noFill();
         for (let seg of this.segments) {
             if (!seg || seg.length < 2) continue;

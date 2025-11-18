@@ -4,6 +4,8 @@ let selectedNotes = []
 let liveNotes = []
 let micMuted = true;
 let muteButton;
+let segmentButton; // <-- ajouté
+let selectionModeButton; // <-- nouveau
 let guitar
 let sensitivitySlider;
 let volumeLevel = 0;
@@ -26,6 +28,19 @@ function setup() {
     muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
     muteButton.position(10, 10);
     muteButton.mousePressed(toggleMic);
+
+    // Bouton pour commuter Note <-> Segment (à côté du mute)
+    segmentButton = createButton('Mode: Note');
+    segmentButton.position(80, 10);
+    segmentButton.style('padding', '6px 10px');
+    segmentButton.mousePressed(toggleSegmentMode);
+
+    // Bouton pour commuter le mode d'affichage des occurrences
+    selectionModeButton = createButton('Affichage: all');
+    selectionModeButton.position(200, 10);
+    selectionModeButton.style('padding', '6px 10px');
+    selectionModeButton.mousePressed(toggleSelectionMode);
+
     sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
     sensitivitySlider.position(10, 60);
     sensitivitySlider.style('width', '200px');
@@ -61,6 +76,50 @@ function toggleMic() {
       detector.mic.start();
     }
   }
+
+// ajoute la fonction de bascule
+function toggleSegmentMode() {
+    // bascule l'état sur l'objet guitar si disponible
+    if (typeof guitar !== 'undefined' && guitar) {
+        guitar.segmentMode = !guitar.segmentMode;
+    } else {
+        // si guitar pas encore instancié, on conserve l'état sur le bouton quand même
+    }
+    // déterminer état affiché (si guitar non défini, on considère le label inverse actuel)
+    let isSegment = (guitar && guitar.segmentMode) || (!guitar && segmentButton.html().includes('Segment'));
+    // si guitar était undefined, basculer l'interprétation
+    if (!guitar) isSegment = !isSegment;
+    // mettre à jour label
+    segmentButton.html('Mode: ' + (isSegment ? 'Segment' : 'Note'));
+    // style visuel simple
+    if (isSegment) {
+        segmentButton.style('background-color', '#444');
+        segmentButton.style('color', '#fff');
+    } else {
+        segmentButton.style('background-color', '');
+        segmentButton.style('color', '');
+    }
+}
+
+// Nouveau : bascule cyclique entre 'all' -> 'exact' -> 'single'
+function toggleSelectionMode() {
+	const modes = ['all', 'exact', 'single'];
+	let current = 'all';
+	if (guitar && guitar.selectionMode) current = guitar.selectionMode;
+	const next = modes[(modes.indexOf(current) + 1) % modes.length];
+	// appliquer sur l'objet guitar si présent
+	if (guitar) guitar.selectionMode = next;
+	// mettre à jour label
+	selectionModeButton.html('Affichage: ' + next);
+	// styling simple
+	if (next === 'single') {
+		selectionModeButton.style('background-color', '#222');
+		selectionModeButton.style('color', '#fff');
+	} else {
+		selectionModeButton.style('background-color', '');
+		selectionModeButton.style('color', '');
+	}
+}
 
 function windowResized() {
     // gestion reponsive
