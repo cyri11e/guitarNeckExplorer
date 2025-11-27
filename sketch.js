@@ -4,8 +4,11 @@ let selectedNotes = []
 let liveNotes = []
 let micMuted = true;
 let muteButton;
-let segmentButton; // <-- ajouté
-let selectionModeButton; // <-- nouveau
+let segmentButton;
+let selectionModeButton;
+let majorMinorToggle; // <-- nouveau : toggle Maj/min
+let scaleTypeButton; // <-- nouveau : 3-état Accords/Penta/Gamme
+let clearButton;
 let guitar
 let sensitivitySlider;
 let volumeLevel = 0;
@@ -29,17 +32,32 @@ function setup() {
     muteButton.position(10, 10);
     muteButton.mousePressed(toggleMic);
 
-    // Bouton pour commuter Note <-> Segment (à côté du mute)
     segmentButton = createButton('Mode: Note');
     segmentButton.position(80, 10);
     segmentButton.style('padding', '6px 10px');
     segmentButton.mousePressed(toggleSegmentMode);
 
-    // Bouton pour commuter le mode d'affichage des occurrences
     selectionModeButton = createButton('Affichage: all');
     selectionModeButton.position(200, 10);
     selectionModeButton.style('padding', '6px 10px');
     selectionModeButton.mousePressed(toggleSelectionMode);
+
+    // Toggle Maj/min
+    majorMinorToggle = createButton('Maj');
+    majorMinorToggle.position(340, 10);
+    majorMinorToggle.style('padding', '6px 10px');
+    majorMinorToggle.mousePressed(toggleMajorMinor);
+
+    // 3-état : Accords / Penta / Gamme
+    scaleTypeButton = createButton('Accords');
+    scaleTypeButton.position(410, 10);
+    scaleTypeButton.style('padding', '6px 10px');
+    scaleTypeButton.mousePressed(toggleScaleType);
+
+    clearButton = createButton('Vider');
+    clearButton.position(500, 10);
+    clearButton.style('padding', '6px 10px');
+    clearButton.mousePressed(clearSelection);
 
     sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
     sensitivitySlider.position(10, 60);
@@ -310,4 +328,56 @@ function noteReleased(midiNote) {
         liveNotes.splice(index, 1)   
 
       guitar.setMidiNotes(liveNotes)
+}
+
+function toggleMajorMinor() {
+   if (guitar) {
+       guitar.isMajor = !guitar.isMajor;
+       majorMinorToggle.html(guitar.isMajor ? 'Maj' : 'min');
+       majorMinorToggle.style('background-color', guitar.isMajor ? '' : '#666');
+       // mettre à jour les intervals selon le type courant
+       updateIntervalsFromMode();
+   }
+}
+
+function toggleScaleType() {
+   if (guitar) {
+       const types = ['accords', 'penta', 'gamme'];
+       let currentIndex = types.indexOf(guitar.scaleType || 'accords');
+       let nextIndex = (currentIndex + 1) % types.length;
+       guitar.scaleType = types[nextIndex];
+       scaleTypeButton.html(types[nextIndex].charAt(0).toUpperCase() + types[nextIndex].slice(1));
+       // mettre à jour les intervals
+       updateIntervalsFromMode();
+   }
+}
+
+function updateIntervalsFromMode() {
+   if (!guitar) return;
+   const scaleType = guitar.scaleType || 'accords';
+   const isMajor = guitar.isMajor;
+   let intervals = [];
+   
+   if (scaleType === 'accords') {
+       intervals = isMajor ? guitar.majorChord : guitar.minorChord;
+   } else if (scaleType === 'penta') {
+       intervals = isMajor ? guitar.majorPentatonicScale : guitar.minorPentatonicScale;
+   } else if (scaleType === 'gamme') {
+       intervals = isMajor ? guitar.majorScale : guitar.minorScale;
+   }
+   guitar.intervals = [...intervals];
+}
+
+function setIntervals(intervals) {
+   if (guitar) {
+       guitar.intervals = [...intervals];
+   }
+}
+
+function clearSelection() {
+   if (guitar) {
+       guitar.intervals = [];
+       guitar.clickedNotes = [];
+       guitar.tonic = null;
+   }
 }

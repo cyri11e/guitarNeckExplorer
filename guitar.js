@@ -58,6 +58,9 @@ class Guitar{
           this.currentIntervals = this.majorChord;
           // mode d'affichage des occurrences : 'all' | 'exact' | 'single'
           this.selectionMode = 'all';
+          this.scaleType = 'accords'; // 'accords' | 'penta' | 'gamme'
+          // Facteur de transparence (0 = aucun, 1 = maximum)
+          this.transparencyFactor = 1.2;
     }
 
     fade(speed) {
@@ -376,56 +379,56 @@ class Guitar{
     }
 
     drawNoteOnFretboard(note, string, fret, vibre, hover) {
-	// Couleur doit etre definie avant l'appel
-	push()
-	// sauvegarde alpha précédent
-	const prevAlpha = drawingContext.globalAlpha || 1;
+        // Couleur doit etre definie avant l'appel
+        push()
+        const prevAlpha = drawingContext.globalAlpha || 1;
 
-	// Si une note est survolée, appliquer le filtre d'affichage selon selectionMode,
-	// sauf si cette position est déjà sélectionnée (clickedNotes) -> toujours visible.
-	if (this.hoveredNote) {
-		const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
-		const isSelected = this.clickedNotes.some(n => n.note === note && n.string === string && n.fret === fret);
-		// décider si on doit afficher cette occurrence
-		let display = true;
-		if (!isSamePosition && !isSelected) {
-			if (this.selectionMode === 'single') {
-				display = false; // n'afficher que la note sous le curseur
-			} else if (this.selectionMode === 'exact') {
-				// n'afficher que exactement la même note (même nom+octave)
-				display = (note === this.hoveredNote.note);
-			} else if (this.selectionMode === 'all') {
-				// afficher toutes les versions (mêmes noms, toutes octaves)
-				display = (this.getNoteName(note) === this.getNoteName(this.hoveredNote.note));
-			}
-		}
-		if (!display) {
-			// ne rien dessiner pour cette occurrence
-			pop();
-			return;
-		}
-	}
+        // Si une note est survolée ET qu'aucune note n'est sélectionnée,
+        // appliquer le filtre d'affichage selon selectionMode.
+        if (this.hoveredNote && this.clickedNotes.length === 0 && this.intervals.length === 0) {
+            const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
+            const isSelected = this.clickedNotes.some(n => n.note === note && n.string === string && n.fret === fret);
+            let display = true;
+            if (!isSamePosition && !isSelected) {
+                if (this.selectionMode === 'single') {
+                    display = false;
+                } else if (this.selectionMode === 'exact') {
+                    display = (note === this.hoveredNote.note);
+                } else if (this.selectionMode === 'all') {
+                    display = (this.getNoteName(note) === this.getNoteName(this.hoveredNote.note));
+                }
+            }
+            if (!display) {
+                pop();
+                return;
+            }
+        }
 
-		// déterminer opacité :
-		// - si aucune note n'est survolée => opacity 1
-		// - si une note est survolée :
-		//     * la note sous le curseur -> opacity 1
-		//     * les notes déjà sélectionnées -> opacity 1
-		//     * toutes les autres -> opacity 0.5
-		let alpha = 1;
-		if (this.hoveredNote) {
-			const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
-			const isSelected = this.clickedNotes.some(n => n.note === note && n.string === string && n.fret === fret);
-			if (!isSamePosition && !isSelected) {
-				alpha = 0.3;
-			}
-		}
-		drawingContext.globalAlpha = alpha;
+        // Transparence proportionnelle à la distance du curseur (TOUJOURS appliquée si hoveredNote existe)
+        let alpha = 1;
+        if (this.hoveredNote) {
+            const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
+            const isSelected = this.clickedNotes.some(n => n.note === note && n.string === string && n.fret === fret);
+            
+            if (isSamePosition || isSelected) {
+                alpha = 1; // pleine opacité pour la note sous le curseur ou sélectionnée
+            } else {
+                // Calculer la distance (Manhattan) entre la note courante et la note survolée
+                const fretDist = Math.abs(fret - this.hoveredNote.fret);
+                const stringDist = Math.abs(string - this.hoveredNote.string);
+                const distance = fretDist + stringDist;
+                
+                // Transparence inversement proportionnelle avec facteur ajustable
+                const maxDist = 10; // distance maximale pour atténuation
+                alpha = Math.max(0.2, 1 - (distance / maxDist) * this.transparencyFactor);
+            }
+        }
+        drawingContext.globalAlpha = alpha;
 
-	noStroke();
-	let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
-	let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
-	let pulse, noteLabel
+        noStroke();
+        let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
+        let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
+        let pulse, noteLabel
 
 	if (vibre){
 		stroke(255); // Définir la couleur du pourtour en blanc 
@@ -478,7 +481,7 @@ class Guitar{
 	
 	// restaurer alpha précédent
 	drawingContext.globalAlpha = prevAlpha;
-	pop()
+        pop()
 }
 
     swapEnharmonics(note) {
