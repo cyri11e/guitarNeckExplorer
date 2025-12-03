@@ -31,7 +31,7 @@ class Guitar{
         this.tonic = null
         this.highlightedNotes = [];
         this.flatMode = false;
-        this.intervals = [12] // par defaut mode octave
+        this.intervals = [] // par defaut mode octave
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
             color(255, 82, 90),        // Do# (C#) / Réb (Db) - Intermédiaire entre rouge et orange
@@ -197,11 +197,18 @@ class Guitar{
                 noteColor = 'red';
             fill(color(noteColor));
 
-           // if (this.showIntervals)
+
             this.drawAllOctaves(this.hoveredNote, null, true);
-            this.drawIntervals(this.hoveredNote,this.intervals, null, true);
-              // else
-            this.drawAllOccurrences(this.hoveredNote, null, true);
+            
+            if ( this.selectionMode != 'all')
+                this.drawExactIntervals(this.hoveredNote,this.intervals, null, true);
+            else
+                this.drawAllIntervals(this.hoveredNote,this.intervals, null, true);
+
+            if ( this.selectionMode != 'all')
+                this.drawExactOccurrences(this.hoveredNote, null, true);
+            else    
+                this.drawAllOccurrences(this.hoveredNote, null, true);
 
         }
     }
@@ -419,7 +426,7 @@ class Guitar{
                 const distance = fretDist + stringDist;
                 
                 // Transparence inversement proportionnelle avec facteur ajustable
-                const maxDist = 10; // distance maximale pour atténuation
+                const maxDist = 6; // distance maximale pour atténuation
                 alpha = Math.max(0.2, 1 - (distance / maxDist) * this.transparencyFactor);
             }
         }
@@ -555,7 +562,7 @@ class Guitar{
         text(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
 
-      drawAllOccurrences(note, pulse, hover) {
+    drawAllOccurrences(note, pulse, hover) {
         push()
         // Dessiner toutes les occurrences de la note
         noStroke();
@@ -570,7 +577,22 @@ class Guitar{
         pop()
       }
 
-      drawAllOctaves(note, pulse, hover) {
+    drawExactOccurrences(note, pulse, hover) {
+        push()
+        // Dessiner uniquement la note exacte (avec octave)
+        noStroke();
+        // Parcourir toutes les cordes et frettes pour dessiner la note exacte
+        for (let string = 0; string < this.stringCount; string++) {
+            for (let fret = 0; fret < this.fretCount+1; fret++) {
+                if (this.getNoteFromCoordinates(string, fret) === note.note) {
+                    this.drawNoteOnFretboard(note.note, string, fret, pulse, hover);          
+                }
+            }
+        }
+        pop()
+    }
+
+    drawAllOctaves(note, pulse, hover) {
         push()
         // Dessiner toutes les occurrences de la note
         noStroke();
@@ -585,19 +607,45 @@ class Guitar{
         pop()
       }
     
-    drawIntervals(note, intervals = [0, 4, 7], pulse, hover) {
-        push();
-        // Dessiner toutes les occurrences de la note et des intervalles
-        noStroke();
+drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
+    push();
+    noStroke();
 
+    // Toujours inclure la tonique (0) mais sans doublon
+    const fullIntervals = intervals.includes(0) ? intervals : [0, ...intervals];
+
+    for (let string = 0; string < this.stringCount; string++) {
+        for (let fret = 0; fret <= this.fretCount; fret++) {
+            let currentNote = this.getNoteFromCoordinates(string, fret);
+
+            if (fullIntervals.some(interval => {
+                let transposedNote = this.transpose(note.note, interval);
+                return this.getNoteName(currentNote) === this.getNoteName(transposedNote);
+            })) {
+                fill(color(this.noteColors[
+                    this.calculeDegreeChromatique(this.tonic ?? note.note, {note: currentNote})
+                ]));
+
+                this.drawNoteOnFretboard(currentNote, string, fret, pulse, hover);
+            }
+        }
+    }
+    pop();
+}
+
+
+    drawExactIntervals(note, intervals = [0, 4, 7], pulse, hover) {
+        push();
+        // Dessiner la note exacte et les intervalles (SANS les octaves)
+        noStroke();
         
-        // Parcourir toutes les cordes et frettes pour dessiner les occurrences de la note et des intervalles
+        // Parcourir toutes les cordes et frettes pour dessiner la note exacte et ses intervalles
         for (let string = 0; string < this.stringCount; string++) {
             for (let fret = 0; fret < this.fretCount + 1; fret++) {
                 let currentNote = this.getNoteFromCoordinates(string, fret);
                 if (currentNote === note.note || (intervals && intervals.some(interval => {
                     let transposedNote = this.transpose(note.note, interval);
-                    return this.getNoteName(currentNote) === this.getNoteName(transposedNote);
+                    return currentNote === transposedNote; // Comparaison exacte (avec octave)
                 }))) {
                     fill(color(this.noteColors[this.calculeDegreeChromatique(this.tonic||this.hoveredNote, {note : currentNote })]));
 
@@ -700,9 +748,6 @@ class Guitar{
         //  que si segmentMode est false)
     }
 
-    mousePressed() {
-        // Ajoutez ici le code que vous souhaitez exécuter lors de l'événement mousePressed
-    }
 
     getHighlightedNotesMatrix() {
         let highlightedMatrix = [];
@@ -751,6 +796,7 @@ class Guitar{
             50: [2, 1], // touche "2" pour seconde majeure et mineure
             51: [4, 3], // touche "3" pour tierce majeure et mineure
             52: [5, 4], // touche "4" pour quarte juste et diminuée
+            // touche "4" gérée par toggleIntervalButton dans sketch.js
             53: [7, 6], // touche "5" pour quinte juste et diminuée
             54: [9, 8], // touche "6" pour sixte majeure et mineure
             55: [11, 10], // touche "7" pour septième majeure et mineure
@@ -809,10 +855,9 @@ class Guitar{
                 this.midiPlayedNotes = [];
                 this.tonic = null;
                 this.intervals = []
-                
+                this.resetIntervalButtons(); // MAJ visuelle immédiate des boutons
             } else
                 this.segments = []
-
 
 
         if (keyCode == 76 ) { // touche "L"

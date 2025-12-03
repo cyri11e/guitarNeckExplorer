@@ -24,6 +24,8 @@ let volumeThreshold = 0.001
 let noteFrequency
 let noteVolume 
 
+let intervalButtons = []; // boutons multi-états pour intervalles
+
 function setup() {
     wH = windowHeight;
     wW = windowWidth;
@@ -44,13 +46,13 @@ function setup() {
 
     // Toggle Maj/min
     majorMinorToggle = createButton('Maj');
-    majorMinorToggle.position(340, 10);
+    majorMinorToggle.position(410, 10);
     majorMinorToggle.style('padding', '6px 10px');
     majorMinorToggle.mousePressed(toggleMajorMinor);
 
     // 3-état : Accords / Penta / Gamme
     scaleTypeButton = createButton('Accords');
-    scaleTypeButton.position(410, 10);
+    scaleTypeButton.position(340, 10);
     scaleTypeButton.style('padding', '6px 10px');
     scaleTypeButton.mousePressed(toggleScaleType);
 
@@ -80,6 +82,34 @@ function setup() {
     guitar = new Guitar(13);
     detector = new MultiPitchDetector();
     volumeControl = new VolumeControl(detector);
+
+    // Boutons multi-états pour intervalles 1 à 7
+    const intervalLabels = [
+        ['1'],        // 1
+        ['2', 'b2'],  // 2
+        ['3', 'b3'],  // 3
+        ['4', '#4'],  // 4
+        ['5', 'b5'],  // 5
+        ['6', 'b6'],  // 6
+        ['7', 'b7'],  // 7
+        ['8']         // 8 octave
+    ];
+    // Positionnement à droite du bouton "Vider"
+    let baseX = 500 + clearButton.width + 10; // 10px d'espace après "Vider"
+    let baseY = 10;
+    let btnWidth = 38; // largeur fixe pour coller les boutons
+    for (let i = 0; i < 8; i++) {
+        let btn = createButton(intervalLabels[i][0]);
+        btn.position(baseX + i * btnWidth, baseY);
+        btn.style('padding', '6px 0px');
+        btn.style('width', btnWidth + 'px');
+        btn.style('font-weight', 'bold');
+        btn.style('margin', '0');
+        btn.style('border-radius', '0');
+        btn.mousePressed(() => toggleIntervalButton(i + 1));
+        intervalButtons.push(btn);
+    }
+    updateIntervalButtons();
 } 
 
 function toggleMic() {
@@ -163,6 +193,10 @@ function mouseReleased(){
 function keyPressed(){
     if (guitar) {
         guitar.keyPressed();
+    }
+    // Synchroniser boutons avec touches 1 à 7
+    if (keyCode >= 49 && keyCode <= 56) { // touches '1' à '8'
+        toggleIntervalButton(keyCode - 48);
     }
     if (keyCode == 81) guitar.setPlayedNote ('E4');
 }
@@ -366,6 +400,7 @@ function updateIntervalsFromMode() {
        intervals = isMajor ? guitar.majorScale : guitar.minorScale;
    }
    guitar.intervals = [...intervals];
+   updateIntervalButtons();
 }
 
 function setIntervals(intervals) {
@@ -376,8 +411,95 @@ function setIntervals(intervals) {
 
 function clearSelection() {
    if (guitar) {
-       guitar.intervals = [];
-       guitar.clickedNotes = [];
-       guitar.tonic = null;
+       if (guitar.segmentMode) {
+           // Mode segment : vider les segments
+           guitar.segments = [];
+           guitar._segmentBuffer = [];
+       } else {
+           // Mode note : vider les notes et intervalles
+           guitar.intervals = [];
+           guitar.clickedNotes = [];
+           guitar.tonic = null;
+       }
+   }
+   guitar.resetIntervalButtons(); // MAJ visuelle des boutons
+   updateIntervalButtons();
+}
+
+// --- NOUVEAU : INTERVALLES MULTI-ETATS ---
+
+function toggleIntervalButton(n) {
+   // n = 1 à 8
+   if (!guitar) return;
+   const intervalMap = {
+       1: [0],        // 1
+       2: [2, 1],     // 2, b2
+       3: [4, 3],     // 3, b3
+       4: [5, 6],     // 4, #4
+       5: [7, 6],     // 5, b5
+       6: [9, 8],     // 6, b6
+       7: [11, 10],   // 7, b7
+       8: [12]        // 8 octave
+   };
+   let intervals = intervalMap[n];
+   let current = intervals.find(val => guitar.intervals.includes(val));
+   // cycle : inactif -> majeur -> altéré -> inactif
+   if (!current) {
+       // aucun actif, activer majeur
+       guitar.intervals.push(intervals[0]);
+   } else if (current === intervals[0] && intervals[1] !== undefined) {
+       // majeur actif, passer à altéré
+       guitar.intervals = guitar.intervals.filter(val => val !== intervals[0]);
+       guitar.intervals.push(intervals[1]);
+   } else if (intervals[1] !== undefined) {
+        // altéré actif, désactiver tout
+        guitar.intervals = guitar.intervals.filter(val => val !== intervals[1]);
+   } else {
+      // octave (pas d'altéré), désactiver
+      guitar.intervals = guitar.intervals.filter(val => val !== intervals[0]);
+   }
+   updateIntervalButtons();
+}
+
+function updateIntervalButtons() {
+   if (!guitar) return;
+   const intervalMap = {
+       1: [0],        // 1
+       2: [2, 1],     // 2, b2
+       3: [4, 3],     // 3, b3
+       4: [5, 6],     // 4, #4
+       5: [7, 6],     // 5, b5
+       6: [9, 8],     // 6, b6
+       7: [11, 10],   // 7, b7
+       8: [12]        // 8 octave
+   };
+   const intervalLabels = [
+       ['1'],
+       ['2', 'b2'],
+       ['3', 'b3'],
+       ['4', '#4'],
+       ['5', 'b5'],
+       ['6', 'b6'],
+       ['7', 'b7'],
+       ['8']
+   ];
+   for (let i = 0; i < 8; i++) {
+       let intervals = intervalMap[i + 1];
+       let btn = intervalButtons[i];
+       let label = intervalLabels[i][0];
+       let minorLabel = intervalLabels[i][1];
+       if (guitar.intervals.includes(intervals[0])) {
+           btn.html(label);
+           btn.style('background-color', '#2ecc40');
+           btn.style('color', '#fff');
+       } else if (intervals[1] !== undefined && guitar.intervals.includes(intervals[1])) {
+           btn.html(minorLabel);
+           btn.style('background-color', '#ff9800');
+           btn.style('color', '#fff');
+       } else {
+           btn.html(label);
+           btn.style('background-color', '#eee');
+           btn.style('color', '#888');
+       }
    }
 }
