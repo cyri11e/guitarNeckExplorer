@@ -133,21 +133,27 @@ function toggleSegmentMode() {
     } else {
         // si guitar pas encore instancié, on conserve l'état sur le bouton quand même
     }
-    // déterminer état affiché (si guitar non défini, on considère le label inverse actuel)
+
+    // déterminer état affiché
     let isSegment = (guitar && guitar.segmentMode) || (!guitar && segmentButton.html().includes('Segment'));
-    // si guitar était undefined, basculer l'interprétation
     if (!guitar) isSegment = !isSegment;
+
     // mettre à jour label
     segmentButton.html('Mode: ' + (isSegment ? 'Segment' : 'Note'));
+
     // style visuel simple
     if (isSegment) {
-        segmentButton.style('background-color', '#444');
-        segmentButton.style('color', '#fff');
+        // ⚡️ ici on appelle la fonction de couleur
+        let newColor = guitar.segmentColorToggle();
+        segmentButton.style('background-color', newColor);
+        segmentButton.style('color', '#000000ff');
     } else {
         segmentButton.style('background-color', '');
         segmentButton.style('color', '');
     }
 }
+
+
 
 // Nouveau : bascule cyclique entre 'all' -> 'exact' -> 'single'
 function toggleSelectionMode() {
@@ -184,11 +190,11 @@ function mouseMoved(){
     }
 }
 
-function mouseReleased(){
-    if (guitar) {
-        guitar.mousePressed();
-    }
-}
+// function mouseReleased(){
+//     if (guitar) {
+//         guitar.mousePressed();
+//     }
+// }
 
 function keyPressed(){
     if (guitar) {
@@ -229,11 +235,6 @@ function draw() {
     }
 }
 
-function mousePressed() {
-    if (guitar) {
-        guitar.mousePressed();
-    }
-}
 
 function mouseClicked() {
     if (guitar) {

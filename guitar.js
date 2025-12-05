@@ -61,7 +61,15 @@ class Guitar{
           this.scaleType = 'accords'; // 'accords' | 'penta' | 'gamme'
           // Facteur de transparence (0 = aucun, 1 = maximum)
           this.transparencyFactor = 1.2;
+          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346']
+          this.segmentColorIndex = 0
     }
+
+    segmentColorToggle() {
+        this.segmentColorIndex = (this.segmentColorIndex + 1) % this.segmentColor.length;
+        return this.segmentColor[this.segmentColorIndex];
+    }
+
 
     fade(speed) {
         let value = speed > 0 ? 0 : 100; // Initialiser en fonction de la direction de l'animation
@@ -106,8 +114,7 @@ class Guitar{
         // Dessiner les marqueurs de position pour les cases 3, 5, 7, 9 et 12
         this.drawMarkers();
 
-        // Afficher les segments (au-dessus du manche, sous les pastilles)
-        this.drawSegments(); // <-- nouveau rendu des segments
+
 		
 		// Ajouter les noms des cordes à vide
 		this.drawOpenNotes();
@@ -116,34 +123,46 @@ class Guitar{
 		// Dessiner les notes selectionées
 		this.drawSelectedNotes();
 		
+        // Afficher les segments (au-dessus du manche, sous les pastilles)
+        this.drawSegments(); // <-- nouveau rendu des segments
+
 		// afficher la note jouée
 		this.drawPlayedNotes();
 		
 		// Dessiner la note survolée et ses variantes
 		this.drawHoveredNote();
+
+
     }
 
-    drawNeckBackground() {
 
-        fill(250, 255, 219); // Couleur marron pour le manche
-        rect(this.neckX, this.neckY -10, this.neckWidth, this.neckHeight +20);
+    drawNeckBackground() {
+        fill('#eedbcbff'); // Couleur marron pour le manche
+        rect(this.neckX, this.neckY-10, this.neckWidth, this.neckHeight+20);
 
         // Dessiner le sillet
         fill(0); // Couleur noire pour le sillet
-        rect(this.neckX - 5, this.neckY -10 , 5, this.neckHeight +20);
+        rect(this.neckX - 5, this.neckY-10, 5, this.neckHeight+20);
 
         // Dessiner les frettes avec un effet métallique
         for (let i = 0; i <= this.fretCount; i++) {
             let x = this.neckX + i * (this.neckWidth / this.fretCount);
             let gradient = drawingContext.createLinearGradient(x, this.neckY, x + (this.neckWidth / this.fretCount), this.neckY + this.neckHeight);
-            gradient.addColorStop(0, '#706464ff'); // Gris clair
-            gradient.addColorStop(0.5, '#8b8484ff'); // Blanc pour le reflet
-            gradient.addColorStop(1, '#494947ff'); // Gris foncé
+            gradient.addColorStop(0, '#D3D3D3'); // Gris clair
+            gradient.addColorStop(0.5, '#FFFFFF'); // Blanc pour le reflet
+            gradient.addColorStop(1, '#A9A9A9'); // Gris foncé
             drawingContext.fillStyle = gradient;
             rect(x, this.neckY-10, 4, this.neckHeight+20);
+            push()
+            stroke(80);          // noir
+            strokeWeight(1);    // épaisseur 1 px
+            line(x + 4, this.neckY-10, x + 4, this.neckY + this.neckHeight+10);
+            stroke(250);          // noir
+            strokeWeight(1);    // épaisseur 1 px
+            line(x , this.neckY-10, x  , this.neckY + this.neckHeight+10);
+            pop()
         }
     }
-
     drawPlayedNotes() {
         if (this.playedNoteName != null) {
             let noteColor;
@@ -268,11 +287,19 @@ class Guitar{
             { // Appliquer l'effet métallique 
                 let gradient = drawingContext.createLinearGradient(this.neckX, y, this.neckX + this.neckWidth, y);
                 gradient.addColorStop(0, '#C0C0C0'); // Argenté
-                gradient.addColorStop(0.5, '#585757ff'); // Blanc pour le reflet
+                gradient.addColorStop(0.5, '#e3dedeff'); // Blanc pour le reflet
                 gradient.addColorStop(1, '#808080'); // Gris foncé
                 drawingContext.fillStyle = gradient;
                 noStroke();
                 rect(this.neckX, y - this.stringThickness[i] / 2, this.neckWidth, this.stringThickness[i]);
+                stroke(0);          // noir
+                strokeWeight(1);    // épaisseur 1 px
+                line(
+                    this.neckX,
+                    y + this.stringThickness[i] / 2,
+                    this.neckX + this.neckWidth,
+                    y + this.stringThickness[i] / 2
+                );
             }
         }
     }
@@ -682,7 +709,7 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         // Si on est en mode segment : ne pas commuter/sélectionner les notes,
         // uniquement enregistrer la paire et sortir.
         if (this.segmentMode && this.hoveredNote) {
-            this._segmentBuffer.push({ string: this.hoveredNote.string, fret: this.hoveredNote.fret });
+            this._segmentBuffer.push({ string: this.hoveredNote.string, fret: this.hoveredNote.fret, colorIndex : this.segmentColorIndex });
             if (this._segmentBuffer.length === 2) {
                 this.segments.push([ this._segmentBuffer[0], this._segmentBuffer[1] ]);
                 this._segmentBuffer = [];
@@ -785,6 +812,10 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
     }
 
     keyPressed(){
+        if (keyCode == 79) {
+            this.segmentColorToggle();
+            toggleSegmentMode();
+        }  
         if (keyCode == 68) this.degreMode = !this.degreMode // touche "D" pour basculer entre les
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
@@ -894,12 +925,13 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
     drawSegments() {
         if (!this.segments || this.segments.length === 0) return;
         push();
-        stroke(0);
-        strokeWeight(8);
+
+        strokeWeight(this.noteMarkerDiameter*1.3);
         strokeCap(ROUND)
 
-        noFill();
+
         for (let seg of this.segments) {
+            stroke(this.segmentColor[seg[0].colorIndex]);            
             if (!seg || seg.length < 2) continue;
             const a = seg[0], b = seg[1];
             // x comme pour drawNoteOnFretboard
