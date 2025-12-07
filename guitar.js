@@ -63,6 +63,8 @@ class Guitar{
           this.transparencyFactor = 1.2;
           this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346']
           this.segmentColorIndex = 0
+          this.degreMode = false;
+          this.blankMode = false; // Mode blank : notes masquées, pastilles noires
     }
 
     segmentColorToggle() {
@@ -237,6 +239,21 @@ class Guitar{
 
         // Ne pas afficher les notes hors zone visible
         if (fret < 0 || fret > this.fretCount || string < 0 || string >= this.stringCount) {
+            pop();
+            return;
+        }
+
+        // En mode blank, afficher uniquement les pastilles noires sans labels
+        if (this.blankMode) {
+            noStroke();
+            let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
+            let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
+            
+            fill(0); // Noir
+            strokeWeight(4);
+            stroke(0);
+            ellipse(x, y, this.noteMarkerDiameter, this.noteMarkerDiameter);
+            
             pop();
             return;
         }
@@ -651,7 +668,17 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
             this.segmentColorToggle();
             toggleSegmentMode();
         }  
-        if (keyCode == 68) this.degreMode = !this.degreMode // touche "D" pour basculer entre les
+        if (keyCode == 68) {
+            // touche "D" pour basculer entre les modes Note / Degrés / Blank
+            if (!this.degreMode && !this.blankMode) {
+                this.degreMode = true;  // Note → Degrés
+            } else if (this.degreMode && !this.blankMode) {
+                this.blankMode = true;  // Degrés → Blank
+                this.degreMode = false;
+            } else {
+                this.blankMode = false; // Blank → Note
+            }
+        }
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
         //if (keyCode == 80) this.setPlayedNote ('C3') // 80 = p
