@@ -235,6 +235,12 @@ class Guitar{
         push()
         const prevAlpha = drawingContext.globalAlpha || 1;
 
+        // Ne pas afficher les notes hors zone visible
+        if (fret < 0 || fret > this.fretCount || string < 0 || string >= this.stringCount) {
+            pop();
+            return;
+        }
+
         // Appliquer le filtre d'affichage selon selectionMode SEULEMENT en mode single
         if (this.selectionMode === 'single' && this.hoveredNote && this.clickedNotes.length === 0 && this.intervals.length === 0) {
             const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
@@ -618,6 +624,29 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
     }
 
     keyPressed(){
+        // Transposition géométrique des notes sélectionnées
+        if (keyCode === UP_ARROW) {
+            // Flèche haut : déplacement vers la corde grave (+1 corde)
+            // Transposer la tonique UNIQUEMENT si Shift n'est pas appuyé
+            this.transposeVertical(-1, !keyIsDown(SHIFT));
+            return;
+        }
+        if (keyCode === DOWN_ARROW) {
+            // Flèche bas : déplacement vers la corde aiguë (-1 corde)
+            this.transposeVertical(1, !keyIsDown(SHIFT));
+            return;
+        }
+        if (keyCode === RIGHT_ARROW) {
+            // Flèche droite : déplacement vers les aigus (+1 frette)
+            this.transposeHorizontal(1, !keyIsDown(SHIFT));
+            return;
+        }
+        if (keyCode === LEFT_ARROW) {
+            // Flèche gauche : déplacement vers les graves (-1 frette)
+            this.transposeHorizontal(-1, !keyIsDown(SHIFT));
+            return;
+        }
+
         if (keyCode == 79) {
             this.segmentColorToggle();
             toggleSegmentMode();
@@ -895,6 +924,121 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         }
     }
 
-    // ...existing code...
+    transposeSelectedNotes(semitones) {
+        if (this.clickedNotes.length === 0) return;
+        
+        const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const openStringOctaves = [4, 3, 3, 3, 2, 2];
+        
+        for (let note of this.clickedNotes) {
+            let noteName = note.note.slice(0, -1);
+            let octave = parseInt(note.note.slice(-1));
+            let noteIndex = notesOrderSharp.indexOf(noteName);
+            
+            if (noteIndex === -1) continue;
+            
+            // Calculer l'indice MIDI de la note actuelle
+            let midiIndex = notesOrderSharp.indexOf(noteName) + (octave * 12);
+            let newMidiIndex = midiIndex + semitones;
+            
+            // Récupérer la nouvelle note et octave
+            let newOctave = Math.floor(newMidiIndex / 12);
+            let newNoteIndex = newMidiIndex % 12;
+            let newNoteName = notesOrderSharp[newNoteIndex];
+            note.note = newNoteName + newOctave;
+            
+            // Trouver la nouvelle position (string, fret) qui correspond à cette note
+            for (let string = 0; string < this.stringCount; string++) {
+                for (let fret = 0; fret <= this.fretCount; fret++) {
+                    if (this.getNoteFromCoordinates(string, fret) === note.note) {
+                        // Garder la même corde si possible, sinon prendre la première occurrence
+                        if (string === note.string || fret === 0) {
+                            note.string = string;
+                            note.fret = fret;
+                            throw new Error('break'); // Sortir des deux boucles
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    transposeHorizontal(fretOffset, transposeTonic = true) {
+        if (this.clickedNotes.length === 0) return;
+        
+        for (let note of this.clickedNotes) {
+            let newFret = note.fret + fretOffset;
+            note.fret = newFret;
+            note.note = this.getVirtualNoteFromCoordinates(note.string, note.fret);
+        }
+        
+        // Transposer la tonique seulement si transposeTonic est true
+        if (this.tonic && transposeTonic) {
+            let newFret = this.tonic.fret + fretOffset;
+            this.tonic.fret = newFret;
+            this.tonic.note = this.getVirtualNoteFromCoordinates(this.tonic.string, this.tonic.fret);
+        }
+    }
+
+    transposeVertical(stringOffset, transposeTonic = true) {
+        if (this.clickedNotes.length === 0) return;
+        
+        for (let note of this.clickedNotes) {
+            let newString = note.string + stringOffset;
+            let fretAdjustment = 0;
+            
+            if (note.string === 1 && newString === 2) {
+                fretAdjustment = -1;
+            }
+            else if (note.string === 2 && newString === 1) {
+                fretAdjustment = 1;
+            }
+            
+            note.string = newString;
+            note.fret = note.fret + fretAdjustment;
+            note.note = this.getVirtualNoteFromCoordinates(note.string, note.fret);
+        }
+        
+        // Transposer la tonique seulement si transposeTonic est true
+        if (this.tonic && transposeTonic) {
+            let newString = this.tonic.string + stringOffset;
+            let fretAdjustment = 0;
+            
+            if (this.tonic.string === 1 && newString === 2) {
+                fretAdjustment = -1;
+            }
+            else if (this.tonic.string === 2 && newString === 1) {
+                fretAdjustment = 1;
+            }
+            
+            this.tonic.string = newString;
+            this.tonic.fret = this.tonic.fret + fretAdjustment;
+            this.tonic.note = this.getVirtualNoteFromCoordinates(this.tonic.string, this.tonic.fret);
+        }
+    }
+
+    getVirtualNoteFromCoordinates(string, fret) {
+        // Calcule la note même si string/fret sont hors limites
+        const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const openStringOctaves = [4, 3, 3, 3, 2, 2];
+        const openStringNotes = ['E', 'A', 'D', 'G', 'B', 'E'];
+        
+        // Limiter string à la plage valide pour obtenir l'octave de base
+        let safeString = Math.max(0, Math.min(string, this.stringCount - 1));
+        let openNoteIndex = notesOrderSharp.indexOf(openStringNotes[this.stringCount - 1 - safeString]);
+        let octave = openStringOctaves[safeString];
+        
+        // Ajouter le décalage de frette (positif ou négatif)
+        let noteIndex = (openNoteIndex + fret) % 12;
+        octave += Math.floor((openNoteIndex + fret) / 12);
+        
+        // Gérer les indices négatifs
+        while (noteIndex < 0) {
+            noteIndex += 12;
+            octave -= 1;
+        }
+        
+        return notesOrderSharp[noteIndex] + octave;
+    }
 }
 
