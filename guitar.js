@@ -65,6 +65,10 @@ class Guitar{
           this.segmentColorIndex = 0
           this.degreMode = false;
           this.blankMode = false; // Mode blank : notes masquées, pastilles noires
+          this.tonicMode = false; // Mode tonic : pastille noire, contour rouge pour la tonique
+          this.zoomMode = false; // Mode zoom : agrandir/réduire les pastilles
+          this.normalNoteMarkerDiameter = this.neckHeight/6; // Taille normale
+          this.zoomedNoteMarkerDiameter = this.neckHeight/5; // Taille zoomée (comme resize)
     }
 
     segmentColorToggle() {
@@ -239,6 +243,30 @@ class Guitar{
 
         // Ne pas afficher les notes hors zone visible
         if (fret < 0 || fret > this.fretCount || string < 0 || string >= this.stringCount) {
+            pop();
+            return;
+        }
+
+        // En mode tonic, afficher toutes les pastilles noires + tonique avec contour rouge
+        if (this.tonicMode) {
+            noStroke();
+            let x = fret === 0 ? this.neckX - 20 : this.neckX + fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
+            let y = this.neckY + string * (this.neckHeight / (this.stringCount - 1));
+            
+            fill(0); // Pastille noire
+            
+            // Vérifier si c'est une occurrence de la tonique (même note, peu importe la position)
+            if (this.tonic && this.getNoteName(note) === this.getNoteName(this.tonic.note)) {
+                // Tonique : contour rouge
+                strokeWeight(4);
+                stroke(255, 0, 0);
+            } else {
+                // Autres notes : pas de contour
+                noStroke();
+            }
+            
+            ellipse(x, y, this.noteMarkerDiameter, this.noteMarkerDiameter);
+            
             pop();
             return;
         }
@@ -737,17 +765,31 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
             toggleSegmentMode();
         }  
         if (keyCode == 68) {
-            // touche "D" pour basculer entre les modes Note / Degrés / Blank
-            if (!this.degreMode && !this.blankMode) {
+            // touche "D" pour basculer entre les modes Note / Degrés / Blank / Tonic
+            if (!this.degreMode && !this.blankMode && !this.tonicMode) {
                 this.degreMode = true;  // Note → Degrés
-            } else if (this.degreMode && !this.blankMode) {
+            } else if (this.degreMode && !this.blankMode && !this.tonicMode) {
                 this.blankMode = true;  // Degrés → Blank
                 this.degreMode = false;
+            } else if (this.blankMode && !this.tonicMode) {
+                this.tonicMode = true;  // Blank → Tonic
+                this.blankMode = false;
             } else {
-                this.blankMode = false; // Blank → Note
+                this.tonicMode = false; // Tonic → Note
             }
         }
         if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
+        
+        if (keyCode == 90) { // touche "Z" pour basculer le mode zoom
+            this.zoomMode = !this.zoomMode;
+            if (this.zoomMode) {
+                this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
+                this.textSize = this.noteMarkerDiameter           
+            } else {
+                this.noteMarkerDiameter = this.neckHeight/6 // Diamètre des pastilles de note
+                this.textSize = this.noteMarkerDiameter 
+                 }
+        }
         
         //if (keyCode == 80) this.setPlayedNote ('C3') // 80 = p
 
