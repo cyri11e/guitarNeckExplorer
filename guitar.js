@@ -30,7 +30,7 @@ class Guitar{
         this.playedNotes = []
         this.tonic = null
         this.highlightedNotes = [];
-        this.flatMode = false;
+        this.flatMode = true;
         this.intervals = [] // par defaut mode octave
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
@@ -1188,56 +1188,83 @@ s
     }
 
     transposeHorizontal(fretOffset, transposeTonic = true) {
-        if (this.clickedNotes.length === 0) return;
-        
-        for (let note of this.clickedNotes) {
-            let newFret = note.fret + fretOffset;
-            note.fret = newFret;
-            note.note = this.getVirtualNoteFromCoordinates(note.string, note.fret);
-        }
-        
-        // Transposer la tonique seulement si transposeTonic est true
-        if (this.tonic && transposeTonic) {
-            let newFret = this.tonic.fret + fretOffset;
-            this.tonic.fret = newFret;
-            this.tonic.note = this.getVirtualNoteFromCoordinates(this.tonic.string, this.tonic.fret);
+        if (this.segmentMode) {
+            // Mode segment : déplacer les segments
+            for (let segment of this.segments) {
+                for (let point of segment) {
+                    point.fret += fretOffset;
+                }
+            }
+        } else {
+            // Mode note : déplacer les notes sélectionnées
+            if (this.clickedNotes.length === 0) return;
+            
+            for (let note of this.clickedNotes) {
+                let newFret = note.fret + fretOffset;
+                note.fret = newFret;
+                note.note = this.getVirtualNoteFromCoordinates(note.string, note.fret);
+            }
+            
+            // Transposer la tonique seulement si transposeTonic est true
+            if (this.tonic && transposeTonic) {
+                let newFret = this.tonic.fret + fretOffset;
+                this.tonic.fret = newFret;
+                this.tonic.note = this.getVirtualNoteFromCoordinates(this.tonic.string, this.tonic.fret);
+            }
         }
     }
 
     transposeVertical(stringOffset, transposeTonic = true) {
-        if (this.clickedNotes.length === 0) return;
-        
-        for (let note of this.clickedNotes) {
-            let newString = note.string + stringOffset;
-            let fretAdjustment = 0;
-            
-            if (note.string === 1 && newString === 2) {
-                fretAdjustment = -1;
+        if (this.segmentMode) {
+            // Mode segment : déplacer les segments
+            for (let segment of this.segments) {
+                for (let point of segment) {
+                    point.string += stringOffset;
+                    
+                    // Appliquer l'ajustement de frette (règle corde 1-2)
+                    if (point.string === 1 && point.string - stringOffset === 2) {
+                        point.fret -= 1;
+                    } else if (point.string === 2 && point.string - stringOffset === 1) {
+                        point.fret += 1;
+                    }
+                }
             }
-            else if (note.string === 2 && newString === 1) {
-                fretAdjustment = 1;
+        } else {
+            // Mode note : déplacer les notes sélectionnées
+            if (this.clickedNotes.length === 0) return;
+            
+            for (let note of this.clickedNotes) {
+                let newString = note.string + stringOffset;
+                let fretAdjustment = 0;
+                
+                if (note.string === 1 && newString === 2) {
+                    fretAdjustment = -1;
+                }
+                else if (note.string === 2 && newString === 1) {
+                    fretAdjustment = 1;
+                }
+                
+                note.string = newString;
+                note.fret = note.fret + fretAdjustment;
+                note.note = this.getVirtualNoteFromCoordinates(note.string, note.fret);
             }
             
-            note.string = newString;
-            note.fret = note.fret + fretAdjustment;
-            note.note = this.getVirtualNoteFromCoordinates(note.string, note.fret);
-        }
-        
-        // Transposer la tonique seulement si transposeTonic est true
-        if (this.tonic && transposeTonic) {
-            let newString = this.tonic.string + stringOffset;
-            let fretAdjustment = 0;
-            
-            if (this.tonic.string === 1 && newString === 2) {
-                fretAdjustment = -1;
+            // Transposer la tonique seulement si transposeTonic est true
+            if (this.tonic && transposeTonic) {
+                let newString = this.tonic.string + stringOffset;
+                let fretAdjustment = 0;
+                
+                if (this.tonic.string === 1 && newString === 2) {
+                    fretAdjustment = -1;
+                }
+                else if (this.tonic.string === 2 && newString === 1) {
+                    fretAdjustment = 1;
+                }
+                
+                this.tonic.string = newString;
+                this.tonic.fret = this.tonic.fret + fretAdjustment;
+                this.tonic.note = this.getVirtualNoteFromCoordinates(this.tonic.string, this.tonic.fret);
             }
-            else if (this.tonic.string === 2 && newString === 1) {
-                fretAdjustment = 1;
-            }
-            
-            this.tonic.string = newString;
-            this.tonic.fret = this.tonic.fret + fretAdjustment;
-            this.tonic.note = this.getVirtualNoteFromCoordinates(this.tonic.string, this.tonic.fret);
         }
     }
 

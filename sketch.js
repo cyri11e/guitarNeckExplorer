@@ -158,7 +158,7 @@ function toggleSegmentMode() {
 // Nouveau : bascule cyclique entre 'all' -> 'exact' -> 'single'
 function toggleSelectionMode() {
 	const modes = ['all', 'exact', 'single'];
-	let current = 'all';
+	let current = 'single';
 	if (guitar && guitar.selectionMode) current = guitar.selectionMode;
 	const next = modes[(modes.indexOf(current) + 1) % modes.length];
 	// appliquer sur l'objet guitar si présent
@@ -377,8 +377,8 @@ function toggleMajorMinor() {
 
 function toggleScaleType() {
    if (guitar) {
-       const types = ['accords', 'penta', 'gamme'];
-       let currentIndex = types.indexOf(guitar.scaleType || 'accords');
+       const types = ['Note','accords', 'penta', 'gamme'];
+       let currentIndex = types.indexOf(guitar.scaleType || 'Note');
        let nextIndex = (currentIndex + 1) % types.length;
        guitar.scaleType = types[nextIndex];
        scaleTypeButton.html(types[nextIndex].charAt(0).toUpperCase() + types[nextIndex].slice(1));
