@@ -504,3 +504,31 @@ function updateIntervalButtons() {
        }
    }
 }
+
+function mouseClicked() {
+    // Vérifier si un bouton d'accord ouvert est cliqué
+    const buttonY = guitar.neckY + guitar.neckHeight * 1.5;
+    const buttonHeight = guitar.neckWidth / 10;
+    const openNotes = ['C', 'A', 'G', 'E', 'D']; // Ordre CAGED
+    const buttonWidth = guitar.neckWidth / 5;
+    
+    for (let i = 0; i < openNotes.length; i++) {
+        const note = openNotes[i];
+        const buttonX = guitar.neckX + i * buttonWidth;
+        
+        // Vérifier si le clic est dans la hitbox du bouton
+        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth - 5 &&
+            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+            
+            // Charger l'accord ouvert
+            guitar.loadOpenChord(note);
+            return false;
+        }
+    }
+    
+    // Si aucun bouton n'a été cliqué, continuer avec le comportement normal du manche
+    if (guitar) {
+        guitar.mouseClicked();
+    }
+    return false;
+}
