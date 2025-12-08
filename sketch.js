@@ -30,9 +30,9 @@ function setup() {
     wH = windowHeight;
     wW = windowWidth;
     createCanvas(wW, wH);
-    muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
-    muteButton.position(10, 10);
-    muteButton.mousePressed(toggleMic);
+    // muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
+    // muteButton.position(10, 10);
+    // muteButton.mousePressed(toggleMic);
 
     segmentButton = createButton('Mode: Note');
     segmentButton.position(80, 10);
@@ -61,14 +61,14 @@ function setup() {
     clearButton.style('padding', '6px 10px');
     clearButton.mousePressed(clearSelection);
 
-    sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
-    sensitivitySlider.position(10, 60);
-    sensitivitySlider.style('width', '200px');
-    sensitivitySlider.input(() => {
-        let value = sensitivitySlider.value();
-        console.log('Sensitivity Slider Value:', value);
-        detector.setSensitivity(value);
-    });
+    // sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
+    // sensitivitySlider.position(10, 60);
+    // sensitivitySlider.style('width', '200px');
+    // sensitivitySlider.input(() => {
+    //     let value = sensitivitySlider.value();
+    //     console.log('Sensitivity Slider Value:', value);
+    //     detector.setSensitivity(value);
+    // });
   
     // Démarrer l'AudioContext lorsque la page est chargée
     userStartAudio().then(() => {
@@ -80,8 +80,8 @@ function setup() {
 
     // Création d'un manche de guitare
     guitar = new Guitar(13);
-    detector = new MultiPitchDetector();
-    volumeControl = new VolumeControl(detector);
+    //detector = new MultiPitchDetector();
+    //volumeControl = new VolumeControl(detector);
 
     // Boutons multi-états pour intervalles 1 à 7
     const intervalLabels = [
@@ -216,23 +216,23 @@ function keyReleased(){
 function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
-    displayTuner(noteFrequency,400,400,100)
+    // displayTuner(noteFrequency,400,400,100)
     
     // Mettre à jour et afficher le vumètre
-    volumeControl.updateVolumeLevel(mic);
-    volumeControl.display();
+    //volumeControl.updateVolumeLevel(mic);
+    //volumeControl.display();
     
-    if (!micMuted) {
-        // Autres logiques liées à l'analyse du micro
-        let result = detector.analyze();
-        let notes = detector.getPitches()
-        //text('Notes des 6 premiers pics: ' + result.notePeaks.join(', '), 10, height - 30);
-        //text('3 notes les plus graves: ' + detector.getPitches().join(', '), 10, height - 50);
-        if (notes.length > 0)
-            guitar.setPlayedNote(notes)
-        else
-            guitar.setPlayedNote(null)
-    }
+    // if (!micMuted) {
+    //     // Autres logiques liées à l'analyse du micro
+    //     let result = detector.analyze();
+    //     let notes = detector.getPitches()
+    //     //text('Notes des 6 premiers pics: ' + result.notePeaks.join(', '), 10, height - 30);
+    //     //text('3 notes les plus graves: ' + detector.getPitches().join(', '), 10, height - 50);
+    //     if (notes.length > 0)
+    //         guitar.setPlayedNote(notes)
+    //     else
+    //         guitar.setPlayedNote(null)
+    // }
 }
 
 

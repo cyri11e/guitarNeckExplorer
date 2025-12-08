@@ -61,7 +61,7 @@ class Guitar{
           this.scaleType = 'accords'; // 'accords' | 'penta' | 'gamme'
           // Facteur de transparence (0 = aucun, 1 = maximum)
           this.transparencyFactor = 1.2;
-          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346']
+          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346','#fafe038b']
           this.segmentColorIndex = 0
           this.degreMode = false;
           this.blankMode = false; // Mode blank : notes masquées, pastilles noires
@@ -121,7 +121,7 @@ class Guitar{
         if (this.tonic) {
             push();
             fill(255, 0, 0); // Rouge pour la tonique
-            textSize(this.textSize * 1.2);
+            textSize(this.textSize * 1.4);
             textStyle(BOLD);
             textAlign(CENTER, CENTER);
             let x = this.neckX + this.neckWidth / 2;
@@ -543,10 +543,17 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
                 this.segments.push([ this._segmentBuffer[0], this._segmentBuffer[1] ]);
                 this._segmentBuffer = [];
             }
-            return; // important : ne pas exécuter le code de sélection des notes
+            return;
         }
 
         if (this.hoveredNote) {
+            // CTRL+CLIC : ajouter toutes les notes visibles de la sélection
+            if (keyIsDown(CONTROL) && !keyIsDown(SHIFT)) {
+                // Récupérer toutes les occurrences visibles de la sélection
+                this.addAllVisibleSelectionsToClickedNotes();
+                return;
+            }
+
             let index = this.clickedNotes.findIndex(item => 
                 item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
             );
@@ -581,7 +588,7 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
             }
 
             // Gestion de la surbrillance avec CTRL + clic
-            if (keyIsDown(CONTROL)) {
+            if (keyIsDown(CONTROL) && keyIsDown(SHIFT)) {
                 let highlightIndex = this.highlightedNotes.findIndex(item =>
                     item.note === this.hoveredNote.note && item.string === this.hoveredNote.string
                 );
@@ -598,12 +605,73 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
                 this.highlightSurroundedNotes();
             }
         }
-
-        // --- garder ancienne logique de segment non-active --- 
-        // (le code d'ajout au buffer était déplacé au début et ne s'exécutera
-        //  que si segmentMode est false)
     }
 
+    addAllVisibleSelectionsToClickedNotes() {
+        // Ajouter ou retirer toutes les notes visibles en fonction du mode de sélection
+        const notesToToggle = new Set(); // Notes à ajouter/retirer
+        let shouldRemove = false; // Déterminer si on ajoute ou retire
+
+        if (this.selectionMode === 'all') {
+            // Mode 'all' : ajouter/retirer toutes les occurrences (octaves)
+            for (let string = 0; string < this.stringCount; string++) {
+                for (let fret = 0; fret <= this.fretCount; fret++) {
+                    if (this.getNoteName(this.getNoteFromCoordinates(string, fret)) === this.getNoteName(this.hoveredNote.note)) {
+                        const key = `${string}-${fret}`;
+                        notesToToggle.add(key);
+                    }
+                }
+            }
+        } else if (this.selectionMode === 'exact') {
+            // Mode 'exact' : ajouter/retirer toutes les occurrences exactes (avec octave)
+            for (let string = 0; string < this.stringCount; string++) {
+                for (let fret = 0; fret <= this.fretCount; fret++) {
+                    if (this.getNoteFromCoordinates(string, fret) === this.hoveredNote.note) {
+                        const key = `${string}-${fret}`;
+                        notesToToggle.add(key);
+                    }
+                }
+            }
+        } else if (this.selectionMode === 'single') {
+            // Mode 'single' : ajouter/retirer uniquement la note survolée
+            const key = `${this.hoveredNote.string}-${this.hoveredNote.fret}`;
+            notesToToggle.add(key);
+        }
+
+        // Vérifier si la première note à ajouter/retirer est déjà sélectionnée
+        for (let key of notesToToggle) {
+            const [string, fret] = key.split('-').map(Number);
+            const note = this.getNoteFromCoordinates(string, fret);
+            const isAlreadySelected = this.clickedNotes.some(n => 
+                n.string === string && n.fret === fret && n.note === note
+            );
+            if (isAlreadySelected) {
+                shouldRemove = true;
+                break;
+            }
+        }
+
+        // Ajouter ou retirer les notes
+        for (let key of notesToToggle) {
+            const [string, fret] = key.split('-').map(Number);
+            const note = this.getNoteFromCoordinates(string, fret);
+
+            if (shouldRemove) {
+                // Retirer la note
+                this.clickedNotes = this.clickedNotes.filter(n => 
+                    !(n.string === string && n.fret === fret && n.note === note)
+                );
+            } else {
+                // Ajouter la note si elle n'existe pas déjà
+                const alreadyExists = this.clickedNotes.some(n => 
+                    n.string === string && n.fret === fret && n.note === note
+                );
+                if (!alreadyExists) {
+                    this.clickedNotes.push({ note: note, string: string, fret: fret });
+                }
+            }
+        }
+    }
 
     getHighlightedNotesMatrix() {
         let highlightedMatrix = [];
@@ -725,7 +793,7 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
             this.isMajor = !this.isMajor;
             this.intervals = this.isMajor ? this.majorPentatonicScale : this.minorPentatonicScale;
         }
-        if (keyCode == 84) { // touche "T" pour basculer de triade à tétrade
+        if (keyCode == 84) { // touche "T" pour basculer de triade  à tétrade
             this.isTriad = !this.isTriad;
             if (this.isTriad) {
                 this.majorChord = [0, 4, 7];
@@ -740,9 +808,16 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         if (keyCode == 58) { // 0 vide le buffer de selection
             this.intervals = []
         }
-        // Gestion de la touche Backspace pour vider les notes sélectionnées
+        // Gestion de la touche Backspace pour effacer  suppr pour vider les notes sélectionnées
         if (keyCode == 8) 
             if (!this.segmentMode){ // touche "Backspace"
+                this.clickedNotes.pop()
+s
+            } else
+                this.segments.pop()
+
+        if (keyCode == 46) 
+            if (!this.segmentMode){ // touche "Suppr"
                 this.clickedNotes = [];
                 this.playedNotes = [];
                 this.midiPlayedNotes = [];
@@ -863,10 +938,12 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
     drawSelectedNotes() {
         for (let note of this.clickedNotes) {
             let noteColor;
-            if (this.getNoteName(note.note) === this.getNoteName(this.tonic.note))
+            if (this.tonic && this.getNoteName(note.note) === this.getNoteName(this.tonic.note))
                 noteColor = 'red';
-            else
+            else if (this.tonic)
                 noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, note)];
+            else
+                noteColor = 'gray'; // Couleur par défaut si pas de tonique
             fill(color(noteColor));
             this.drawNoteOnFretboard(note.note, note.string, note.fret);
         }
