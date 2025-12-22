@@ -4,7 +4,7 @@ let selectedNotes = []
 let liveNotes = []
 let micMuted = true;
 let muteButton;
-let segmentButton;
+let segmentModeControl; // Nouveau contrôle graphique pour mode segment
 let selectionModeButton;
 let majorMinorToggle; // <-- nouveau : toggle Maj/min
 let scaleTypeButton; // <-- nouveau : 3-état Accords/Penta/Gamme
@@ -34,10 +34,11 @@ function setup() {
     // muteButton.position(10, 10);
     // muteButton.mousePressed(toggleMic);
 
-    segmentButton = createButton('Mode: Note');
-    segmentButton.position(80, 10);
-    segmentButton.style('padding', '6px 10px');
-    segmentButton.mousePressed(toggleSegmentMode);
+    // Création du manche de guitare AVANT le contrôle de mode segment
+    guitar = new Guitar(13);
+    
+    // Contrôle graphique pour le mode segment avec couleurs et alpha
+    segmentModeControl = new SegmentModeControl(10, 10, guitar);
 
     selectionModeButton = createButton('Affichage: all');
     selectionModeButton.position(200, 10);
@@ -78,8 +79,6 @@ function setup() {
         mic.start();
     });
 
-    // Création d'un manche de guitare
-    guitar = new Guitar(13);
     //detector = new MultiPitchDetector();
     //volumeControl = new VolumeControl(detector);
 
@@ -125,31 +124,11 @@ function toggleMic() {
     }
   }
 
-// ajoute la fonction de bascule
+// La fonction toggleSegmentMode est maintenant gérée par SegmentModeControl
+// On la garde pour la compatibilité avec les touches clavier
 function toggleSegmentMode() {
-    // bascule l'état sur l'objet guitar si disponible
     if (typeof guitar !== 'undefined' && guitar) {
         guitar.segmentMode = !guitar.segmentMode;
-    } else {
-        // si guitar pas encore instancié, on conserve l'état sur le bouton quand même
-    }
-
-    // déterminer état affiché
-    let isSegment = (guitar && guitar.segmentMode) || (!guitar && segmentButton.html().includes('Segment'));
-    if (!guitar) isSegment = !isSegment;
-
-    // mettre à jour label
-    segmentButton.html('Mode: ' + (isSegment ? 'Segment' : 'Note'));
-
-    // style visuel simple
-    if (isSegment) {
-        // ⚡️ ici on appelle la fonction de couleur
-        let newColor = guitar.segmentColorToggle();
-        segmentButton.style('background-color', newColor);
-        segmentButton.style('color', '#000000ff');
-    } else {
-        segmentButton.style('background-color', '');
-        segmentButton.style('color', '');
     }
 }
 
@@ -190,9 +169,24 @@ function mouseMoved(){
     }
 }
 
-// function mouseReleased(){
-//     if (guitar) {
-//         guitar.mousePressed();
+function mouseDragged() {
+    // Priorité au slider du contrôle de mode segment
+    if (segmentModeControl && segmentModeControl.sliderDragging && segmentModeControl.isMouseOverSlider()) {
+        segmentModeControl.mouseDragged();
+        return false;
+    }
+    // Sinon, laisser la guitare gérer le drag
+    if (guitar) {
+        guitar.mouseMoved();
+    }
+    return false;
+}
+
+function mouseReleased() {
+    if (segmentModeControl) {
+        segmentModeControl.mouseReleased();
+    }
+}
 //     }
 // }
 
@@ -216,6 +210,12 @@ function keyReleased(){
 function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
+    
+    // Afficher le contrôle du mode segment
+    if (segmentModeControl) {
+        segmentModeControl.display();
+    }
+    
     // displayTuner(noteFrequency,400,400,100)
     
     // Mettre à jour et afficher le vumètre
@@ -237,9 +237,36 @@ function draw() {
 
 
 function mouseClicked() {
+    // Priorité au contrôle du mode segment
+    if (segmentModeControl && segmentModeControl.mousePressed()) {
+        return false; // Empêcher propagation
+    }
+    
+    // Vérifier si un bouton d'accord ouvert est cliqué
+    const buttonY = guitar.neckY + guitar.neckHeight * 1.5;
+    const buttonHeight = guitar.neckWidth / 10;
+    const openNotes = ['C', 'A', 'G', 'E', 'D']; // Ordre CAGED
+    const buttonWidth = guitar.neckWidth / 5;
+    
+    for (let i = 0; i < openNotes.length; i++) {
+        const note = openNotes[i];
+        const buttonX = guitar.neckX + i * buttonWidth;
+        
+        // Vérifier si le clic est dans la hitbox du bouton
+        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth - 5 &&
+            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+            
+            // Charger l'accord ouvert
+            guitar.loadOpenChord(note);
+            return false;
+        }
+    }
+    
+    // Si aucun bouton n'a été cliqué, continuer avec le comportement normal du manche
     if (guitar) {
         guitar.mouseClicked();
     }
+    return false;
 }
 
 function midiNumberToNoteName(midiNumber) {
@@ -503,32 +530,4 @@ function updateIntervalButtons() {
            btn.style('color', '#888');
        }
    }
-}
-
-function mouseClicked() {
-    // Vérifier si un bouton d'accord ouvert est cliqué
-    const buttonY = guitar.neckY + guitar.neckHeight * 1.5;
-    const buttonHeight = guitar.neckWidth / 10;
-    const openNotes = ['C', 'A', 'G', 'E', 'D']; // Ordre CAGED
-    const buttonWidth = guitar.neckWidth / 5;
-    
-    for (let i = 0; i < openNotes.length; i++) {
-        const note = openNotes[i];
-        const buttonX = guitar.neckX + i * buttonWidth;
-        
-        // Vérifier si le clic est dans la hitbox du bouton
-        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth - 5 &&
-            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-            
-            // Charger l'accord ouvert
-            guitar.loadOpenChord(note);
-            return false;
-        }
-    }
-    
-    // Si aucun bouton n'a été cliqué, continuer avec le comportement normal du manche
-    if (guitar) {
-        guitar.mouseClicked();
-    }
-    return false;
 }

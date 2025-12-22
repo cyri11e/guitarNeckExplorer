@@ -57,11 +57,11 @@ class Guitar{
           this.isTriad = true;
           this.currentIntervals = this.majorChord;
           // mode d'affichage des occurrences : 'all' | 'exact' | 'single'
-          this.selectionMode = 'all';
+          this.selectionMode = 'single';
           this.scaleType = 'accords'; // 'accords' | 'penta' | 'gamme'
           // Facteur de transparence (0 = aucun, 1 = maximum)
           this.transparencyFactor = 1.2;
-          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346','#fafe038b']
+          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346','#fafe038b','#ff80004d']
           this.segmentColorIndex = 0
           this.degreMode = false;
           this.blankMode = false; // Mode blank : notes masquées, pastilles noires
@@ -166,8 +166,8 @@ class Guitar{
         this.drawTonicDisplay();
         this.drawOpenNotes();
         this.drawENotes();
-        this.drawSelectedNotes();
         this.drawSegments();
+        this.drawSelectedNotes();
         this.drawPlayedNotes();
         this.drawHoveredNote();
         this.drawOpenChordButtons(); // Ajouter les boutons
