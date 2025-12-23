@@ -13,6 +13,7 @@ let guitar
 let sensitivitySlider;
 let volumeLevel = 0;
 let volumeControl;
+let helpPopup; // Popup d'aide
 
 // pitch detection
 const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
@@ -39,6 +40,9 @@ function setup() {
     
     // Contrôle graphique pour le mode segment avec couleurs et alpha
     segmentModeControl = new SegmentModeControl(10, 10, guitar);
+    
+    // Popup d'aide
+    helpPopup = new HelpPopup();
 
     selectionModeButton = createButton('Affichage: all');
     selectionModeButton.position(200, 10);
@@ -191,6 +195,14 @@ function mouseReleased() {
 // }
 
 function keyPressed(){
+    // Touche H pour l'aide
+    if (keyCode == 72) { // 72 = H
+        if (helpPopup) {
+            helpPopup.toggle();
+        }
+        return;
+    }
+    
     if (guitar) {
         guitar.keyPressed();
     }
@@ -216,6 +228,11 @@ function draw() {
         segmentModeControl.display();
     }
     
+    // Afficher le popup d'aide
+    if (helpPopup) {
+        helpPopup.display();
+    }
+    
     // displayTuner(noteFrequency,400,400,100)
     
     // Mettre à jour et afficher le vumètre
@@ -237,6 +254,11 @@ function draw() {
 
 
 function mouseClicked() {
+    // Priorité au popup d'aide
+    if (helpPopup && helpPopup.mousePressed()) {
+        return false;
+    }
+    
     // Priorité au contrôle du mode segment
     if (segmentModeControl && segmentModeControl.mousePressed()) {
         return false; // Empêcher propagation
