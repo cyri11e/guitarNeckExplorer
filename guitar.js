@@ -21,17 +21,15 @@ class Guitar{
                                           .concat(this.noteNames.slice(0, startIndex));
         this.hoveredNote = null;
         this.clickedNote = null;
-        this.segments = [];           // <-- stocke les paires de notes [{string,fret},{string,fret}]
-        this._segmentBuffer = [];     // <-- buffer temporaire pour construire une paire
-        this.segmentMode = false;
         this.playedNoteName = null;
-        this.clickedNotes =[]
-        this.midiPlayedNotes = []
-        this.playedNotes = []
-        this.tonic = null
+        this.playedNotes = [];
+        this.midiPlayedNotes = [];
+        this.clickedNotes = []
         this.highlightedNotes = [];
         this.flatMode = true;
-        this.intervals = [] // par defaut mode octave
+        this.startingNotePosition = null; // {string, fret} de la note de départ
+        this.startingNote = null; // Nom de la note de départ (ex: "C4")
+        this.godMode = true; // Affiche la pastille sous le curseur
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
             color(255, 82, 90),        // Do# (C#) / Réb (Db) - Intermédiaire entre rouge et orange
@@ -46,85 +44,7 @@ class Guitar{
             color(111, 21, 168),       // La# (A#) / Sib (Bb) - Intermédiaire entre indigo et violet
             color(148, 10, 211)         // Si (B) - Violet foncé
           ];
-          this.anim =this.fade(10)
-          this.majorChord = [0, 4, 7];
-          this.minorChord = [0, 3, 7];
-          this.majorScale = [0, 2, 4, 5, 7, 9, 11];
-          this.minorScale = [0, 2, 3, 5, 7, 8, 10];
-          this.majorPentatonicScale = [0, 2, 4, 7, 9];
-          this.minorPentatonicScale = [0, 3, 5, 7, 10];
-          this.isMajor = true;
-          this.isTriad = true;
-          this.currentIntervals = this.majorChord;
-          // mode d'affichage des occurrences : 'all' | 'exact' | 'single'
-          this.selectionMode = 'single';
-          this.scaleType = 'accords'; // 'accords' | 'penta' | 'gamme'
-          // Facteur de transparence (0 = aucun, 1 = maximum)
-          this.transparencyFactor = 1.2;
-          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346','#fafe038b','#ff80004d']
-          this.segmentColorIndex = 0
-          this.degreMode = false;
-          this.blankMode = false; // Mode blank : notes masquées, pastilles noires
-          this.tonicMode = false; // Mode tonic : pastille noire, contour rouge pour la tonique
-          this.zoomMode = false; // Mode zoom : agrandir/réduire les pastilles
-          this.normalNoteMarkerDiameter = this.neckHeight/6; // Taille normale
-          this.zoomedNoteMarkerDiameter = this.neckHeight/5; // Taille zoomée (comme resize)
-          
-          this.openChordsDefinitions = {
-            'E': [
-                { string: 0, fret: 0 },
-                { string: 1, fret: 0 },
-                { string: 2, fret: 1 },
-                { string: 3, fret: 2 },
-                { string: 4, fret: 2 },
-                { string: 5, fret: 0 }
-            ],
-            'A': [
-                { string: 0, fret: 0 },
-                { string: 1, fret: 2 },
-                { string: 2, fret: 2 },
-                { string: 3, fret: 2 },
-                { string: 4, fret: 0 },
-                { string: 5, fret: 0 } 
-            ],
-            'D': [
-                { string: 0, fret: 2 },
-                { string: 1, fret: 3 },
-                { string: 2, fret: 2 },
-                { string: 3, fret: 0 },
-                { string: 4, fret: 0 },
-                { string: 5, fret: 2 }
-            ],
-            'G': [
-                { string: 0, fret: 3 },
-                { string: 1, fret: 0 },
-                { string: 2, fret: 0 },
-                { string: 3, fret: 0 },
-                { string: 4, fret: 2 },
-                { string: 5, fret: 3 }
-            ],
-            'B': [
-                { string: 0, fret: 2 },
-                { string: 1, fret: 4 },
-                { string: 2, fret: 4 },
-                { string: 3, fret: 4 },
-                { string: 4, fret: 2 },
-                { string: 5, fret: 2 }
-            ],
-            'C': [
-                { string: 0, fret: 0 },
-                { string: 1, fret: 1 },
-                { string: 2, fret: 0 },
-                { string: 3, fret: 2 },
-                { string: 4, fret: 3 },
-                { string: 5, fret: 0 }
-            ]
-        };
-    }
-
-    segmentColorToggle() {
-        this.segmentColorIndex = (this.segmentColorIndex + 1) % this.segmentColor.length;
-        return this.segmentColor[this.segmentColorIndex];
+          this.anim = this.fade(10)
     }
 
     fade(speed) {
@@ -138,10 +58,6 @@ class Guitar{
             }
             return val;
         };
-    }
-    
-    setMidiNotes(notes){
-        this.midiPlayedNotes = notes
     }
 
     setPlayedNote(notes){
@@ -163,30 +79,12 @@ class Guitar{
         this.drawNeckBackground();
         this.drawStrings();
         this.drawMarkers();
-        this.drawTonicDisplay();
         this.drawOpenNotes();
         this.drawENotes();
-        this.drawSegments();
-        this.drawSelectedNotes();
         this.drawPlayedNotes();
+        this.drawStartingNote();
         this.drawHoveredNote();
-        this.drawOpenChordButtons(); // Ajouter les boutons
-    }
-
-    drawTonicDisplay() {
-        if (this.tonic) {
-            push();
-            fill(255, 0, 0); // Rouge pour la tonique
-            textSize(this.textSize * 1.4);
-            textStyle(BOLD);
-            textAlign(CENTER, CENTER);
-            let x = this.neckX + this.neckWidth / 2;
-            let y = this.neckY - 30;
-            let noteName = this.getNoteName(this.tonic.note);
-            if (this.flatMode) noteName = this.swapEnharmonics(noteName);
-            text(noteName, x, y);
-            pop();
-        }
+        this.drawGodMode();
     }
 
     drawNeckBackground() {
@@ -285,6 +183,75 @@ class Guitar{
             else if (this.selectionMode === 'single') {
                 this.drawNoteOnFretboard(this.hoveredNote.note, this.hoveredNote.string, this.hoveredNote.fret, null, true);
             }
+        }
+    }
+
+    drawStartingNote() {
+        // Afficher la note de départ avec une pastille rouge normale
+        if (this.startingNotePosition && this.startingNote) {
+            let stringIdx = this.startingNotePosition.string;
+            let fretIdx = this.startingNotePosition.fret;
+            
+            push();
+            let stringHeight = this.neckHeight / (this.stringCount - 1);
+            let fretWidth = this.neckWidth / this.fretCount;
+            
+            let x = fretIdx === 0 ? this.neckX - 20 : this.neckX + fretIdx * fretWidth - (fretWidth / 2);
+            let y = this.neckY + stringIdx * stringHeight;
+            
+            // Dessiner la pastille rouge normale
+            fill(255, 0, 0); // Rouge pour la note de départ
+            strokeWeight(4);
+            stroke(0);
+            ellipse(x, y, this.noteMarkerDiameter, this.noteMarkerDiameter);
+            
+            // Déterminer le label à afficher
+            let noteLabel;
+            if (this.degreMode && this.tonic) {
+                // En mode degré: afficher "1" pour la tonique
+                noteLabel = '1';
+            } else {
+                // En mode note: afficher le nom de la note
+                let notePart = this.startingNote.slice(0, -1);
+                let octave = this.startingNote.slice(-1);
+                if (this.flatMode) notePart = this.swapEnharmonics(notePart);
+                noteLabel = notePart + octave;
+            }
+            
+            // Afficher le texte
+            textSize(this.textSize * 0.8);
+            textAlign(CENTER, CENTER);
+            noStroke();
+            fill(255);
+            text(noteLabel, x, y);
+            
+            pop();
+        }
+    }
+
+    drawGodMode() {
+        // Afficher une pastille sous le curseur pour tous les modes quand god_mode est true
+        if (this.godMode && this.hoveredNote) {
+            let stringIdx = this.hoveredNote.string;
+            let fretIdx = this.hoveredNote.fret;
+            
+            push();
+            let stringHeight = this.neckHeight / (this.stringCount - 1);
+            let fretWidth = this.neckWidth / this.fretCount;
+            
+            let x = this.neckX + fretIdx * fretWidth - (fretWidth / 2);
+            let y = this.neckY + stringIdx * stringHeight;
+            
+            // Dessiner un cercle pulsant rouge transparent par-dessus la note survolée
+            fill(255, 0, 0, 80); // Rouge semi-transparent
+            stroke(255, 0, 0);
+            strokeWeight(2);
+            
+            // Ajouter une pulsation légère
+            let pulse = sin(frameCount * 0.1) * 2;
+            ellipse(x, y, this.noteMarkerDiameter * 1.2 + pulse, this.noteMarkerDiameter * 1.2 + pulse);
+            
+            pop();
         }
     }
 
@@ -813,8 +780,7 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         }
 
         if (keyCode == 79) {
-            this.segmentColorToggle();
-            toggleSegmentMode();
+            // Touche O (actuellement non utilisée)
         }  
         if (keyCode == 68) {
             // touche "D" pour basculer entre les modes Note / Degrés / Blank / Tonic
@@ -914,10 +880,8 @@ s
             if (!this.segmentMode){ // touche "Suppr"
                 this.clickedNotes = [];
                 this.playedNotes = [];
-                this.midiPlayedNotes = [];
                 this.tonic = null;
                 this.intervals = []
-                this.resetIntervalButtons(); // MAJ visuelle immédiate des boutons
             } else
                 this.segments = []
 
@@ -953,31 +917,6 @@ s
     }
 
     // Dessine les segments (noir, épais) sur le manche, sous les pastilles (notes)
-    drawSegments() {
-        if (!this.segments || this.segments.length === 0) return;
-        push();
-
-        strokeWeight(this.noteMarkerDiameter*1.3);
-        strokeCap(ROUND)
-
-
-        for (let seg of this.segments) {
-            stroke(this.segmentColor[seg[0].colorIndex]);            
-            if (!seg || seg.length < 2) continue;
-            const a = seg[0], b = seg[1];
-            // x comme pour drawNoteOnFretboard
-            const xOf = (pt) => (pt.fret === 0) 
-                ? this.neckX - 20 
-                : this.neckX + pt.fret * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
-            // y au centre de la corde
-            const yOf = (pt) => this.neckY + pt.string * (this.neckHeight / (this.stringCount - 1));
-            let x1 = xOf(a), y1 = yOf(a);
-            let x2 = xOf(b), y2 = yOf(b);
-            // tracer la ligne entre les deux notes (sous les pastilles car appelée avant le rendu des notes)
-            line(x1, y1, x2, y2);
-        }
-        pop();
-    }
 
     drawStrings() {
         for (let i = 0; i < this.stringCount; i++) {
@@ -1013,60 +952,6 @@ s
             if (!this.ENoteNames[i].includes('#'))
                 text(this.ENoteNames[i], x + (this.neckWidth / (this.fretCount )/2), this.neckY +this.neckHeight *1.2 );
         }
-    }
-
-    drawOpenChordButtons() {
-        const buttonY = this.neckY + this.neckHeight * 1.5 ;
-        const buttonHeight =  this.neckWidth / 10;
-        const openNotes = ['C', 'A', 'G', 'E', 'D']; // Ordre CAGED (sans B)
-        const buttonWidth = this.neckWidth / 5;
-        
-        for (let i = 0; i < openNotes.length; i++) {
-            const note = openNotes[i];
-            const buttonX = this.neckX + i * buttonWidth;
-            
-            push();
-            
-            // Fond du bouton - GRIS toujours (pas de vérification de clickedNotes)
-            fill(color(200, 200, 200));
-            stroke(0);
-            strokeWeight(2);
-            rect(buttonX, buttonY, buttonWidth - 5, buttonHeight);
-            
-            // Texte
-            fill(0);
-            textSize(this.textSize);
-            textAlign(CENTER, CENTER);
-            text(note, buttonX + buttonWidth / 2 - 2.5, buttonY + buttonHeight / 2);
-            
-            pop();
-        }
-    }
-
-    loadOpenChord(noteName) {
-        // Vider les notes précédentes
-        this.clickedNotes = [];
-        this.clickedNote = null;
-        this.hoveredNote = null;
-        this.intervals = [];
-        
-        // Charger l'accord ouvert
-        const chordDefinition = this.openChordsDefinitions[noteName];
-        if (chordDefinition) {
-            for (let noteInfo of chordDefinition) {
-                if (noteInfo.fret !== null) {
-                    const note = this.getNoteFromCoordinates(noteInfo.string, noteInfo.fret);
-                    this.clickedNotes.push({
-                        note: note,
-                        string: noteInfo.string,
-                        fret: noteInfo.fret
-                    });
-                }
-            }
-        }
-        
-        // Définir la tonique
-        this.tonic = { note: noteName + '2', string: 0, fret: 0 };
     }
 
     getNoteFromCoordinates(string, fret) {
@@ -1132,19 +1017,12 @@ s
         };
         return conversionTable[degreeChromatic % 12];
     }
-
     animated(drawFunction,targetDiameter,growthRate) {
         if (diameter < targetDiameter) {
             diameter += growthRate;
             drawFunction(circleX, circleY, diameter, fillColor);
         } else {
             diameter = targetDiameter;
-        }
-    }
-
-    resetIntervalButtons() {
-        if (typeof updateIntervalButtons === 'function') {
-            updateIntervalButtons();
         }
     }
 
@@ -1303,20 +1181,6 @@ s
             } else {
                 ellipse(x, this.neckY + 0.9 * this.neckHeight , this.markerDiameter, this.markerDiameter);
             }
-        }
-    }
-
-    drawSelectedNotes() {
-        for (let note of this.clickedNotes) {
-            let noteColor;
-            if (this.tonic && this.getNoteName(note.note) === this.getNoteName(this.tonic.note))
-                noteColor = 'red';
-            else if (this.tonic)
-                noteColor = this.noteColors[this.calculeDegreeChromatique(this.tonic, note)];
-            else
-                noteColor = 'gray'; // Couleur par défaut si pas de tonique
-            fill(color(noteColor));
-            this.drawNoteOnFretboard(note.note, note.string, note.fret);
         }
     }
 

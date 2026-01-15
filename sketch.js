@@ -1,162 +1,46 @@
 let wH 
 let wW 
-let selectedNotes = []
-let liveNotes = []
-let micMuted = true;
-let muteButton;
-let segmentModeControl; // Nouveau contrôle graphique pour mode segment
-let selectionModeButton;
-let majorMinorToggle; // <-- nouveau : toggle Maj/min
-let scaleTypeButton; // <-- nouveau : 3-état Accords/Penta/Gamme
-let clearButton;
 let guitar
-let sensitivitySlider;
-let volumeLevel = 0;
-let volumeControl;
-let helpPopup; // Popup d'aide
 
-// pitch detection
-const model_url = 'https://cdn.jsdelivr.net/gh/ml5js/ml5-data-and-models/models/pitch-detection/crepe/';
-const scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-let pitch;
-let audioContext;
-let mic;
-let volumeThreshold = 0.001
-let noteFrequency
-let noteVolume 
+// Game variables
+let gameStarted = false;
+let gameMode = null; // "intervals", "degrees" ou "notes"
+let useFlatMode = true; // true = bémols, false = dièses
+let god_mode = true; // Affiche la pastille sous le curseur (mode debug)
+let gameActive = true;
+let gameStartTime = 0;
+let questionStartTime = 0; // Pour tracker le temps par question
+let currentTime = 0;
+let score = 0;
+let totalTime = 0; // Temps total des réponses
+let questionsAnswered = 0; // Nombre de questions répondues
+let sessionQuestions = 10; // Nombre de questions par session
+let targetNote = null;
+let startingNote = null;
+let startingNotePosition = null; // {string, fret} de la note de départ
+let currentInterval = 0;
+let currentDegree = 0;
+let currentTargetNoteName = null; // Pour le mode "notes"
+let userSelectedNote = null;
+let userSelectedPosition = null; // {string, fret} de la sélection de l'utilisateur
+let showingAnswer = false;
+let answerWasCorrect = false;
+let correctNotePosition = null;
+let sessionEnded = false; // La session est-elle terminée ?
 
-let intervalButtons = []; // boutons multi-états pour intervalles
+// Intervalle list (semitones) - incluant montées et descentes
+const intervalList = [-12, -10, -9, -8, -7, -5, -4, -3, -2, 0, 2, 3, 4, 5, 7, 8, 9, 10, 12];
 
 function setup() {
     wH = windowHeight;
     wW = windowWidth;
     createCanvas(wW, wH);
-    // muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
-    // muteButton.position(10, 10);
-    // muteButton.mousePressed(toggleMic);
-
-    // Création du manche de guitare AVANT le contrôle de mode segment
+    
+    // Création du manche de guitare
     guitar = new Guitar(13);
     
-    // Contrôle graphique pour le mode segment avec couleurs et alpha
-    segmentModeControl = new SegmentModeControl(10, 10, guitar);
-    
-    // Popup d'aide
-    helpPopup = new HelpPopup();
-
-    selectionModeButton = createButton('Affichage: all');
-    selectionModeButton.position(200, 10);
-    selectionModeButton.style('padding', '6px 10px');
-    selectionModeButton.mousePressed(toggleSelectionMode);
-
-    // Toggle Maj/min
-    majorMinorToggle = createButton('Maj');
-    majorMinorToggle.position(410, 10);
-    majorMinorToggle.style('padding', '6px 10px');
-    majorMinorToggle.mousePressed(toggleMajorMinor);
-
-    // 3-état : Accords / Penta / Gamme
-    scaleTypeButton = createButton('Accords');
-    scaleTypeButton.position(340, 10);
-    scaleTypeButton.style('padding', '6px 10px');
-    scaleTypeButton.mousePressed(toggleScaleType);
-
-    clearButton = createButton('Vider');
-    clearButton.position(500, 10);
-    clearButton.style('padding', '6px 10px');
-    clearButton.mousePressed(clearSelection);
-
-    // sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
-    // sensitivitySlider.position(10, 60);
-    // sensitivitySlider.style('width', '200px');
-    // sensitivitySlider.input(() => {
-    //     let value = sensitivitySlider.value();
-    //     console.log('Sensitivity Slider Value:', value);
-    //     detector.setSensitivity(value);
-    // });
-  
-    // Démarrer l'AudioContext lorsque la page est chargée
-    userStartAudio().then(() => {
-        // Initialiser le contexte audio et le micro après que l'utilisateur ait interagi
-        audioContext = getAudioContext();
-        mic = new p5.AudioIn();
-        mic.start();
-    });
-
-    //detector = new MultiPitchDetector();
-    //volumeControl = new VolumeControl(detector);
-
-    // Boutons multi-états pour intervalles 1 à 7
-    const intervalLabels = [
-        ['1'],        // 1
-        ['2', 'b2'],  // 2
-        ['3', 'b3'],  // 3
-        ['4', '#4'],  // 4
-        ['5', 'b5'],  // 5
-        ['6', 'b6'],  // 6
-        ['7', 'b7'],  // 7
-        ['8']         // 8 octave
-    ];
-    // Positionnement à droite du bouton "Vider"
-    let baseX = 500 + clearButton.width + 10; // 10px d'espace après "Vider"
-    let baseY = 10;
-    let btnWidth = 38; // largeur fixe pour coller les boutons
-    for (let i = 0; i < 8; i++) {
-        let btn = createButton(intervalLabels[i][0]);
-        btn.position(baseX + i * btnWidth, baseY);
-        btn.style('padding', '6px 0px');
-        btn.style('width', btnWidth + 'px');
-        btn.style('font-weight', 'bold');
-        btn.style('margin', '0');
-        btn.style('border-radius', '0');
-        btn.mousePressed(() => toggleIntervalButton(i + 1));
-        intervalButtons.push(btn);
-    }
-    updateIntervalButtons();
+    // Ne pas démarrer le jeu tout de suite - attendre que l'utilisateur appuie sur Space
 } 
-
-function toggleMic() {
-    micMuted = !micMuted;
-    if (micMuted) {
-      muteButton.html('<i class="fas fa-microphone"></i>');
-      // Arrêter le micro
-      detector.mic.stop();
-    } else {
-      muteButton.html('<i class="fas fa-microphone-slash"></i>');
-      // Démarrer le micro
-      detector.mic.start();
-    }
-  }
-
-// La fonction toggleSegmentMode est maintenant gérée par SegmentModeControl
-// On la garde pour la compatibilité avec les touches clavier
-function toggleSegmentMode() {
-    if (typeof guitar !== 'undefined' && guitar) {
-        guitar.segmentMode = !guitar.segmentMode;
-    }
-}
-
-
-
-// Nouveau : bascule cyclique entre 'all' -> 'exact' -> 'single'
-function toggleSelectionMode() {
-	const modes = ['all', 'exact', 'single'];
-	let current = 'single';
-	if (guitar && guitar.selectionMode) current = guitar.selectionMode;
-	const next = modes[(modes.indexOf(current) + 1) % modes.length];
-	// appliquer sur l'objet guitar si présent
-	if (guitar) guitar.selectionMode = next;
-	// mettre à jour label
-	selectionModeButton.html('Affichage: ' + next);
-	// styling simple
-	if (next === 'single') {
-		selectionModeButton.style('background-color', '#222');
-		selectionModeButton.style('color', '#fff');
-	} else {
-		selectionModeButton.style('background-color', '');
-		selectionModeButton.style('color', '');
-	}
-}
 
 function windowResized() {
     // gestion reponsive
@@ -174,12 +58,6 @@ function mouseMoved(){
 }
 
 function mouseDragged() {
-    // Priorité au slider du contrôle de mode segment
-    if (segmentModeControl && segmentModeControl.sliderDragging && segmentModeControl.isMouseOverSlider()) {
-        segmentModeControl.mouseDragged();
-        return false;
-    }
-    // Sinon, laisser la guitare gérer le drag
     if (guitar) {
         guitar.mouseMoved();
     }
@@ -187,30 +65,30 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
-    if (segmentModeControl) {
-        segmentModeControl.mouseReleased();
-    }
+    // nothing for now
 }
-//     }
-// }
 
 function keyPressed(){
-    // Touche H pour l'aide
-    if (keyCode == 72) { // 72 = H
-        if (helpPopup) {
-            helpPopup.toggle();
+    // Espace pour passer à la question suivante ou terminer la session
+    if (key === ' ' || keyCode === 32) {
+        if (showingAnswer) {
+            questionsAnswered++;
+            
+            // Vérifier si la session est terminée
+            if (questionsAnswered >= sessionQuestions) {
+                sessionEnded = true;
+                gameStarted = false;
+            } else {
+                // Passer à la question suivante
+                startNewQuestion();
+            }
         }
-        return;
+        return false;
     }
     
     if (guitar) {
         guitar.keyPressed();
     }
-    // Synchroniser boutons avec touches 1 à 7
-    if (keyCode >= 49 && keyCode <= 56) { // touches '1' à '8'
-        toggleIntervalButton(keyCode - 48);
-    }
-    if (keyCode == 81) guitar.setPlayedNote ('E4');
 }
 
 function keyReleased(){
@@ -220,336 +98,597 @@ function keyReleased(){
 }
 
 function draw() {
-    // ici on ne s'occupe que de l affichage
-    guitar.display(selectedNotes)
+    // Affichage du manche de guitare
+    guitar.display()
     
-    // Afficher le contrôle du mode segment
-    if (segmentModeControl) {
-        segmentModeControl.display();
-    }
+    // Afficher les indices visuels
+    drawVisualFeedback();
     
-    // Afficher le popup d'aide
-    if (helpPopup) {
-        helpPopup.display();
-    }
-    
-    // displayTuner(noteFrequency,400,400,100)
-    
-    // Mettre à jour et afficher le vumètre
-    //volumeControl.updateVolumeLevel(mic);
-    //volumeControl.display();
-    
-    // if (!micMuted) {
-    //     // Autres logiques liées à l'analyse du micro
-    //     let result = detector.analyze();
-    //     let notes = detector.getPitches()
-    //     //text('Notes des 6 premiers pics: ' + result.notePeaks.join(', '), 10, height - 30);
-    //     //text('3 notes les plus graves: ' + detector.getPitches().join(', '), 10, height - 50);
-    //     if (notes.length > 0)
-    //         guitar.setPlayedNote(notes)
-    //     else
-    //         guitar.setPlayedNote(null)
-    // }
+    // Affichage du jeu
+    displayGameUI();
 }
 
-
 function mouseClicked() {
-    // Priorité au popup d'aide
-    if (helpPopup && helpPopup.mousePressed()) {
-        return false;
-    }
-    
-    // Priorité au contrôle du mode segment
-    if (segmentModeControl && segmentModeControl.mousePressed()) {
-        return false; // Empêcher propagation
-    }
-    
-    // Vérifier si un bouton d'accord ouvert est cliqué
-    const buttonY = guitar.neckY + guitar.neckHeight * 1.5;
-    const buttonHeight = guitar.neckWidth / 10;
-    const openNotes = ['C', 'A', 'G', 'E', 'D']; // Ordre CAGED
-    const buttonWidth = guitar.neckWidth / 5;
-    
-    for (let i = 0; i < openNotes.length; i++) {
-        const note = openNotes[i];
-        const buttonX = guitar.neckX + i * buttonWidth;
+    // Écran d'accueil : boutons cliquables
+    if (!gameMode && !sessionEnded) {
+        let buttonY = height / 2 + 50;
+        let buttonWidth = 120;
+        let buttonHeight = 50;
         
-        // Vérifier si le clic est dans la hitbox du bouton
-        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth - 5 &&
-            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-            
-            // Charger l'accord ouvert
-            guitar.loadOpenChord(note);
+        // Bouton 1 - Intervalles
+        if (mouseX > width / 2 - 200 - buttonWidth / 2 && mouseX < width / 2 - 200 + buttonWidth / 2 &&
+            mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
+            gameMode = "intervals";
+            useFlatMode = random() > 0.5;
+            gameStarted = true;
+            startNewQuestion();
+            return false;
+        }
+        
+        // Bouton 2 - Degrés
+        if (mouseX > width / 2 - buttonWidth / 2 && mouseX < width / 2 + buttonWidth / 2 &&
+            mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
+            gameMode = "degrees";
+            useFlatMode = random() > 0.5;
+            gameStarted = true;
+            startNewQuestion();
+            return false;
+        }
+        
+        // Bouton 3 - Notes
+        if (mouseX > width / 2 + 200 - buttonWidth / 2 && mouseX < width / 2 + 200 + buttonWidth / 2 &&
+            mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
+            gameMode = "notes";
+            useFlatMode = random() > 0.5;
+            gameStarted = true;
+            startNewQuestion();
             return false;
         }
     }
     
-    // Si aucun bouton n'a été cliqué, continuer avec le comportement normal du manche
+    // Écran de fin : recommencer
+    if (sessionEnded) {
+        let restartButtonY = height / 2 + 100;
+        let restartButtonWidth = 150;
+        let restartButtonHeight = 50;
+        
+        if (mouseX > width / 2 - restartButtonWidth / 2 && mouseX < width / 2 + restartButtonWidth / 2 &&
+            mouseY > restartButtonY - restartButtonHeight / 2 && mouseY < restartButtonY + restartButtonHeight / 2) {
+            // Réinitialiser le jeu
+            gameMode = null;
+            gameStarted = false;
+            sessionEnded = false;
+            score = 0;
+            totalTime = 0;
+            questionsAnswered = 0;
+            return false;
+        }
+    }
+    
+    // Jeu normal
+    if (!gameActive || !gameMode || showingAnswer) return false;
+    
     if (guitar) {
         guitar.mouseClicked();
+        
+        // Vérifier si l'utilisateur a cliqué sur une note
+        if (guitar.clickedNote) {
+            userSelectedNote = guitar.clickedNote;
+            userSelectedPosition = { string: guitar.clickedNote.string, fret: guitar.clickedNote.fret };
+            
+            // Vérifier si c'est la bonne réponse
+            if (userSelectedNote.note === targetNote) {
+                answerWasCorrect = true;
+                score++;
+            } else {
+                answerWasCorrect = false;
+            }
+            
+            // Tracker le temps de cette question
+            let responseTime = millis() - questionStartTime;
+            totalTime += responseTime;
+            questionsAnswered++;
+            
+            showingAnswer = true;
+            
+            // Afficher la position correcte sur le manche
+            if (correctNotePosition) {
+                guitar.setPlayedNote([targetNote]);
+            }
+        }
     }
     return false;
 }
 
-function midiNumberToNoteName(midiNumber) {
-    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    let octave = Math.floor(midiNumber / 12) - 1;
-    let note = notes[midiNumber % 12];
-    return  note + octave;
-  }
-  
-
-// function listening(){
-//     console.log('listening');
-//     pitch = ml5.pitchDetection(
-//         model_url,
-//         audioContext,
-//         mic.stream,
-//         modelLoaded);
-//   }
-  
-function displayTuner(frequency, x, y, s) {
-    let midiNote, accurateNoteFrequency, centOffset, noteName;
-
-    if ((frequency)&&(noteVolume > volumeThreshold)){
-        push()   
-        midiNote = freqToMidi(frequency);
-        accurateNoteFrequency = midiToFreq(midiNote);
-        centOffset = 1200 * Math.log2(frequency / accurateNoteFrequency);
-        noteName = midiNumberToNoteName(midiNote) 
-        textSize(s); // Définir la taille du texte
-        fill(0); // Couleur noire pour le texte
-        text(noteName, x, y); // Afficher le nom de la note et le numéro MIDI
-        
-        stroke(0);
-        line(x - s, y + s, x + s, y + s); // Dessiner la ligne de base
-        
-        let offsetX = map(centOffset, -50, 50, -s, s); // Convertir le décalage en pixels
-        stroke(255, 0, 0); // Couleur rouge pour l'indicateur de décalage
-        strokeCap(SQUARE)
-        strokeWeight(10)
-        if ( Math.abs(centOffset)<20 ) 
-            stroke('green')
-        line(x, y + s - 10, x + offsetX, y + s - 10); // Dessiner l'indicateur de décalage
-        pop()
-    }
-}
-
-
-function gotPitch(error, frequency){
-    let midiNote
-    if (error) {
-      console.error(error);
+function getRandomNote(baseNote, maxOctaveDistance = 1) {
+    const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const notesOrderFlat = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const enharmonics = {
+        'C#': 'Db',
+        'Db': 'C#',
+        'D#': 'Eb',
+        'Eb': 'D#',
+        'F#': 'Gb',
+        'Gb': 'F#',
+        'G#': 'Ab',
+        'Ab': 'G#',
+        'A#': 'Bb',
+        'Bb': 'A#'
+    };
+    
+    // Extraire la note et l'octave
+    let noteName = baseNote.match(/[A-G]#?b?/)[0];
+    let octave = parseInt(baseNote.match(/\d+/)[0]);
+    
+    // Normaliser la note selon le mode (flat ou sharp)
+    if (useFlatMode) {
+        // Si en mode bémol, convertir les dièses en bémols
+        if (noteName.includes('#')) {
+            noteName = enharmonics[noteName];
+        }
     } else {
-      noteVolume = mic.getLevel(); // Obtenir le niveau de volume
-      noteFrequency = frequency
-      if (noteVolume > volumeThreshold) { // Vérifier si le volume dépasse le seuil
-        if (frequency) { // S'assurer que la fréquence est définie
-          midiNote = freqToMidi(frequency);
-          if (midiNote>30) 
-            guitar.setPlayedNote(midiNumberToNoteName(midiNote)) 
-        } else
-            guitar.setPlayedNote(null) 
-      }    
-            
-            
-    pitch.getPitch(gotPitch); // Demande la prochaine fréquence
-  }
+        // Si en mode dièse, convertir les bémols en dièses
+        if (noteName.includes('b')) {
+            noteName = enharmonics[noteName];
+        }
+    }
+    
+    let notesOrder = useFlatMode ? notesOrderFlat : notesOrderSharp;
+    let baseNoteIndex = notesOrder.indexOf(noteName);
+    if (baseNoteIndex === -1) {
+        // Fallback si la note normalisée n'est pas trouvée
+        baseNoteIndex = 0;
+    }
+    
+    let baseMidiIndex = baseNoteIndex + (octave * 12);
+    
+    // Générer une note aléatoire dans la plage ± (maxOctaveDistance * 12) semitones
+    // Mais limiter aux octaves 2-4 qui existent sur le fretboard
+    let midiRange = maxOctaveDistance * 12;
+    let minOctave = 2;
+    let maxOctave = 4;
+    let minMidiIndex = minOctave * 12;
+    let maxMidiIndex = (maxOctave + 1) * 12 - 1;
+    
+    let randomMidiIndex;
+    let attempts = 0;
+    do {
+        randomMidiIndex = baseMidiIndex + floor(random(-midiRange, midiRange + 1));
+        attempts++;
+    } while ((randomMidiIndex < minMidiIndex || randomMidiIndex > maxMidiIndex) && attempts < 10);
+    
+    // Si on a pas trouvé après 10 tentatives, utiliser une note dans les limites
+    if (randomMidiIndex < minMidiIndex || randomMidiIndex > maxMidiIndex) {
+        randomMidiIndex = baseMidiIndex; // Fallback à la note de base
+    }
+    
+    let targetOctave = Math.floor(randomMidiIndex / 12);
+    let targetNoteIndex = randomMidiIndex % 12;
+    if (targetNoteIndex < 0) {
+        targetNoteIndex += 12;
+        targetOctave -= 1;
+    }
+    
+    return notesOrder[targetNoteIndex] + targetOctave;
 }
 
-// function modelLoaded(){
-// console.log('model loaded!');
-// pitch.getPitch(gotPitch);
-// }
+// ====== GAME FUNCTIONS ======
 
-function drawCircleOfFifths() {
-    textSize(32);    
-    let radius = (wH - textSize()*2) / 4;
-    let centerX = wW / 2;
-    let centerY = wH * 3 / 4;
-    let notes = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
+function startNewQuestion() {
+    let validQuestion = false;
+    let attempts = 0;
+    
+    // Boucler jusqu'à trouver une question valide (intervalle accessible sur le manche)
+    while (!validQuestion && attempts < 20) {
+        // Sélectionner une position aléatoire sur le manche
+        let randomString = floor(random(6));
+        let randomFret = floor(random(1, guitar.fretCount));
+        
+        startingNote = guitar.getNoteFromCoordinates(randomString, randomFret);
+        startingNotePosition = { string: randomString, fret: randomFret };
+        
+        if (gameMode === "intervals") {
+            // Mode Intervalles
+            currentInterval = random(intervalList);
+            targetNote = calculateTargetNote(startingNote, currentInterval);
+        } else if (gameMode === "degrees") {
+            // Mode Degrés - degrés de la gamme majeure (incluant unisson)
+            const degrees = [0, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7];
+            currentDegree = random(degrees);
+            targetNote = calculateTargetByDegree(startingNote, currentDegree);
+        } else if (gameMode === "notes") {
+            // Mode Notes - note aléatoire
+            targetNote = getRandomNote(startingNote, 1); // ±1 octave
+            currentTargetNoteName = targetNote.match(/[A-G]#?b?/)[0];
+        }
+        
+        // Trouver la position de cette note sur le manche
+        correctNotePosition = findNoteOnFretboard(targetNote);
+        
+        // Vérifier que la note cible est accessible (existe sur le manche)
+        if (correctNotePosition) {
+            validQuestion = true;
+        }
+        attempts++;
+    }
+    
+    // Réinitialiser l'état
+    userSelectedNote = null;
+    userSelectedPosition = null;
+    showingAnswer = false;
+    answerWasCorrect = false;
+    questionStartTime = millis(); // Tracker le temps du début de la question
+    
+    // Configurer le guitar pour afficher la pastille correctement en god_mode
+    guitar.startingNotePosition = startingNotePosition; // Passer la position de départ
+    guitar.godMode = god_mode; // Passer l'état du mode dieu
+    guitar.startingNote = startingNote; // Passer la note de départ pour affichage
+    
+    if (gameMode === "notes") {
+        guitar.degreMode = false; // Afficher les notes
+        guitar.tonic = null; // Pas de tonique en mode notes
+    } else {
+        guitar.degreMode = true; // Afficher les degrés
+        guitar.tonic = { note: startingNote, string: startingNotePosition.string, fret: startingNotePosition.fret };
+    }
+    
+    // Configuration pour afficher uniquement la note survolée
+    guitar.selectionMode = 'single';
+    guitar.intervals = []; // Vider les intervalles
+    guitar.clickedNotes = []; // Vider les notes cliquées
+    guitar.playedNotes = []; // Vider les notes jouées
+}
 
-    fill(255);
-    stroke(0);
-    strokeWeight(1);
+function calculateTargetByDegree(startNote, degree) {
+    // Gamme majeure : intervalles en semitones [0, 2, 4, 5, 7, 9, 11]
+    const majorScaleIntervals = [0, 2, 4, 5, 7, 9, 11];
+    const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    // Extraire la note et l'octave
+    let noteName = startNote.match(/[A-G]#?/)[0];
+    let octave = parseInt(startNote.match(/\d+/)[0]);
+    
+    let startNoteIndex = notesOrderSharp.indexOf(noteName);
+    let startMidiIndex = startNoteIndex + (octave * 12);
+    
+    // Cas spécial : degré 0 = unisson (même note)
+    if (degree === 0) {
+        return startNote;
+    }
+    
+    // Pour les autres degrés
+    let degreeIndex = Math.abs(degree) - 1;
+    degreeIndex = degreeIndex % 7; // Limiter à 0-6
+    
+    // Obtenir l'intervalle en semitones pour ce degré
+    let intervalInSemitones = majorScaleIntervals[degreeIndex];
+    
+    // Si le degré est négatif, aller une octave vers le bas
+    if (degree < 0) {
+        intervalInSemitones = intervalInSemitones - 12;
+    }
+    
+    // Calculer la note cible en MIDI
+    let targetMidiIndex = startMidiIndex + intervalInSemitones;
+    
+    let targetOctave = Math.floor(targetMidiIndex / 12);
+    let targetNoteIndex = targetMidiIndex % 12;
+    if (targetNoteIndex < 0) {
+        targetNoteIndex += 12;
+        targetOctave -= 1;
+    }
+    
+    let targetNote = notesOrderSharp[targetNoteIndex] + targetOctave;
+    
+    // Convertir en bémol si nécessaire
+    if (useFlatMode) {
+        let targetNoteName = targetNote.match(/[A-G]#?b?/)[0];
+        if (targetNoteName.includes('#')) {
+            const enharmonics = {'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb'};
+            targetNoteName = enharmonics[targetNoteName];
+            targetNote = targetNoteName + targetOctave;
+        }
+    }
+    
+    return targetNote;
+}
 
+function calculateTargetNote(startNote, interval) {
+    const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    // Extraire la note et l'octave
+    let noteName = startNote.match(/[A-G]#?/)[0];
+    let octave = parseInt(startNote.match(/\d+/)[0]);
+    
+    let noteIndex = notesOrderSharp.indexOf(noteName);
+    let midiIndex = noteIndex + (octave * 12);
+    let targetMidiIndex = midiIndex + interval;
+    
+    let targetOctave = Math.floor(targetMidiIndex / 12);
+    let targetNoteIndex = targetMidiIndex % 12;
+    if (targetNoteIndex < 0) {
+        targetNoteIndex += 12;
+        targetOctave -= 1;
+    }
+    
+    let targetNote = notesOrderSharp[targetNoteIndex] + targetOctave;
+    
+    // Convertir en bémol si nécessaire
+    if (useFlatMode) {
+        let targetNoteName = targetNote.match(/[A-G]#?b?/)[0];
+        if (targetNoteName.includes('#')) {
+            const enharmonics = {'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb'};
+            targetNoteName = enharmonics[targetNoteName];
+            targetNote = targetNoteName + targetOctave;
+        }
+    }
+    
+    return targetNote;
+}
 
-    textAlign(CENTER, CENTER);
+function findNoteOnFretboard(noteName) {
+    // Rechercher la première occurrence de cette note sur le manche
+    for (let string = 0; string < 6; string++) {
+        for (let fret = 0; fret <= guitar.fretCount; fret++) {
+            let noteOnFret = guitar.getNoteFromCoordinates(string, fret);
+            if (noteOnFret === noteName) {
+                return { string: string, fret: fret };
+            }
+        }
+    }
+    return null; // Note non trouvée
+}
 
+function displayGameUI() {
+    if (!gameMode) {
+        // Écran d'accueil avec options cliquables
+        fill(0);
+        textSize(48);
+        textAlign(CENTER, CENTER);
+        text('The KYN Game', width / 2, height / 2 - 100);
+        
+        textSize(32);
+        text('Know Your Neck !', width / 2, height / 2 - 50);
+        
+        // Boutons cliquables
+        let buttonY = height / 2 + 50;
+        let buttonWidth = 120;
+        let buttonHeight = 50;
+        
+        // Bouton 1 - Intervalles
+        fill(0, 100, 200);
+        rect(width / 2 - 200 - buttonWidth / 2, buttonY - buttonHeight / 2, buttonWidth, buttonHeight);
+        fill(255);
+        textSize(18);
+        text('1 - INTERVALLES', width / 2 - 200, buttonY);
+        
+        // Bouton 2 - Degrés
+        fill(0, 100, 200);
+        rect(width / 2 - buttonWidth / 2, buttonY - buttonHeight / 2, buttonWidth, buttonHeight);
+        fill(255);
+        text('2 - DEGRÉS', width / 2, buttonY);
+        
+        // Bouton 3 - Notes
+        fill(0, 100, 200);
+        rect(width / 2 + 200 - buttonWidth / 2, buttonY - buttonHeight / 2, buttonWidth, buttonHeight);
+        fill(255);
+        text('3 - NOTES', width / 2 + 200, buttonY);
+        
+        fill(100);
+        textSize(14);
+        text('Intervalles: montée/descente', width / 2 - 200, height / 2 + 110);
+        text('Degrés: dans une gamme', width / 2, height / 2 + 110);
+        text('Notes: trouver une note spécifique', width / 2 + 200, height / 2 + 110);
+        
+        return;
+    }
+    
+    // Écran de fin de session
+    if (sessionEnded) {
+        fill(0);
+        textSize(48);
+        textAlign(CENTER, CENTER);
+        text('Session terminée!', width / 2, height / 2 - 100);
+        
+        textSize(32);
+        let averageTime = totalTime / questionsAnswered / 1000;
+        text('Score: ' + score + '/' + sessionQuestions, width / 2, height / 2 - 20);
+        text('Temps moyen: ' + averageTime.toFixed(1) + 's', width / 2, height / 2 + 30);
+        
+        // Bouton Recommencer
+        let restartButtonY = height / 2 + 100;
+        let restartButtonWidth = 150;
+        let restartButtonHeight = 50;
+        
+        fill(0, 150, 0);
+        rect(width / 2 - restartButtonWidth / 2, restartButtonY - restartButtonHeight / 2, restartButtonWidth, restartButtonHeight);
+        fill(255);
+        textSize(20);
+        text('Recommencer', width / 2, restartButtonY);
+        
+        return;
+    }
+    
+    // Calculer le temps écoulé - arrêter le chrono si réponse donnée
+    if (showingAnswer) {
+        // Le chrono reste figé au moment de la réponse
+    } else {
+        currentTime = millis() - gameStartTime;
+    }
+    
+    let seconds = floor(currentTime / 1000);
+    let ms = currentTime % 1000;
+    
+    // Afficher l'UI sous le manche - plus loin du manche
     fill(0);
-
-    for (let i = 0; i < notes.length; i++) {
-        let angle = TWO_PI * i / notes.length - HALF_PI;
-        let x = centerX + cos(angle) * radius;
-        let y = centerY + sin(angle) * radius;
-        text(notes[i], x, y);
+    textSize(24);
+    textAlign(CENTER, TOP);
+    
+    let uiY = guitar.neckY + guitar.neckHeight + 80;
+    
+    // Afficher les informations de la question
+    let questionText = "";
+    if (gameMode === "intervals") {
+        // Format: "Monte d'une tierce mineure (+m3)" ou "Descend d'une quarte juste (-P4)"
+        let intervalInfo = getIntervalName(int(currentInterval));
+        
+        if (currentInterval === 0) {
+            // Unisson - cas spécial
+            questionText = "Trouve la même note (unisson)";
+        } else {
+            let sign = currentInterval >= 0 ? "+" : "-";
+            if (currentInterval >= 0) {
+                questionText = "Monte d'une " + intervalInfo.fr + " (" + sign + intervalInfo.code + ")";
+            } else {
+                questionText = "Descend d'une " + intervalInfo.fr + " (" + sign + intervalInfo.code + ")";
+            }
+        }
+    } else if (gameMode === "degrees") {
+        // Format pour les degrés
+        if (currentDegree === 0) {
+            // Unisson
+            questionText = "Trouve le degré 1 (unisson)";
+        } else {
+            let degreeNum = Math.abs(currentDegree);
+            let direction = currentDegree > 0 ? "aigu" : "grave";
+            
+            if (Math.abs(currentDegree) === 1) {
+                // Degré 1 plus aigu/grave = octave
+                questionText = "Trouve le degré 1 " + direction + " (octave)";
+            } else {
+                // Autres degrés
+                questionText = "Trouve le degré " + degreeNum + " " + direction;
+            }
+        }
+    } else if (gameMode === "notes") {
+        // Format pour les notes
+        let startNoteName = startingNote.match(/[A-G]#?b?/)[0];
+        let targetNoteName = targetNote.match(/[A-G]#?b?/)[0];
+        let startOctave = parseInt(startingNote.match(/\d+/)[0]);
+        let targetOctave = parseInt(targetNote.match(/\d+/)[0]);
+        
+        if (targetNoteName === startNoteName && targetOctave === startOctave) {
+            // Unisson - même note, même octave (normalement pas possible)
+            questionText = "Trouve le même " + currentTargetNoteName;
+        } else if (targetNoteName === startNoteName) {
+            // Même note, octave différent
+            let direction = targetOctave > startOctave ? "aigu" : "grave";
+            questionText = "Trouve le même " + currentTargetNoteName + " " + direction;
+        } else {
+            // Note différente - préciser la direction
+            let direction = targetOctave > startOctave ? "aigu" : "grave";
+            questionText = "Trouve le " + currentTargetNoteName + " " + direction;
+        }
+    }
+    
+    text(questionText, width / 2, uiY);
+    
+    // Afficher le score et le timer sur la même ligne
+    text('Score: ' + score + '  |  Time: ' + seconds + '.' + floor(ms / 100), width / 2, uiY + 40);
+    
+    // Message de résultat
+    if (showingAnswer) {
+        textSize(28);
+        textAlign(CENTER, CENTER);
+        
+        let resultY = uiY + 100;
+        
+        if (answerWasCorrect) {
+            fill(0, 200, 0); // Vert
+            if (gameMode === "intervals") {
+                let intervalInfo = getIntervalName(int(currentInterval));
+                text('✓ CORRECT! ' + intervalInfo.fr, width / 2, resultY);
+            } else if (gameMode === "degrees") {
+                if (currentDegree === 0) {
+                    text('✓ CORRECT! Degré 1 (unisson)', width / 2, resultY);
+                } else {
+                    let degreeNum = Math.abs(currentDegree);
+                    if (degreeNum === 1) {
+                        text('✓ CORRECT! Octave', width / 2, resultY);
+                    } else {
+                        text('✓ CORRECT! Degré ' + degreeNum, width / 2, resultY);
+                    }
+                }
+            } else if (gameMode === "notes") {
+                text('✓ CORRECT! ' + currentTargetNoteName, width / 2, resultY);
+            }
+        } else {
+            fill(200, 0, 0); // Rouge
+            text('✗ ERREUR! Réponse: ' + targetNote, width / 2, resultY);
+        }
+        
+        // Instructions pour continuer
+        fill(100);
+        textSize(16);
+        text('Pressez ESPACE pour continuer', width / 2, resultY + 50);
     }
 }
 
-// gestion du midi
-
-function notePressed(midiNote) {
-    let index = liveNotes.findIndex(item => 
-        item.note === midiNumberToNoteName(midiNote) 
-      );
-  
-      if (index === -1) {
-        // Si la note n'est déjà dans le tableau
-        // ajouter la note au tableau
-        liveNotes.push({note:midiNumberToNoteName(midiNote)});
-      }
-      console.log(liveNotes)
-    guitar.setMidiNotes(liveNotes)
-}
-  
-function noteReleased(midiNote) { 
-    // retirer la note relachee
-    let index = liveNotes.findIndex(item => 
-        item.note === midiNumberToNoteName(midiNote) 
-      );
-  
-      if (index !== -1) 
-        liveNotes.splice(index, 1)   
-
-      guitar.setMidiNotes(liveNotes)
-}
-
-function toggleMajorMinor() {
-   if (guitar) {
-       guitar.isMajor = !guitar.isMajor;
-       majorMinorToggle.html(guitar.isMajor ? 'Maj' : 'min');
-       majorMinorToggle.style('background-color', guitar.isMajor ? '' : '#666');
-       // mettre à jour les intervals selon le type courant
-       updateIntervalsFromMode();
-   }
+function getIntervalName(semitones) {
+    const intervals = {
+        0: { fr: 'unisson', code: 'P1' },
+        1: { fr: 'seconde mineure', code: 'm2' },
+        2: { fr: 'seconde majeure', code: 'M2' },
+        3: { fr: 'tierce mineure', code: 'm3' },
+        4: { fr: 'tierce majeure', code: 'M3' },
+        5: { fr: 'quarte juste', code: 'P4' },
+        6: { fr: 'triton', code: 'TT' },
+        7: { fr: 'quinte juste', code: 'P5' },
+        8: { fr: 'sixte mineure', code: 'm6' },
+        9: { fr: 'sixte majeure', code: 'M6' },
+        10: { fr: 'septième mineure', code: 'm7' },
+        11: { fr: 'septième majeure', code: 'M7' },
+        12: { fr: 'octave', code: 'P8' }
+    };
+    
+    // Pour les intervalles négatifs, afficher le nom de l'intervalle ascendant équivalent
+    if (semitones < 0) {
+        let positiveSemitones = Math.abs(semitones) % 12;
+        // Cas spécial: -12 est une octave, pas unisson
+        if (Math.abs(semitones) % 12 === 0 && Math.abs(semitones) > 0) {
+            positiveSemitones = 12;
+        }
+        let baseInterval = intervals[positiveSemitones] || { fr: 'Unknown', code: '?' };
+        return baseInterval;
+    }
+    
+    return intervals[semitones % 12] || { fr: 'Unknown', code: '?' };
 }
 
-function toggleScaleType() {
-   if (guitar) {
-       const types = ['Note','accords', 'penta', 'gamme'];
-       let currentIndex = types.indexOf(guitar.scaleType || 'Note');
-       let nextIndex = (currentIndex + 1) % types.length;
-       guitar.scaleType = types[nextIndex];
-       scaleTypeButton.html(types[nextIndex].charAt(0).toUpperCase() + types[nextIndex].slice(1));
-       // mettre à jour les intervals
-       updateIntervalsFromMode();
-   }
-}
-
-function updateIntervalsFromMode() {
-   if (!guitar) return;
-   const scaleType = guitar.scaleType || 'accords';
-   const isMajor = guitar.isMajor;
-   let intervals = [];
-   
-   if (scaleType === 'accords') {
-       intervals = isMajor ? guitar.majorChord : guitar.minorChord;
-   } else if (scaleType === 'penta') {
-       intervals = isMajor ? guitar.majorPentatonicScale : guitar.minorPentatonicScale;
-   } else if (scaleType === 'gamme') {
-       intervals = isMajor ? guitar.majorScale : guitar.minorScale;
-   }
-   guitar.intervals = [...intervals];
-   updateIntervalButtons();
-}
-
-function setIntervals(intervals) {
-   if (guitar) {
-       guitar.intervals = [...intervals];
-   }
-}
-
-function clearSelection() {
-   if (guitar) {
-       if (guitar.segmentMode) {
-           // Mode segment : vider les segments
-           guitar.segments = [];
-           guitar._segmentBuffer = [];
-       } else {
-           // Mode note : vider les notes et intervalles
-           guitar.intervals = [];
-           guitar.clickedNotes = [];
-           guitar.tonic = null;
-       }
-   }
-   guitar.resetIntervalButtons(); // MAJ visuelle des boutons
-   updateIntervalButtons();
-}
-
-// --- NOUVEAU : INTERVALLES MULTI-ETATS ---
-
-function toggleIntervalButton(n) {
-   // n = 1 à 8
-   if (!guitar) return;
-   const intervalMap = {
-       1: [0],        // 1
-       2: [2, 1],     // 2, b2
-       3: [4, 3],     // 3, b3
-       4: [5, 6],     // 4, #4
-       5: [7, 6],     // 5, b5
-       6: [9, 8],     // 6, b6
-       7: [11, 10],   // 7, b7
-       8: [12]        // 8 octave
-   };
-   let intervals = intervalMap[n];
-   let current = intervals.find(val => guitar.intervals.includes(val));
-   // cycle : inactif -> majeur -> altéré -> inactif
-   if (!current) {
-       // aucun actif, activer majeur
-       guitar.intervals.push(intervals[0]);
-   } else if (current === intervals[0] && intervals[1] !== undefined) {
-       // majeur actif, passer à altéré
-       guitar.intervals = guitar.intervals.filter(val => val !== intervals[0]);
-       guitar.intervals.push(intervals[1]);
-   } else if (intervals[1] !== undefined) {
-        // altéré actif, désactiver tout
-        guitar.intervals = guitar.intervals.filter(val => val !== intervals[1]);
-   } else {
-      // octave (pas d'altéré), désactiver
-      guitar.intervals = guitar.intervals.filter(val => val !== intervals[0]);
-   }
-   updateIntervalButtons();
-}
-
-function updateIntervalButtons() {
-   if (!guitar) return;
-   const intervalMap = {
-       1: [0],        // 1
-       2: [2, 1],     // 2, b2
-       3: [4, 3],     // 3, b3
-       4: [5, 6],     // 4, #4
-       5: [7, 6],     // 5, b5
-       6: [9, 8],     // 6, b6
-       7: [11, 10],   // 7, b7
-       8: [12]        // 8 octave
-   };
-   const intervalLabels = [
-       ['1'],
-       ['2', 'b2'],
-       ['3', 'b3'],
-       ['4', '#4'],
-       ['5', 'b5'],
-       ['6', 'b6'],
-       ['7', 'b7'],
-       ['8']
-   ];
-   for (let i = 0; i < 8; i++) {
-       let intervals = intervalMap[i + 1];
-       let btn = intervalButtons[i];
-       let label = intervalLabels[i][0];
-       let minorLabel = intervalLabels[i][1];
-       if (guitar.intervals.includes(intervals[0])) {
-           btn.html(label);
-           btn.style('background-color', '#2ecc40');
-           btn.style('color', '#fff');
-       } else if (intervals[1] !== undefined && guitar.intervals.includes(intervals[1])) {
-           btn.html(minorLabel);
-           btn.style('background-color', '#ff9800');
-           btn.style('color', '#fff');
-       } else {
-           btn.html(label);
-           btn.style('background-color', '#eee');
-           btn.style('color', '#888');
-       }
-   }
+function drawVisualFeedback() {
+    if (!gameStarted || !gameMode) return;
+    
+    let startFretWidth = guitar.neckWidth / guitar.fretCount;
+    let stringHeight = guitar.neckHeight / (guitar.stringCount - 1);
+    
+    // Afficher un cercle autour de la sélection de l'utilisateur
+    if (userSelectedPosition && showingAnswer) {
+        let x = guitar.neckX + userSelectedPosition.fret * startFretWidth - (startFretWidth / 2);
+        let y = guitar.neckY + userSelectedPosition.string * stringHeight;
+        
+        push();
+        noFill();
+        stroke(0);
+        strokeWeight(3);
+        ellipse(x, y, guitar.noteMarkerDiameter * 1.5, guitar.noteMarkerDiameter * 1.5);
+        pop();
+    }
+    
+    // Afficher la position correcte en vert si la réponse est incorrecte
+    if (showingAnswer && !answerWasCorrect && correctNotePosition) {
+        let x = guitar.neckX + correctNotePosition.fret * startFretWidth - (startFretWidth / 2);
+        let y = guitar.neckY + correctNotePosition.string * stringHeight;
+        
+        push();
+        fill(0, 255, 0, 100); // Vert semi-transparent
+        noStroke();
+        ellipse(x, y, guitar.noteMarkerDiameter * 1.2, guitar.noteMarkerDiameter * 1.2);
+        
+        // Bordure verte
+        noFill();
+        stroke(0, 255, 0);
+        strokeWeight(2);
+        ellipse(x, y, guitar.noteMarkerDiameter * 1.4, guitar.noteMarkerDiameter * 1.4);
+        pop();
+    }
 }
