@@ -7,7 +7,7 @@ let gameStarted = false;
 let gameMode = null; // "intervals", "degrees" ou "notes"
 let difficultySelected = false; // La difficulté a-t-elle été sélectionnée ?
 let useFlatMode = true; // true = bémols, false = dièses
-let god_mode = true; // Affiche la pastille sous le curseur (mode debug)
+let god_mode = false; // Affiche la pastille sous le curseur (mode debug)
 let gameActive = true;
 let gameStartTime = 0;
 let questionDisplayTime = 0; // Temps d'affichage de la question
@@ -33,16 +33,16 @@ let sessionEnded = false; // La session est-elle terminée ?
 let showingQuestion = false; // La question est-elle affichée ?
 let startingNoteVisible = false; // La note de départ est-elle visible ?
 let timeoutOccurred = false; // Le temps a-t-il expiré ?
-let displayTimeDelay = 2000
+let displayTimeDelay = 1000
 let nextTimeDelay = 1000 // Délai avant la question suivante
 let answerDisplayTime = 0 // Moment où la réponse a été affichée
 // Intervalle list (semitones) - incluant montées et descentes
 const intervalList = [-12, -11, -10, -9, -8, -7, -5, -4, -3, -2, -1 ,0,1, 2, 3, 4, 5, 7, 8, 9, 10,11, 12];
 
 // Intervalle par difficulté (en semitones)
-const noobIntervals = [3, 4, 7, 12]; // b3, 3, 5, 8 - triades uniquement ascendant (sans unisson, sans triton)
+const noobIntervals = [3, 4, 7, 11,12]; // b3, 3, 5, 8 - triades uniquement ascendant (sans unisson, sans triton)
 const slowIntervals = [3, 4, 6, 7, 10, 11, 12, -3, -4, -6, -7, -10, -11, -12]; // +7ièmes ascendant/descendant
-const normalIntervals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12]; // Pentato (sans unisson)
+const normalIntervals = [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12]; // Pentato (sans unisson)
 const expertIntervals = intervalList; // Tous les intervalles
 
 function setup() {
@@ -161,8 +161,8 @@ function mouseClicked() {
         let difficulties = [
             { label: 'NOOB', time: 10 },
             { label: 'SLOW', time: 5 },
-            { label: 'NORMAL', time: 3 },
-            { label: 'EXPERT', time: 1 }
+            { label: 'NORMAL', time: 4 },
+            { label: 'EXPERT', time: 2 }
         ];
         
         for (let i = 0; i < difficulties.length; i++) {
@@ -328,7 +328,7 @@ function startNewQuestion() {
                 allowedIntervals = noobIntervals;
             } else if (timeLimitSeconds === 5) { // SLOW
                 allowedIntervals = slowIntervals;
-            } else if (timeLimitSeconds === 3) { // NORMAL
+            } else if (timeLimitSeconds === 4) { // NORMAL
                 allowedIntervals = normalIntervals;
             } else { // EXPERT (1s)
                 allowedIntervals = expertIntervals;
@@ -343,8 +343,8 @@ function startNewQuestion() {
             if (timeLimitSeconds === 10) { // NOOB - b3, 3, 5, 8 (triades ascendantes, sans unisson, sans triton)
                 allowedIntervals = [3, 4, 7, 12];
             } else if (timeLimitSeconds === 5) { // SLOW - +7ièmes ascendant seulement
-                allowedIntervals = [3, 4, 6, 7, 10, 11, 12];
-            } else if (timeLimitSeconds === 3) { // NORMAL - pentato ascendant seulement
+                allowedIntervals = [3, 4, 6, 7, 10, 11, 12,-3, -4, -6, -7, -10, -11, -12];
+            } else if (timeLimitSeconds === 4) { // NORMAL - pentato ascendant seulement
                 allowedIntervals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
             } else { // EXPERT
                 allowedIntervals = intervalList;
@@ -603,8 +603,8 @@ function displayGameUI() {
         let difficulties = [
             { label: 'NOOB', time: '10s' },
             { label: 'SLOW', time: '5s' },
-            { label: 'NORMAL', time: '3s' },
-            { label: 'EXPERT', time: '1s' }
+            { label: 'NORMAL', time: '4s' },
+            { label: 'EXPERT', time: '2s' }
         ];
         
         for (let i = 0; i < difficulties.length; i++) {
@@ -722,7 +722,9 @@ function displayGameUI() {
         if (nameText) {
             textSize(28);
             textStyle(NORMAL);
-            text(nameText, width / 2, uiY + 80);
+            text((directionText == "UP" ? 'Monte ' : 'Descends ') + 
+                 (nameText == 'triton' ? "d'un " :"d'une ")
+                  + nameText, width / 2, uiY + 80);
         }
     } else if (gameMode === "degrees") {
         let degreeInfo = getDegreeName(int(currentDegree));
@@ -739,6 +741,11 @@ function displayGameUI() {
         textSize(70);
         textStyle(BOLD);
         text(directionText, width / 2, uiY);
+        
+        textSize(28);
+        textStyle(NORMAL);
+        text( (currentDegree === 0 ? 'Trouve le meme ' : (currentDegree > 0 ? 'Monte à ' : 'Descends à '))  
+                + degreeInfo, width / 2, uiY + 80);
         
     } else if (gameMode === "notes") {
         let startNoteName = startingNote.match(/[A-G]#?b?/)[0];
@@ -764,7 +771,7 @@ function displayGameUI() {
     }
     
     // Afficher le score et le countdown
-    text('Score: ' + score, width / 3, uiY + 40);
+    text('Score: ' + score, width / 3,  40);
     
     // Afficher le countdown si la note de départ est visible
     if (startingNoteVisible && !showingAnswer) {
@@ -777,7 +784,7 @@ function displayGameUI() {
             fill(200, 0, 0);
         }
         textSize(40);
-        text(secondsRemaining.toFixed(1) + 's', width / 2 + 100, uiY + 40);
+        text(secondsRemaining.toFixed(1) + 's',100, uiY + 40);
     }
     
     // Message de résultat
@@ -787,10 +794,11 @@ function displayGameUI() {
             answerDisplayTime = millis();
         }
         
-        textSize(28);
+        textSize(100);
+        textStyle(BOLD)
         textAlign(CENTER, CENTER);
         
-        let resultY = uiY + 100;
+        let resultY = 200;
         
         if (answerWasCorrect) {
             fill(0, 200, 0); // Vert
@@ -798,9 +806,9 @@ function displayGameUI() {
         } else {
             fill(200, 0, 0); // Rouge
             if (timeoutOccurred) {
-                text('✗ TEMPS ÉCOULÉ! ' , width / 2, resultY);
+                text('✗ 🕑! ' , width / 2, resultY);
             } else {
-                text('✗ ERREUR! Réponse: ' , width / 2, resultY);
+                text('✗' , width / 2, resultY);
             }
         }
         
@@ -819,7 +827,7 @@ function displayGameUI() {
         fill(100);
         textSize(16);
         let remainingTime = nextTimeDelay - timeSinceAnswerDisplay;
-        text('Prochaine question dans ' + max(0, (remainingTime / 1000).toFixed(1)) + 's', width / 2, resultY + 50);
+        //text('Prochaine question dans ' + max(0, (remainingTime / 1000).toFixed(1)) + 's', width / 2, resultY + 50);
     }
 }
 

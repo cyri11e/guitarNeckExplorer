@@ -84,7 +84,7 @@ class Guitar{
         this.drawENotes();
         this.drawPlayedNotes();
         this.drawStartingNote();
-        this.drawHoveredNote();
+       // this.drawHoveredNote();
         this.drawGodMode();
     }
 
