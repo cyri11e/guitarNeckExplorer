@@ -350,7 +350,7 @@ function startNewQuestion() {
                 allowedIntervals = intervalList;
             }
             let randomInterval = random(allowedIntervals);
-            targetNote = calculateTargetNote(startingNote, randomInterval);
+            targetNote = calculateTargetNoteByDegree(startingNote, randomInterval);
             // Convertir l'intervalle en degré pour l'affichage
             currentDegree = randomInterval;
         } else if (gameMode === "notes") {
@@ -361,7 +361,7 @@ function startNewQuestion() {
                 allowedIntervals = [3, 4, 7, 12];
             } else if (timeLimitSeconds === 5) { // SLOW - +7ièmes ascendant/descendant
                 allowedIntervals = [3, 4, 6, 7, 10, 11, 12, -3, -4, -6, -7, -10, -11, -12];
-            } else if (timeLimitSeconds === 3) { // NORMAL - pentato ascendant/descendant
+            } else if (timeLimitSeconds === 4) { // NORMAL - pentato ascendant/descendant
                 allowedIntervals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12];
             } else { // EXPERT
                 allowedIntervals = intervalList;
@@ -435,44 +435,20 @@ function startNewQuestion() {
     console.log('');
 }
 
-function calculateTargetByDegree(startNote, degree) {
-    // Gamme majeure : intervalles en semitones [0, 2, 4, 5, 7, 9, 11]
-    const majorScaleIntervals = [0, 2, 4, 5, 7, 9, 11];
+
+function calculateTargetNoteByDegree(startNote, interval) {
     const notesOrderSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     
     // Extraire la note et l'octave
     let noteName = startNote.match(/[A-G]#?/)[0];
     let octave = parseInt(startNote.match(/\d+/)[0]);
     
-    let startNoteIndex = notesOrderSharp.indexOf(noteName);
-    let startMidiIndex = startNoteIndex + (octave * 12);
+    let noteIndex = notesOrderSharp.indexOf(noteName);
+    let midiIndex = noteIndex + (octave * 12);
+    let targetMidiIndex = midiIndex + Math.abs(interval);
     
-    // Cas spécial : degré 0 = unisson (même note)
-    if (degree === 0) {
-        return startNote;
-    }
-    
-    // Pour les autres degrés
-    let degreeIndex = Math.abs(degree) - 1;
-    degreeIndex = degreeIndex % 7; // Limiter à 0-6
-    
-    // Obtenir l'intervalle en semitones pour ce degré
-    let intervalInSemitones = majorScaleIntervals[degreeIndex];
-    
-    // Si le degré est négatif, aller une octave vers le bas
-    if (degree < 0) {
-        intervalInSemitones = intervalInSemitones - 12;
-    }
-    
-    // Calculer la note cible en MIDI
-    let targetMidiIndex = startMidiIndex + intervalInSemitones;
-    
-    let targetOctave = Math.floor(targetMidiIndex / 12);
+    let targetOctave = Math.floor(targetMidiIndex / 12) - (interval < 0 ? 1 : 0);
     let targetNoteIndex = targetMidiIndex % 12;
-    if (targetNoteIndex < 0) {
-        targetNoteIndex += 12;
-        targetOctave -= 1;
-    }
     
     let targetNote = notesOrderSharp[targetNoteIndex] + targetOctave;
     
@@ -480,7 +456,13 @@ function calculateTargetByDegree(startNote, degree) {
     if (useFlatMode) {
         let targetNoteName = targetNote.match(/[A-G]#?b?/)[0];
         if (targetNoteName.includes('#')) {
-            const enharmonics = {'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb'};
+            const enharmonics = {
+                'C#': 'Db',
+                'D#': 'Eb',
+                'F#': 'Gb',
+                'G#': 'Ab',
+                'A#': 'Bb'
+            };
             targetNoteName = enharmonics[targetNoteName];
             targetNote = targetNoteName + targetOctave;
         }
