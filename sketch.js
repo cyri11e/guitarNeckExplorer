@@ -5,16 +5,19 @@ let guitar
 // Game variables
 let gameStarted = false;
 let gameMode = null; // "intervals", "degrees" ou "notes"
+let difficultySelected = false; // La difficulté a-t-elle été sélectionnée ?
 let useFlatMode = true; // true = bémols, false = dièses
 let god_mode = true; // Affiche la pastille sous le curseur (mode debug)
 let gameActive = true;
 let gameStartTime = 0;
-let questionStartTime = 0; // Pour tracker le temps par question
-let currentTime = 0;
+let questionDisplayTime = 0; // Temps d'affichage de la question
+let startingNoteDisplayTime = 0; // Temps d'affichage de la note de départ
 let score = 0;
-let totalTime = 0; // Temps total des réponses
+let totalCorrectResponses = 0; // Nombre de réponses correctes
+let responseTimes = []; // Array des temps de réponse (uniquement pour réponses correctes)
 let questionsAnswered = 0; // Nombre de questions répondues
 let sessionQuestions = 10; // Nombre de questions par session
+let timeLimitSeconds = 3; // Limite de temps en secondes (par défaut: Normal 3s)
 let targetNote = null;
 let startingNote = null;
 let startingNotePosition = null; // {string, fret} de la note de départ
@@ -27,9 +30,20 @@ let showingAnswer = false;
 let answerWasCorrect = false;
 let correctNotePosition = null;
 let sessionEnded = false; // La session est-elle terminée ?
-
+let showingQuestion = false; // La question est-elle affichée ?
+let startingNoteVisible = false; // La note de départ est-elle visible ?
+let timeoutOccurred = false; // Le temps a-t-il expiré ?
+let displayTimeDelay = 2000
+let nextTimeDelay = 1000 // Délai avant la question suivante
+let answerDisplayTime = 0 // Moment où la réponse a été affichée
 // Intervalle list (semitones) - incluant montées et descentes
-const intervalList = [-12, -10, -9, -8, -7, -5, -4, -3, -2, 0, 2, 3, 4, 5, 7, 8, 9, 10, 12];
+const intervalList = [-12, -11, -10, -9, -8, -7, -5, -4, -3, -2, -1 ,0,1, 2, 3, 4, 5, 7, 8, 9, 10,11, 12];
+
+// Intervalle par difficulté (en semitones)
+const noobIntervals = [3, 4, 7, 12]; // b3, 3, 5, 8 - triades uniquement ascendant (sans unisson, sans triton)
+const slowIntervals = [3, 4, 6, 7, 10, 11, 12, -3, -4, -6, -7, -10, -11, -12]; // +7ièmes ascendant/descendant
+const normalIntervals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12]; // Pentato (sans unisson)
+const expertIntervals = intervalList; // Tous les intervalles
 
 function setup() {
     wH = windowHeight;
@@ -71,9 +85,7 @@ function mouseReleased() {
 function keyPressed(){
     // Espace pour passer à la question suivante ou terminer la session
     if (key === ' ' || keyCode === 32) {
-        if (showingAnswer) {
-            questionsAnswered++;
-            
+        if (showingAnswer || timeoutOccurred) {
             // Vérifier si la session est terminée
             if (questionsAnswered >= sessionQuestions) {
                 sessionEnded = true;
@@ -109,7 +121,7 @@ function draw() {
 }
 
 function mouseClicked() {
-    // Écran d'accueil : boutons cliquables
+    // Écran d'accueil : choix du type de jeu
     if (!gameMode && !sessionEnded) {
         let buttonY = height / 2 + 50;
         let buttonWidth = 120;
@@ -120,8 +132,6 @@ function mouseClicked() {
             mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
             gameMode = "intervals";
             useFlatMode = random() > 0.5;
-            gameStarted = true;
-            startNewQuestion();
             return false;
         }
         
@@ -130,8 +140,6 @@ function mouseClicked() {
             mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
             gameMode = "degrees";
             useFlatMode = random() > 0.5;
-            gameStarted = true;
-            startNewQuestion();
             return false;
         }
         
@@ -140,15 +148,38 @@ function mouseClicked() {
             mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
             gameMode = "notes";
             useFlatMode = random() > 0.5;
-            gameStarted = true;
-            startNewQuestion();
             return false;
+        }
+    }
+    
+    // Écran de sélection de difficulté
+    if (gameMode && !difficultySelected && !sessionEnded) {
+        let buttonY = height / 2 + 50;
+        let buttonWidth = 100;
+        let buttonHeight = 50;
+        let buttonsX = [width / 2 - 160, width / 2 - 50, width / 2 + 60, width / 2 + 170];
+        let difficulties = [
+            { label: 'NOOB', time: 10 },
+            { label: 'SLOW', time: 5 },
+            { label: 'NORMAL', time: 3 },
+            { label: 'EXPERT', time: 1 }
+        ];
+        
+        for (let i = 0; i < difficulties.length; i++) {
+            if (mouseX > buttonsX[i] - buttonWidth / 2 && mouseX < buttonsX[i] + buttonWidth / 2 &&
+                mouseY > buttonY - buttonHeight / 2 && mouseY < buttonY + buttonHeight / 2) {
+                timeLimitSeconds = difficulties[i].time;
+                difficultySelected = true;
+                gameStarted = true;
+                startNewQuestion();
+                return false;
+            }
         }
     }
     
     // Écran de fin : recommencer
     if (sessionEnded) {
-        let restartButtonY = height / 2 + 100;
+        let restartButtonY = height / 2 + 120;
         let restartButtonWidth = 150;
         let restartButtonHeight = 50;
         
@@ -156,17 +187,19 @@ function mouseClicked() {
             mouseY > restartButtonY - restartButtonHeight / 2 && mouseY < restartButtonY + restartButtonHeight / 2) {
             // Réinitialiser le jeu
             gameMode = null;
+            difficultySelected = false;
             gameStarted = false;
             sessionEnded = false;
             score = 0;
-            totalTime = 0;
+            responseTimes = [];
+            totalCorrectResponses = 0;
             questionsAnswered = 0;
             return false;
         }
     }
     
     // Jeu normal
-    if (!gameActive || !gameMode || showingAnswer) return false;
+    if (!gameActive || !gameMode || showingAnswer || !startingNoteVisible) return false;
     
     if (guitar) {
         guitar.mouseClicked();
@@ -180,13 +213,14 @@ function mouseClicked() {
             if (userSelectedNote.note === targetNote) {
                 answerWasCorrect = true;
                 score++;
+                // Tracker le temps uniquement pour les bonnes réponses
+                let responseTime = millis() - startingNoteDisplayTime;
+                responseTimes.push(responseTime);
+                totalCorrectResponses++;
             } else {
                 answerWasCorrect = false;
             }
             
-            // Tracker le temps de cette question
-            let responseTime = millis() - questionStartTime;
-            totalTime += responseTime;
             questionsAnswered++;
             
             showingAnswer = true;
@@ -288,17 +322,52 @@ function startNewQuestion() {
         startingNotePosition = { string: randomString, fret: randomFret };
         
         if (gameMode === "intervals") {
-            // Mode Intervalles
-            currentInterval = random(intervalList);
+            // Mode Intervalles - filtrer selon la difficulté
+            let allowedIntervals;
+            if (timeLimitSeconds === 10) { // NOOB
+                allowedIntervals = noobIntervals;
+            } else if (timeLimitSeconds === 5) { // SLOW
+                allowedIntervals = slowIntervals;
+            } else if (timeLimitSeconds === 3) { // NORMAL
+                allowedIntervals = normalIntervals;
+            } else { // EXPERT (1s)
+                allowedIntervals = expertIntervals;
+            }
+            currentInterval = random(allowedIntervals);
             targetNote = calculateTargetNote(startingNote, currentInterval);
         } else if (gameMode === "degrees") {
-            // Mode Degrés - degrés de la gamme majeure (incluant unisson)
-            const degrees = [0, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7];
-            currentDegree = random(degrees);
-            targetNote = calculateTargetByDegree(startingNote, currentDegree);
+            // Mode Degrés - utiliser les intervalles pour pouvoir exprimer b3 et b5
+            // IMPORTANT: en mode degrees, on n'utilise que les intervalles POSITIFS
+            // (un 2 descendant n'est pas un b7, c'est un 2 descendant)
+            let allowedIntervals;
+            if (timeLimitSeconds === 10) { // NOOB - b3, 3, 5, 8 (triades ascendantes, sans unisson, sans triton)
+                allowedIntervals = [3, 4, 7, 12];
+            } else if (timeLimitSeconds === 5) { // SLOW - +7ièmes ascendant seulement
+                allowedIntervals = [3, 4, 6, 7, 10, 11, 12];
+            } else if (timeLimitSeconds === 3) { // NORMAL - pentato ascendant seulement
+                allowedIntervals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            } else { // EXPERT
+                allowedIntervals = intervalList;
+            }
+            let randomInterval = random(allowedIntervals);
+            targetNote = calculateTargetNote(startingNote, randomInterval);
+            // Convertir l'intervalle en degré pour l'affichage
+            currentDegree = randomInterval;
         } else if (gameMode === "notes") {
-            // Mode Notes - note aléatoire
-            targetNote = getRandomNote(startingNote, 1); // ±1 octave
+            // Mode Notes - note aléatoire basée sur la difficulté
+            // Utiliser intervalles ascendants ET descendants pour avoir UP, DOWN et FIND
+            let allowedIntervals;
+            if (timeLimitSeconds === 10) { // NOOB - triades ascendantes uniquement
+                allowedIntervals = [3, 4, 7, 12];
+            } else if (timeLimitSeconds === 5) { // SLOW - +7ièmes ascendant/descendant
+                allowedIntervals = [3, 4, 6, 7, 10, 11, 12, -3, -4, -6, -7, -10, -11, -12];
+            } else if (timeLimitSeconds === 3) { // NORMAL - pentato ascendant/descendant
+                allowedIntervals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12];
+            } else { // EXPERT
+                allowedIntervals = intervalList;
+            }
+            let randomInterval = random(allowedIntervals);
+            targetNote = calculateTargetNote(startingNote, randomInterval);
             currentTargetNoteName = targetNote.match(/[A-G]#?b?/)[0];
         }
         
@@ -317,11 +386,16 @@ function startNewQuestion() {
     userSelectedPosition = null;
     showingAnswer = false;
     answerWasCorrect = false;
-    questionStartTime = millis(); // Tracker le temps du début de la question
+    timeoutOccurred = false;
+    showingQuestion = true; // La question est affichée
+    startingNoteVisible = false; // La note de départ n'est pas encore visible
+    answerDisplayTime = 0; // Réinitialiser le temps d'affichage de la réponse
     
-    // Configurer le guitar pour afficher la pastille correctement en god_mode
+    questionDisplayTime = millis(); // Enregistrer le temps d'affichage de la question
+    
+    // Configurer le guitar pour afficher la pastille correctement
     guitar.startingNotePosition = startingNotePosition; // Passer la position de départ
-    guitar.godMode = god_mode; // Passer l'état du mode dieu
+    guitar.startingNoteVisible = false; // La note de départ n'est pas visible au début
     guitar.startingNote = startingNote; // Passer la note de départ pour affichage
     
     if (gameMode === "notes") {
@@ -337,6 +411,28 @@ function startNewQuestion() {
     guitar.intervals = []; // Vider les intervalles
     guitar.clickedNotes = []; // Vider les notes cliquées
     guitar.playedNotes = []; // Vider les notes jouées
+    
+    // === LOGS DE DEBUG ===
+    console.log('=== NOUVELLE QUESTION ===');
+    console.log('Difficulté:', timeLimitSeconds + 's', '(' + ['NOOB', 'SLOW', 'NORMAL', 'EXPERT'][[10, 5, 3, 1].indexOf(timeLimitSeconds)] + ')');
+    console.log('Mode:', gameMode.toUpperCase());
+    console.log('Question #' + (questionsAnswered + 1) + '/' + sessionQuestions);
+    console.log('');
+    console.log('📍 NOTE DE DÉPART:', startingNote, 'String', startingNotePosition.string, 'Fret', startingNotePosition.fret);
+    
+    if (gameMode === "intervals") {
+        console.log('📊 INTERVALLE:', currentInterval, 'semitones (' + getIntervalName(currentInterval).fr + ')');
+    } else if (gameMode === "degrees") {
+        console.log('📊 DEGRÉ:', currentDegree, 'semitones (' + getDegreeName(currentDegree) + ')');
+    } else if (gameMode === "notes") {
+        console.log('📊 NOTE À TROUVER:', currentTargetNoteName);
+    }
+    
+    console.log('🎯 RÉPONSE ATTENDUE:', targetNote);
+    if (correctNotePosition) {
+        console.log('   Position: String', correctNotePosition.string, 'Fret', correctNotePosition.fret);
+    }
+    console.log('');
 }
 
 function calculateTargetByDegree(startNote, degree) {
@@ -441,7 +537,7 @@ function findNoteOnFretboard(noteName) {
 
 function displayGameUI() {
     if (!gameMode) {
-        // Écran d'accueil avec options cliquables
+        // Écran d'accueil avec choix du type de jeu
         fill(0);
         textSize(48);
         textAlign(CENTER, CENTER);
@@ -449,6 +545,9 @@ function displayGameUI() {
         
         textSize(32);
         text('Know Your Neck !', width / 2, height / 2 - 50);
+        
+        textSize(24);
+        text('Sélectionnez votre type de jeu', width / 2, height / 2 - 10);
         
         // Boutons cliquables
         let buttonY = height / 2 + 50;
@@ -483,6 +582,44 @@ function displayGameUI() {
         return;
     }
     
+    if (gameMode && !difficultySelected) {
+        // Écran de sélection de difficulté
+        fill(0);
+        textSize(48);
+        textAlign(CENTER, CENTER);
+        text('The KYN Game', width / 2, height / 2 - 100);
+        
+        textSize(32);
+        text('Know Your Neck !', width / 2, height / 2 - 50);
+        
+        textSize(24);
+        text('Sélectionnez votre niveau de difficulté', width / 2, height / 2 - 10);
+        
+        // Boutons de difficulté
+        let buttonY = height / 2 + 50;
+        let buttonWidth = 100;
+        let buttonHeight = 50;
+        let buttonsX = [width / 2 - 160, width / 2 - 50, width / 2 + 60, width / 2 + 170];
+        let difficulties = [
+            { label: 'NOOB', time: '10s' },
+            { label: 'SLOW', time: '5s' },
+            { label: 'NORMAL', time: '3s' },
+            { label: 'EXPERT', time: '1s' }
+        ];
+        
+        for (let i = 0; i < difficulties.length; i++) {
+            fill(0, 100, 200);
+            rect(buttonsX[i] - buttonWidth / 2, buttonY - buttonHeight / 2, buttonWidth, buttonHeight);
+            fill(255);
+            textSize(16);
+            text(difficulties[i].label, buttonsX[i], buttonY - 10);
+            textSize(12);
+            text(difficulties[i].time, buttonsX[i], buttonY + 12);
+        }
+        
+        return;
+    }
+    
     // Écran de fin de session
     if (sessionEnded) {
         fill(0);
@@ -491,12 +628,28 @@ function displayGameUI() {
         text('Session terminée!', width / 2, height / 2 - 100);
         
         textSize(32);
-        let averageTime = totalTime / questionsAnswered / 1000;
         text('Score: ' + score + '/' + sessionQuestions, width / 2, height / 2 - 20);
-        text('Temps moyen: ' + averageTime.toFixed(1) + 's', width / 2, height / 2 + 30);
+        
+        // Afficher la moyenne ou le message "Prends ton temps"
+        let percentageScore = (score / sessionQuestions) * 10;
+        if (percentageScore >= 8) {
+            let averageTimeMs = 0;
+            if (totalCorrectResponses > 0) {
+                averageTimeMs = responseTimes.reduce((a, b) => a + b, 0) / totalCorrectResponses;
+            }
+            let averageTime = averageTimeMs / 1000;
+            text('Temps moyen: ' + averageTime.toFixed(1) + 's', width / 2, height / 2 + 30);
+        } else {
+            fill(150, 0, 0);
+            textSize(28);
+            text('Prends ton temps', width / 2, height / 2 + 30);
+            fill(0);
+            textSize(16);
+            text('(Score trop faible pour afficher le temps)', width / 2, height / 2 + 60);
+        }
         
         // Bouton Recommencer
-        let restartButtonY = height / 2 + 100;
+        let restartButtonY = height / 2 + 120;
         let restartButtonWidth = 150;
         let restartButtonHeight = 50;
         
@@ -509,85 +662,131 @@ function displayGameUI() {
         return;
     }
     
-    // Calculer le temps écoulé - arrêter le chrono si réponse donnée
-    if (showingAnswer) {
-        // Le chrono reste figé au moment de la réponse
-    } else {
-        currentTime = millis() - gameStartTime;
-    }
-    
-    let seconds = floor(currentTime / 1000);
-    let ms = currentTime % 1000;
-    
-    // Afficher l'UI sous le manche - plus loin du manche
-    fill(0);
-    textSize(24);
-    textAlign(CENTER, TOP);
-    
+    // Pendant le jeu
     let uiY = guitar.neckY + guitar.neckHeight + 80;
     
-    // Afficher les informations de la question
-    let questionText = "";
-    if (gameMode === "intervals") {
-        // Format: "Monte d'une tierce mineure (+m3)" ou "Descend d'une quarte juste (-P4)"
-        let intervalInfo = getIntervalName(int(currentInterval));
+    // Vérifier si 2 secondes se sont écoulées depuis l'affichage de la question
+    let timeSinceQuestionDisplay = millis() - questionDisplayTime;
+    if (timeSinceQuestionDisplay >= displayTimeDelay && !startingNoteVisible) {
+        startingNoteVisible = true;
+        startingNoteDisplayTime = millis(); // Enregistrer le temps de début du countdown
+        guitar.startingNoteVisible = true; // Afficher la note de départ
+    }
+    
+    // Calculer le temps restant du countdown
+    let timeElapsedSinceStart = millis() - startingNoteDisplayTime;
+    let timeRemaining = timeLimitSeconds * 1000 - timeElapsedSinceStart;
+    
+    // Vérifier si le temps a expiré
+    if (timeRemaining <= 0 && !showingAnswer && startingNoteVisible && !timeoutOccurred) {
+        showingAnswer = true;
+        timeoutOccurred = true;
+        answerWasCorrect = false;
+        questionsAnswered++;
         
-        if (currentInterval === 0) {
-            // Unisson - cas spécial
-            questionText = "Trouve la même note (unisson)";
-        } else {
-            let sign = currentInterval >= 0 ? "+" : "-";
-            if (currentInterval >= 0) {
-                questionText = "Monte d'une " + intervalInfo.fr + " (" + sign + intervalInfo.code + ")";
-            } else {
-                questionText = "Descend d'une " + intervalInfo.fr + " (" + sign + intervalInfo.code + ")";
-            }
-        }
-    } else if (gameMode === "degrees") {
-        // Format pour les degrés
-        if (currentDegree === 0) {
-            // Unisson
-            questionText = "Trouve le degré 1 (unisson)";
-        } else {
-            let degreeNum = Math.abs(currentDegree);
-            let direction = currentDegree > 0 ? "aigu" : "grave";
-            
-            if (Math.abs(currentDegree) === 1) {
-                // Degré 1 plus aigu/grave = octave
-                questionText = "Trouve le degré 1 " + direction + " (octave)";
-            } else {
-                // Autres degrés
-                questionText = "Trouve le degré " + degreeNum + " " + direction;
-            }
-        }
-    } else if (gameMode === "notes") {
-        // Format pour les notes
-        let startNoteName = startingNote.match(/[A-G]#?b?/)[0];
-        let targetNoteName = targetNote.match(/[A-G]#?b?/)[0];
-        let startOctave = parseInt(startingNote.match(/\d+/)[0]);
-        let targetOctave = parseInt(targetNote.match(/\d+/)[0]);
-        
-        if (targetNoteName === startNoteName && targetOctave === startOctave) {
-            // Unisson - même note, même octave (normalement pas possible)
-            questionText = "Trouve le même " + currentTargetNoteName;
-        } else if (targetNoteName === startNoteName) {
-            // Même note, octave différent
-            let direction = targetOctave > startOctave ? "aigu" : "grave";
-            questionText = "Trouve le même " + currentTargetNoteName + " " + direction;
-        } else {
-            // Note différente - préciser la direction
-            let direction = targetOctave > startOctave ? "aigu" : "grave";
-            questionText = "Trouve le " + currentTargetNoteName + " " + direction;
+        // Afficher la position correcte sur le manche
+        if (correctNotePosition) {
+            guitar.setPlayedNote([targetNote]);
         }
     }
     
-    text(questionText, width / 2, uiY);
+    // Afficher les informations de la question
+    fill(0);
+    textAlign(CENTER, TOP);
     
-    // Afficher le score et le timer sur la même ligne
-    text('Score: ' + score + '  |  Time: ' + seconds + '.' + floor(ms / 100), width / 2, uiY + 40);
+    if (gameMode === "intervals") {
+        let intervalInfo = getIntervalName(int(currentInterval));
+        let directionText = "";
+        let codeText = "";
+        let nameText = "";
+        
+        if (currentInterval === 0) {
+            directionText = "FIND";
+            codeText = "unisson";
+        } else if (currentInterval > 0) {
+            directionText = "UP";
+            codeText = intervalInfo.code;
+            nameText = intervalInfo.fr;
+        } else {
+            directionText = "DOWN";
+            codeText = intervalInfo.code;
+            nameText = intervalInfo.fr;
+        }
+        
+        // Afficher DIRECTION CODE en gros
+        textSize(70);
+        textStyle(BOLD);
+        text(directionText + ' ' + codeText, width / 2, uiY);
+        
+        // Afficher le nom de l'intervalle en plus petit si applicable
+        if (nameText) {
+            textSize(28);
+            textStyle(NORMAL);
+            text(nameText, width / 2, uiY + 80);
+        }
+    } else if (gameMode === "degrees") {
+        let degreeInfo = getDegreeName(int(currentDegree));
+        let directionText = "";
+        
+        if (currentDegree === 0) {
+            directionText = "FIND";
+        } else if (currentDegree > 0) {
+            directionText = "UP " + degreeInfo;
+        } else {
+            directionText = "DOWN " + degreeInfo;
+        }
+        
+        textSize(70);
+        textStyle(BOLD);
+        text(directionText, width / 2, uiY);
+        
+    } else if (gameMode === "notes") {
+        let startNoteName = startingNote.match(/[A-G]#?b?/)[0];
+        let startOctave = parseInt(startingNote.match(/\d+/)[0]);
+        let targetOctave = parseInt(targetNote.match(/\d+/)[0]);
+        let directionText = "";
+        
+        // FIND seulement si c'est exactement la même note (même nom ET même octave)
+        if (currentTargetNoteName === startNoteName && targetOctave === startOctave) {
+            directionText = "FIND " + currentTargetNoteName;
+        } else if (targetOctave > startOctave) {
+            directionText = "UP " + currentTargetNoteName;
+        } else if (targetOctave < startOctave) {
+            directionText = "DOWN " + currentTargetNoteName;
+        } else {
+            // Même octave mais note différente
+            directionText = "UP " + currentTargetNoteName;
+        }
+        
+        textSize(70);
+        textStyle(BOLD);
+        text(directionText, width / 2, uiY);
+    }
+    
+    // Afficher le score et le countdown
+    text('Score: ' + score, width / 3, uiY + 40);
+    
+    // Afficher le countdown si la note de départ est visible
+    if (startingNoteVisible && !showingAnswer) {
+        let secondsRemaining = max(0, timeRemaining / 1000);
+        if (secondsRemaining > 2) {
+            fill(0);
+        } else if (secondsRemaining > 1) {
+            fill(200, 150, 0);
+        } else {
+            fill(200, 0, 0);
+        }
+        textSize(40);
+        text(secondsRemaining.toFixed(1) + 's', width / 2 + 100, uiY + 40);
+    }
     
     // Message de résultat
     if (showingAnswer) {
+        // Enregistrer le moment où la réponse est affichée (première fois seulement)
+        if (answerDisplayTime === 0) {
+            answerDisplayTime = millis();
+        }
+        
         textSize(28);
         textAlign(CENTER, CENTER);
         
@@ -595,32 +794,32 @@ function displayGameUI() {
         
         if (answerWasCorrect) {
             fill(0, 200, 0); // Vert
-            if (gameMode === "intervals") {
-                let intervalInfo = getIntervalName(int(currentInterval));
-                text('✓ CORRECT! ' + intervalInfo.fr, width / 2, resultY);
-            } else if (gameMode === "degrees") {
-                if (currentDegree === 0) {
-                    text('✓ CORRECT! Degré 1 (unisson)', width / 2, resultY);
-                } else {
-                    let degreeNum = Math.abs(currentDegree);
-                    if (degreeNum === 1) {
-                        text('✓ CORRECT! Octave', width / 2, resultY);
-                    } else {
-                        text('✓ CORRECT! Degré ' + degreeNum, width / 2, resultY);
-                    }
-                }
-            } else if (gameMode === "notes") {
-                text('✓ CORRECT! ' + currentTargetNoteName, width / 2, resultY);
-            }
+                text('✓ CORRECT! ' , width / 2, resultY);
         } else {
             fill(200, 0, 0); // Rouge
-            text('✗ ERREUR! Réponse: ' + targetNote, width / 2, resultY);
+            if (timeoutOccurred) {
+                text('✗ TEMPS ÉCOULÉ! ' , width / 2, resultY);
+            } else {
+                text('✗ ERREUR! Réponse: ' , width / 2, resultY);
+            }
+        }
+        
+        // Vérifier si le délai d'auto-progression est passé
+        let timeSinceAnswerDisplay = millis() - answerDisplayTime;
+        if (timeSinceAnswerDisplay >= nextTimeDelay) {
+            // Auto-progression
+            if (questionsAnswered < sessionQuestions) {
+                startNewQuestion();
+            } else {
+                sessionEnded = true;
+            }
         }
         
         // Instructions pour continuer
         fill(100);
         textSize(16);
-        text('Pressez ESPACE pour continuer', width / 2, resultY + 50);
+        let remainingTime = nextTimeDelay - timeSinceAnswerDisplay;
+        text('Prochaine question dans ' + max(0, (remainingTime / 1000).toFixed(1)) + 's', width / 2, resultY + 50);
     }
 }
 
@@ -641,18 +840,51 @@ function getIntervalName(semitones) {
         12: { fr: 'octave', code: 'P8' }
     };
     
+    // Cas spécial: 12 et -12 sont une octave, pas unisson
+    if (semitones === 12 || semitones === -12) {
+        return intervals[12];
+    }
+    
     // Pour les intervalles négatifs, afficher le nom de l'intervalle ascendant équivalent
     if (semitones < 0) {
         let positiveSemitones = Math.abs(semitones) % 12;
-        // Cas spécial: -12 est une octave, pas unisson
-        if (Math.abs(semitones) % 12 === 0 && Math.abs(semitones) > 0) {
-            positiveSemitones = 12;
-        }
         let baseInterval = intervals[positiveSemitones] || { fr: 'Unknown', code: '?' };
         return baseInterval;
     }
     
     return intervals[semitones % 12] || { fr: 'Unknown', code: '?' };
+}
+
+function getDegreeName(semitones) {
+    // Convertir les semitones en noms de degrés
+    const degrees = {
+        0: '1',
+        1: 'b2',
+        2: '2',
+        3: 'b3',
+        4: '3',
+        5: '4',
+        6: 'b5',
+        7: '5',
+        8: 'b6',
+        9: '6',
+        10: 'b7',
+        11: '7',
+        12: '1'
+    };
+    
+    // Cas spécial pour 12 et -12 (octave = degré 1 une octave plus haut)
+    if (semitones === 12 || semitones === -12) {
+        return '1 (octave)';
+    }
+    
+    // Pour les intervalles négatifs, on affiche juste le degré positif avec direction "grave"
+    if (semitones < 0) {
+        let positiveSemitones = Math.abs(semitones) % 12;
+        return degrees[positiveSemitones] || 'Unknown';
+    }
+    
+    return degrees[semitones % 12] || 'Unknown';
 }
 
 function drawVisualFeedback() {

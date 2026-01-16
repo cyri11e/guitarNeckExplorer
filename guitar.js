@@ -29,6 +29,7 @@ class Guitar{
         this.flatMode = true;
         this.startingNotePosition = null; // {string, fret} de la note de départ
         this.startingNote = null; // Nom de la note de départ (ex: "C4")
+        this.startingNoteVisible = false; // La note de départ doit-elle être visible ?
         this.godMode = true; // Affiche la pastille sous le curseur
         this.noteColors = [
             color(255, 20, 20),          // Do (C) - Rouge
@@ -134,7 +135,7 @@ class Guitar{
                 if (this.tonic) {
 
                     let dc = this.calculeDegreeChromatique(this.tonic, { note : playedNote } )
-                    console.log(this.tonic, playedNote, dc)
+                    //console.log(this.tonic, playedNote, dc)
 
                     noteColor = this.noteColors[dc];
                 }
@@ -188,6 +189,8 @@ class Guitar{
 
     drawStartingNote() {
         // Afficher la note de départ avec une pastille rouge normale
+        if (!this.startingNoteVisible) return; // Ne pas afficher si pas encore visible
+        
         if (this.startingNotePosition && this.startingNote) {
             let stringIdx = this.startingNotePosition.string;
             let fretIdx = this.startingNotePosition.fret;
