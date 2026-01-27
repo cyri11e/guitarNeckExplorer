@@ -178,29 +178,70 @@ class Guitar{
 
 intervalNameFromSemitones(n) {
     const map = {
-        0: "1",
-        1: "b2",
-        2: "2",
+        0: "P1",
+        1: "m2",
+        2: "M2",
         3: "m3",
         4: "M3",
         5: "P4",
-        6: "b5",
+        6: "TT",
         7: "P5",
         8: "m6",
         9: "M6",
         10: "m7",
         11: "M7",
-        12: "8"
+        12: "P8"
     };
     return map[n] || "-";
+}
+
+getLongIntervalName(shortName) {
+    const map = {
+        "P1": "Unisson Parfait",
+        "m2": "Seconde Mineure",
+        "M2": "Seconde Majeure",
+        "m3": "Tierce Mineure",
+        "M3": "Tierce Majeure",
+        "P4": "Quarte Juste",
+        "TT": "Triton",
+        "P5": "Quinte Juste",
+        "m6": "Sixte Mineure",
+        "M6": "Sixte Majeure",
+        "m7": "Septième Mineure",
+        "M7": "Septième Majeure",
+        "P8": "Octave Parfaite"
+    };
+    return map[shortName] || "";
+}
+getFrenchNoteName(name) {
+    const map = {
+        "C": "do",
+        "C#": "do#",
+        "Db": "ré♭",
+        "D": "ré",
+        "D#": "ré#",
+        "Eb": "mib",
+        "E": "mi",
+        "F": "fa",
+        "F#": "fa#",
+        "Gb": "sol♭",
+        "G": "sol",
+        "G#": "sol#",
+        "Ab": "lab",
+        "A": "la",
+        "A#": "la#",
+        "Bb": "sib",
+        "B": "si"
+    };
+    return map[name] || name;
 }
 
 
 drawHoverInfoCard() {
     if (!this.hoveredNote) return;
 
-    const cardWidth = 240;
-    const cardHeight = 130;
+    const cardWidth = 260;
+    const cardHeight = 160;
     const x = windowWidth - cardWidth - 20;
     const y = 20;
 
@@ -214,64 +255,80 @@ drawHoverInfoCard() {
     const string = this.hoveredNote.string;
     const fret = this.hoveredNote.fret;
 
-    // --- NOM DE NOTE + ENHARMONIQUE ---
-    let mainName = this.getNoteName(note);
+    // NOTE EN + ENHARMONIQUE
+    let mainName = this.getNoteName(note);      // ex: D#
     if (this.flatMode) mainName = this.swapEnharmonics(mainName);
-    let alt = this.getEnharmonic(mainName);
-    let noteDisplay = alt ? `${mainName} (${alt})` : mainName;
+    let alt = this.getEnharmonic(mainName);    // ex: Eb
+    let noteEN = mainName;
+    let noteFR = this.getFrenchNoteName(mainName);
 
-    // --- NOM DE CORDE FR ---
-    const cordeNames = [
-        "Mi aigu", "Si", "Sol", "Ré", "La", "Mi grave"
-    ];
+    // CORDE
+    const cordeNames = ["Mi aigu", "Si", "Sol", "Ré", "La", "Mi grave"];
     const cordeName = cordeNames[5 - string];
 
-    // --- DEGRÉ ---
+    // CALCULS MUSICAUX
     let degreeText = "-";
-    let intervalDisplay = "-";
+    let intervalShort = "-";
+    let longName = "";
+    let arrow = "";
 
+    if (this.tonic) {
+        const deg = this.calculeDegreeChromatique(this.tonic, { note });
+        degreeText = this.chromaticToDiatonic(deg);
 
-
-if (this.tonic) {
-    const deg = this.calculeDegreeChromatique(this.tonic, { note });
-
-    // Degré diatonique (♭3, ♯5, etc.)
-    degreeText = this.chromaticToDiatonic(deg);
-
-    // On travaille en demi-tons absolus
-    const semitones = Math.abs(deg) % 12;
-
-    if (semitones === 0) {
-        intervalDisplay = "1";
-    } else {
+        const signed = this.calculateSemitoneDistance(this.tonic, { note });
+        const semitones = Math.abs(signed) % 12;
         const name = this.intervalNameFromSemitones(semitones);
 
-        if (deg > 0) {
-            // Note plus aiguë → intervalle montant seul
-            intervalDisplay = name;
-        } else if (deg < 0) {
-            // Note plus grave → intervalle descendant + complémentaire
-            const compSemitones = (12 - semitones) % 12;
-            const compName = this.intervalNameFromSemitones(compSemitones);
-            intervalDisplay = `-${name} (+${compName})`;
+        if (signed === 0) {
+            intervalShort = "P1";
+            longName = "Unisson parfait";
+        } else if (signed > 0) {
+            intervalShort = name;
+            longName = this.getLongIntervalName(name);
+            arrow = "↑";
+        } else {
+            const comp = this.intervalNameFromSemitones((12 - semitones) % 12);
+            intervalShort = `-${name} (+${comp})`;
+            longName = this.getLongIntervalName(name);
+            arrow = "↓";
         }
     }
-}
 
-
-    // --- AFFICHAGE ---
     fill(255);
     noStroke();
     textAlign(LEFT, TOP);
-    textSize(this.neckHeight /10);
 
-    let ty = y + 12;
+    const bigSize = this.neckHeight / 9;
+    const smallSize = this.neckHeight / 14;
 
-    text("Note : " + noteDisplay, x + 12, ty); ty += 24;
-    textSize(this.neckHeight /12);
-    text("Degré : " + degreeText, x + 12, ty); ty += 24;
-    text("Intervalle : " + intervalDisplay, x + 12, ty); ty += 24;
-    text(`Corde ${cordeName} • Case ${fret}`, x + 12, ty);
+    // HAUT GAUCHE : NOTE EN + FR
+    let tyTop = y + 10;
+    let lx = x + 12;
+    textSize(bigSize);
+    text(noteEN, lx, tyTop);
+    textSize(smallSize);
+    text(noteFR, lx, tyTop + bigSize);
+
+    // HAUT DROIT : DEGRÉ
+    textAlign(RIGHT, TOP);
+    let rx = x + cardWidth - 12;
+    textSize(bigSize);
+    text(degreeText, rx, tyTop);
+
+    // BAS GAUCHE : COORDONNÉES
+    textAlign(LEFT, BOTTOM);
+    let by = y + cardHeight - 12;
+    textSize(smallSize);
+    text(`Corde ${cordeName}`, lx, by - 18);
+    text(`Case ${fret}`, lx, by);
+
+    // BAS DROIT : INTERVALLE COURT + LONG
+    textAlign(RIGHT, BOTTOM);
+    textSize(bigSize);
+    text(intervalShort, rx, by - 24);
+    textSize(smallSize);
+    text(`${arrow} ${longName}`, rx, by);
 
     pop();
 }
@@ -1245,7 +1302,11 @@ s
         } else 
             return 0
     }
-    
+    getSignedSemitoneDistance(tonic, note) {
+        if (!tonic) return 0;
+        return this.calculateSemitoneDistance(tonic, note); // POSITIF ou NÉGATIF
+    }
+
     chromaticToDiatonic(degreeChromatic) {
         const conversionTable = {
             0: '1', 1: 'b2', 2: '2', 3: 'b3', 4: '3', 5: '4',
