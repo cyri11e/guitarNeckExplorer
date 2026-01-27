@@ -58,7 +58,7 @@ class Guitar{
           this.currentIntervals = this.majorChord;
           // mode d'affichage des occurrences : 'all' | 'exact' | 'single'
           this.selectionMode = 'single';
-          this.scaleType = 'accords'; // 'accords' | 'penta' | 'gamme'
+          this.scaleType = 'note'; // 'accords' | 'penta' | 'gamme'
           // Facteur de transparence (0 = aucun, 1 = maximum)
           this.transparencyFactor = 1.2;
           this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346','#fafe038b','#ff80004d']
@@ -170,8 +170,112 @@ class Guitar{
         this.drawSelectedNotes();
         this.drawPlayedNotes();
         this.drawHoveredNote();
+        this.drawHoverInfoCard();
+
         this.drawOpenChordButtons(); // Ajouter les boutons
     }
+
+
+intervalNameFromSemitones(n) {
+    const map = {
+        0: "1",
+        1: "b2",
+        2: "2",
+        3: "m3",
+        4: "M3",
+        5: "P4",
+        6: "b5",
+        7: "P5",
+        8: "m6",
+        9: "M6",
+        10: "m7",
+        11: "M7",
+        12: "8"
+    };
+    return map[n] || "-";
+}
+
+
+drawHoverInfoCard() {
+    if (!this.hoveredNote) return;
+
+    const cardWidth = 240;
+    const cardHeight = 130;
+    const x = windowWidth - cardWidth - 20;
+    const y = 20;
+
+    push();
+    fill(30, 30, 30, 220);
+    stroke(200);
+    strokeWeight(1.5);
+    rect(x, y, cardWidth, cardHeight, 8);
+
+    const note = this.hoveredNote.note;
+    const string = this.hoveredNote.string;
+    const fret = this.hoveredNote.fret;
+
+    // --- NOM DE NOTE + ENHARMONIQUE ---
+    let mainName = this.getNoteName(note);
+    if (this.flatMode) mainName = this.swapEnharmonics(mainName);
+    let alt = this.getEnharmonic(mainName);
+    let noteDisplay = alt ? `${mainName} (${alt})` : mainName;
+
+    // --- NOM DE CORDE FR ---
+    const cordeNames = [
+        "Mi aigu", "Si", "Sol", "Ré", "La", "Mi grave"
+    ];
+    const cordeName = cordeNames[5 - string];
+
+    // --- DEGRÉ ---
+    let degreeText = "-";
+    let intervalDisplay = "-";
+
+
+
+if (this.tonic) {
+    const deg = this.calculeDegreeChromatique(this.tonic, { note });
+
+    // Degré diatonique (♭3, ♯5, etc.)
+    degreeText = this.chromaticToDiatonic(deg);
+
+    // On travaille en demi-tons absolus
+    const semitones = Math.abs(deg) % 12;
+
+    if (semitones === 0) {
+        intervalDisplay = "1";
+    } else {
+        const name = this.intervalNameFromSemitones(semitones);
+
+        if (deg > 0) {
+            // Note plus aiguë → intervalle montant seul
+            intervalDisplay = name;
+        } else if (deg < 0) {
+            // Note plus grave → intervalle descendant + complémentaire
+            const compSemitones = (12 - semitones) % 12;
+            const compName = this.intervalNameFromSemitones(compSemitones);
+            intervalDisplay = `-${name} (+${compName})`;
+        }
+    }
+}
+
+
+    // --- AFFICHAGE ---
+    fill(255);
+    noStroke();
+    textAlign(LEFT, TOP);
+    textSize(this.neckHeight /10);
+
+    let ty = y + 12;
+
+    text("Note : " + noteDisplay, x + 12, ty); ty += 24;
+    textSize(this.neckHeight /12);
+    text("Degré : " + degreeText, x + 12, ty); ty += 24;
+    text("Intervalle : " + intervalDisplay, x + 12, ty); ty += 24;
+    text(`Corde ${cordeName} • Case ${fret}`, x + 12, ty);
+
+    pop();
+}
+
 
     drawTonicDisplay() {
         if (this.tonic) {
@@ -425,6 +529,23 @@ class Guitar{
 	
 	drawingContext.globalAlpha = prevAlpha;
         pop()
+}
+
+
+getEnharmonic(note) {
+    const map = {
+        'C#': 'Db',
+        'Db': 'C#',
+        'D#': 'Eb',
+        'Eb': 'D#',
+        'F#': 'Gb',
+        'Gb': 'F#',
+        'G#': 'Ab',
+        'Ab': 'G#',
+        'A#': 'Bb',
+        'Bb': 'A#'
+    };
+    return map[note] || null;
 }
 
     swapEnharmonics(note) {

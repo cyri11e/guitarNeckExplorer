@@ -6,6 +6,7 @@ let micMuted = true;
 let muteButton;
 let segmentModeControl; // Nouveau contrôle graphique pour mode segment
 let selectionModeButton;
+
 let majorMinorToggle; // <-- nouveau : toggle Maj/min
 let scaleTypeButton; // <-- nouveau : 3-état Accords/Penta/Gamme
 let clearButton;
@@ -37,7 +38,8 @@ function setup() {
 
     // Création du manche de guitare AVANT le contrôle de mode segment
     guitar = new Guitar(13);
-    
+
+
     // Contrôle graphique pour le mode segment avec couleurs et alpha
     segmentModeControl = new SegmentModeControl(10, 10, guitar);
     
@@ -48,6 +50,8 @@ function setup() {
     selectionModeButton.position(200, 10);
     selectionModeButton.style('padding', '6px 10px');
     selectionModeButton.mousePressed(toggleSelectionMode);
+    updateSelectionModeButton();
+
 
     // Toggle Maj/min
     majorMinorToggle = createButton('Maj');
@@ -56,10 +60,11 @@ function setup() {
     majorMinorToggle.mousePressed(toggleMajorMinor);
 
     // 3-état : Accords / Penta / Gamme
-    scaleTypeButton = createButton('Accords');
+    scaleTypeButton = createButton('note');
     scaleTypeButton.position(340, 10);
     scaleTypeButton.style('padding', '6px 10px');
     scaleTypeButton.mousePressed(toggleScaleType);
+    updateScaleTypeButton();
 
     clearButton = createButton('Vider');
     clearButton.position(500, 10);
@@ -76,12 +81,12 @@ function setup() {
     // });
   
     // Démarrer l'AudioContext lorsque la page est chargée
-    userStartAudio().then(() => {
-        // Initialiser le contexte audio et le micro après que l'utilisateur ait interagi
-        audioContext = getAudioContext();
-        mic = new p5.AudioIn();
-        mic.start();
-    });
+    // userStartAudio().then(() => {
+    //     // Initialiser le contexte audio et le micro après que l'utilisateur ait interagi
+    //     audioContext = getAudioContext();
+    //     mic = new p5.AudioIn();
+    //     mic.start();
+    // });
 
     //detector = new MultiPitchDetector();
     //volumeControl = new VolumeControl(detector);
@@ -115,6 +120,23 @@ function setup() {
     updateIntervalButtons();
 } 
 
+function updateSelectionModeButton() {
+    if (!selectionModeButton || !guitar) return;
+
+    const mode = guitar.selectionMode || 'single';
+
+    selectionModeButton.html('Affichage: ' + mode);
+
+    if (mode === 'single') {
+        selectionModeButton.style('background-color', '#222');
+        selectionModeButton.style('color', '#fff');
+    } else {
+        selectionModeButton.style('background-color', '');
+        selectionModeButton.style('color', '');
+    }
+}
+
+
 function toggleMic() {
     micMuted = !micMuted;
     if (micMuted) {
@@ -140,23 +162,15 @@ function toggleSegmentMode() {
 
 // Nouveau : bascule cyclique entre 'all' -> 'exact' -> 'single'
 function toggleSelectionMode() {
-	const modes = ['all', 'exact', 'single'];
-	let current = 'single';
-	if (guitar && guitar.selectionMode) current = guitar.selectionMode;
-	const next = modes[(modes.indexOf(current) + 1) % modes.length];
-	// appliquer sur l'objet guitar si présent
-	if (guitar) guitar.selectionMode = next;
-	// mettre à jour label
-	selectionModeButton.html('Affichage: ' + next);
-	// styling simple
-	if (next === 'single') {
-		selectionModeButton.style('background-color', '#222');
-		selectionModeButton.style('color', '#fff');
-	} else {
-		selectionModeButton.style('background-color', '');
-		selectionModeButton.style('color', '');
-	}
+    const modes = ['all', 'exact', 'single'];
+    let current = guitar.selectionMode;
+    const next = modes[(modes.indexOf(current) + 1) % modes.length];
+
+    guitar.selectionMode = next;
+
+    updateSelectionModeButton();
 }
+
 
 function windowResized() {
     // gestion reponsive
@@ -425,16 +439,27 @@ function toggleMajorMinor() {
 }
 
 function toggleScaleType() {
-   if (guitar) {
-       const types = ['Note','accords', 'penta', 'gamme'];
-       let currentIndex = types.indexOf(guitar.scaleType || 'Note');
-       let nextIndex = (currentIndex + 1) % types.length;
-       guitar.scaleType = types[nextIndex];
-       scaleTypeButton.html(types[nextIndex].charAt(0).toUpperCase() + types[nextIndex].slice(1));
-       // mettre à jour les intervals
-       updateIntervalsFromMode();
-   }
+    if (!guitar) return;
+
+    const types = ['note', 'accords', 'penta', 'gamme'];
+    let currentIndex = types.indexOf(guitar.scaleType);
+    if (currentIndex === -1) currentIndex = 0; // sécurité
+
+    let nextIndex = (currentIndex + 1) % types.length;
+    guitar.scaleType = types[nextIndex];
+
+    // 🔥 RÈGLE DEMANDÉE : exact → all si multi-sélection
+    if (guitar.scaleType !== 'note' && guitar.selectionMode === 'single') {
+        guitar.selectionMode = 'all';
+        updateSelectionModeButton();
+    }
+
+    updateScaleTypeButton();
+    updateIntervalsFromMode();
 }
+
+
+
 
 function updateIntervalsFromMode() {
    if (!guitar) return;
@@ -510,6 +535,23 @@ function toggleIntervalButton(n) {
    }
    updateIntervalButtons();
 }
+
+function updateScaleTypeButton() {
+    const mode = guitar.scaleType;
+
+    // Mettre le label
+    scaleTypeButton.html(mode.charAt(0).toUpperCase() + mode.slice(1));
+
+    // Style optionnel (tu peux ajuster)
+    if (mode === 'note') {
+        scaleTypeButton.style('background-color', '#222');
+        scaleTypeButton.style('color', '#fff');
+    } else {
+        scaleTypeButton.style('background-color', '');
+        scaleTypeButton.style('color', '');
+    }
+}
+
 
 function updateIntervalButtons() {
    if (!guitar) return;
