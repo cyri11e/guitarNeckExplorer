@@ -13,7 +13,7 @@ class Guitar{
         this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
         this.textSize = 0.8*this.noteMarkerDiameter
         this.markerPositions = [3, 5, 7, 9, 12];
-        this.openStringNotes = ['E', 'A', 'D', 'G', 'B', 'E'];
+        this.openStringNotes = ['E', 'A', 'D', 'G', 'B', 'e'];
         this.stringThickness = [1, 1.5, 2, 2.5, 3, 4]; // Épaisseurs des cordes du Mi aigu au Mi grave
         this.noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const startIndex = this.noteNames.indexOf('F');
@@ -69,7 +69,11 @@ class Guitar{
           this.zoomMode = false; // Mode zoom : agrandir/réduire les pastilles
           this.normalNoteMarkerDiameter = this.neckHeight/6; // Taille normale
           this.zoomedNoteMarkerDiameter = this.neckHeight/5; // Taille zoomée (comme resize)
-          
+          this.infoMode = "corner"; // "none" | "corner" | "cursor"
+          this.drawInfoToggleButton();
+        this.snapBiasX = -0.2;   // entre -0.5 et +0.5
+        this.snapBiasY = 0.4;   // entre -0.5 et +0.5
+
           this.openChordsDefinitions = {
             'E': [
                 { string: 0, fret: 0 },
@@ -121,6 +125,36 @@ class Guitar{
             ]
         };
     }
+
+    drawInfoToggleButton() {
+        // --- DIMENSIONS RESPONSIVES ---
+        const size = this.neckHeight * 0.35;          // Taille du bouton
+        const marginX = this.neckWidth * 0.015;       // Décalage horizontal
+        const marginY = this.neckHeight * 0.05;       // Décalage vertical
+
+        const x = marginX;
+        const y = marginY;
+
+        push();
+        fill(50);
+        stroke(200);
+        strokeWeight(2);
+        ellipse(x + size / 2, y + size / 2, size, size);
+
+        textAlign(CENTER, CENTER);
+        textSize(size * 0.55);
+        noStroke();
+        fill(255);
+        text("i", x + size / 2, y + size / 2);
+        pop();
+
+        // Détection clic (inchangée)
+        if (mouseIsPressed &&
+            dist(mouseX, mouseY, x + size / 2, y + size / 2) < size / 2) {
+            this.toggleInfoMode();
+        }
+    }
+
 
     segmentColorToggle() {
         this.segmentColorIndex = (this.segmentColorIndex + 1) % this.segmentColor.length;
@@ -197,7 +231,7 @@ intervalNameFromSemitones(n) {
 
 getLongIntervalName(shortName) {
     const map = {
-        "P1": "Unisson Parfait",
+        "P1": "Unisson",
         "m2": "Seconde Mineure",
         "M2": "Seconde Majeure",
         "m3": "Tierce Mineure",
@@ -220,33 +254,51 @@ getFrenchNoteName(name) {
         "Db": "ré♭",
         "D": "ré",
         "D#": "ré#",
-        "Eb": "mib",
+        "Eb": "mi♭",
         "E": "mi",
         "F": "fa",
         "F#": "fa#",
         "Gb": "sol♭",
         "G": "sol",
         "G#": "sol#",
-        "Ab": "lab",
+        "Ab": "la♭",
         "A": "la",
         "A#": "la#",
-        "Bb": "sib",
+        "Bb": "si♭",
         "B": "si"
     };
     return map[name] || name;
 }
 
 
-drawHoverInfoCard() {
-    if (!this.hoveredNote) return;
 
-    const cardWidth = 260;
-    const cardHeight = 160;
-    const x = windowWidth - cardWidth - 20;
-    const y = 20;
+drawHoverInfoCard() {
+    if (!this.hoveredNote || this.infoMode === "none") return;
+
+    // --- DIMENSIONS RESPONSIVES ---
+    const cardWidth = this.neckWidth * 0.22;     // ~160px proportionnel
+    const cardHeight = this.neckHeight * 0.75;    // ~160px proportionnel
+    const margin = this.neckWidth * 0.015;       // ~20px proportionnel
+    let x, y;
+
+    if (this.infoMode === "corner") {
+        x = windowWidth - cardWidth - 20;
+        y = 20;
+    } else if (this.infoMode === "cursor") {
+
+        // Sauts quantiques basés sur la géométrie du manche
+        const H = this.neckWidth / this.fretCount;          // largeur d’une frette
+        const V = this.neckHeight / (this.stringCount - 1); // hauteur entre deux cordes
+
+        x = Math.round((mouseX / H) + this.snapBiasX) * H;
+        y = Math.round((mouseY / V) + this.snapBiasY) * V;
+
+    }
+
+
 
     push();
-    fill(30, 30, 30, 220);
+    fill(30, 30, 30, 200);
     stroke(200);
     strokeWeight(1.5);
     rect(x, y, cardWidth, cardHeight, 8);
@@ -256,11 +308,11 @@ drawHoverInfoCard() {
     const fret = this.hoveredNote.fret;
 
     // NOTE EN + ENHARMONIQUE
-    let mainName = this.getNoteName(note);      // ex: D#
+    let mainName = this.getNoteName(note);
     if (this.flatMode) mainName = this.swapEnharmonics(mainName);
-    let alt = this.getEnharmonic(mainName);    // ex: Eb
-    let noteEN = mainName;
-    let noteFR = this.getFrenchNoteName(mainName);
+
+    let noteEN = this.parseAlteration(mainName);
+    let noteFR = this.parseAlteration(this.getFrenchNoteName(mainName));
 
     // CORDE
     const cordeNames = ["Mi aigu", "Si", "Sol", "Ré", "La", "Mi grave"];
@@ -274,7 +326,7 @@ drawHoverInfoCard() {
 
     if (this.tonic) {
         const deg = this.calculeDegreeChromatique(this.tonic, { note });
-        degreeText = this.chromaticToDiatonic(deg);
+        degreeText = this.parseAlteration(this.chromaticToDiatonic(deg));
 
         const signed = this.calculateSemitoneDistance(this.tonic, { note });
         const semitones = Math.abs(signed) % 12;
@@ -282,7 +334,7 @@ drawHoverInfoCard() {
 
         if (signed === 0) {
             intervalShort = "P1";
-            longName = "Unisson parfait";
+            longName = "Unisson";
         } else if (signed > 0) {
             intervalShort = name;
             longName = this.getLongIntervalName(name);
@@ -297,41 +349,54 @@ drawHoverInfoCard() {
 
     fill(255);
     noStroke();
-    textAlign(LEFT, TOP);
 
-    const bigSize = this.neckHeight / 9;
-    const smallSize = this.neckHeight / 14;
+    // --- TAILLES RESPONSIVES ---
+    const bigSize = this.neckHeight * 0.22;   // remplace /5
+    const smallSize = this.neckHeight * 0.11; // remplace /10
+
+    // --- MARGES RESPONSIVES ---
+    const padX = cardWidth * 0.08;
+    const padY = cardHeight * 0.06;
 
     // HAUT GAUCHE : NOTE EN + FR
-    let tyTop = y + 10;
-    let lx = x + 12;
+    let lx = x + padX;
+    let tyTop = y + padY;
+
+    textAlign(LEFT, TOP);
     textSize(bigSize);
     text(noteEN, lx, tyTop);
+
     textSize(smallSize);
-    text(noteFR, lx, tyTop + bigSize);
+    text(noteFR, lx, tyTop + bigSize * 0.8);
 
     // HAUT DROIT : DEGRÉ
+    let rx = x + cardWidth - padX;
     textAlign(RIGHT, TOP);
-    let rx = x + cardWidth - 12;
     textSize(bigSize);
     text(degreeText, rx, tyTop);
 
-    // BAS GAUCHE : COORDONNÉES
-    textAlign(LEFT, BOTTOM);
-    let by = y + cardHeight - 12;
-    textSize(smallSize);
-    text(`Corde ${cordeName}`, lx, by - 18);
-    text(`Case ${fret}`, lx, by);
+    // MILIEU : COORDONNÉES
+    let by = y + cardHeight - padY;
+
+    // MILIEU : COORDONNÉES (centré)
+    // textAlign(CENTER, CENTER);
+    // textSize(smallSize);
+    // let midY = y + cardHeight / 2;
+    // let midX = x + cardWidth / 2;
+    // text(`[${cordeName},case ${fret}]`, midX, midY);
+
 
     // BAS DROIT : INTERVALLE COURT + LONG
     textAlign(RIGHT, BOTTOM);
     textSize(bigSize);
-    text(intervalShort, rx, by - 24);
+    text(intervalShort, rx, by - smallSize * 1.2);
+
     textSize(smallSize);
     text(`${arrow} ${longName}`, rx, by);
 
     pop();
 }
+
 
 
     drawTonicDisplay() {
@@ -616,20 +681,45 @@ getEnharmonic(note) {
         return this.flatMode && enharmonics[note] ? enharmonics[note] : note;
     }
 
+parseAlteration(input) {
+    if (!input) return input;
+
+    // --- CAS 1 : DEGRÉ (commence par b, #, ♭, ♯) ---
+    if (/^[b#♭♯]/.test(input)) {
+        let alt = "";
+        let num = input.replace(/[^0-9]/g, "");
+
+        if (input.includes("b") || input.includes("♭")) alt = "♭";
+        if (input.includes("#") || input.includes("♯")) alt = "♯";
+
+        return alt + num;   // ex: "♭3"
+    }
+
+    // --- CAS 2 : NOTE (commence par une lettre) ---
+    if (/^[A-G]/i.test(input)) {
+        let base = input.replace(/[#b♭♯]/g, "");
+        let alt = "";
+
+        if (input.includes("#") || input.includes("♯")) alt = "♯";
+        if (input.includes("b") || input.includes("♭")) alt = "♭";
+
+        return base + alt;  // ex: "F♯"
+    }
+
+    // fallback
+    return input;
+}
+
+
+
     renderNoteLabel(noteLabel, x, offset, y, hoverPulse) {
         let noteName = noteLabel.slice(0, -1);
         let octave = noteLabel.slice(-1);
         let alteration = '';
 
         if (this.flatMode) noteName = this.swapEnharmonics(noteName);
-
-        if (noteName.includes('#')) {
-            noteName = noteName.replace('#', '');
-            alteration = '♯';
-        } else if (noteName.includes('b')) {
-            noteName = noteName.replace('b', '');
-            alteration = '♭';
-        }
+        
+        noteName = this.parseAlteration(noteName);
 
         textSize(this.textSize* 0.8);
         textAlign(CENTER, CENTER);
@@ -966,7 +1056,17 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         }
     }
 
+    toggleInfoMode() {
+        const modes = ["none", "corner", "cursor"];
+        const currentIndex = modes.indexOf(this.infoMode);
+        this.infoMode = modes[(currentIndex + 1) % modes.length];
+    }
+
     keyPressed(){
+        if (key === "i" || key === "I") {
+            this.toggleInfoMode();
+        }
+
         // Transposition géométrique des notes sélectionnées
         if (keyCode === UP_ARROW) {
             // Flèche haut : déplacement vers la corde grave (+1 corde)
