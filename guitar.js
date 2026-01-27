@@ -276,29 +276,49 @@ drawHoverInfoCard() {
     if (!this.hoveredNote || this.infoMode === "none") return;
 
     // --- DIMENSIONS RESPONSIVES ---
-    const cardWidth = this.neckWidth * 0.22;     // ~160px proportionnel
-    const cardHeight = this.neckHeight * 0.75;    // ~160px proportionnel
+    const cardWidth = this.neckWidth * (this.tonic ? 0.20 : 0.10);     // ~160px proportionnel
+    const cardHeight = this.neckHeight * (this.tonic ? 0.65 : 0.32);    // ~160px proportionnel
     const margin = this.neckWidth * 0.015;       // ~20px proportionnel
     let x, y;
 
     if (this.infoMode === "corner") {
-        x = windowWidth - cardWidth - 20;
+        x = windowWidth - cardWidth - margin;
         y = 20;
     } else if (this.infoMode === "cursor") {
 
-        // Sauts quantiques basés sur la géométrie du manche
-        const H = this.neckWidth / this.fretCount;          // largeur d’une frette
-        const V = this.neckHeight / (this.stringCount - 1); // hauteur entre deux cordes
+        const H = this.neckWidth / this.fretCount;
+        const V = this.neckHeight / (this.stringCount - 1);
 
-        x = Math.round((mouseX / H) + this.snapBiasX) * H;
-        y = Math.round((mouseY / V) + this.snapBiasY) * V;
+        let snapX = Math.round((mouseX / H) + this.snapBiasX) * H;
+        let snapY = Math.round((mouseY / V) + this.snapBiasY) * V;
 
+        const offsetX = H * 0.6;
+        const offsetY = V * 0.6;
+
+        // Orientation horizontale
+        if (mouseX < this.neckX + this.neckWidth / 2) {
+            // curseur à gauche → panneau à droite
+            x = snapX + offsetX;
+        } else {
+            // curseur à droite → panneau à gauche
+            x = snapX - offsetX - cardWidth;
+        }
+
+        // Orientation verticale
+        if (mouseY < this.neckY + this.neckHeight / 2) {
+            // curseur en haut → panneau en bas
+            y = snapY + offsetY;
+        } else {
+            // curseur en bas → panneau en haut
+            y = snapY - offsetY - cardHeight;
+        }
     }
 
 
 
+
     push();
-    fill(30, 30, 30, 200);
+    fill(30, 30, 30, 180);
     stroke(200);
     strokeWeight(1.5);
     rect(x, y, cardWidth, cardHeight, 8);
@@ -315,12 +335,12 @@ drawHoverInfoCard() {
     let noteFR = this.parseAlteration(this.getFrenchNoteName(mainName));
 
     // CORDE
-    const cordeNames = ["Mi aigu", "Si", "Sol", "Ré", "La", "Mi grave"];
+    const cordeNames = ["MI", "La", "Ré", "Sol", "Si", "mi"];
     const cordeName = cordeNames[5 - string];
 
     // CALCULS MUSICAUX
-    let degreeText = "-";
-    let intervalShort = "-";
+    let degreeText = "";
+    let intervalShort = "";
     let longName = "";
     let arrow = "";
 
@@ -341,7 +361,7 @@ drawHoverInfoCard() {
             arrow = "↑";
         } else {
             const comp = this.intervalNameFromSemitones((12 - semitones) % 12);
-            intervalShort = `-${name} (+${comp})`;
+            intervalShort = `-${name}/+${comp}`;
             longName = this.getLongIntervalName(name);
             arrow = "↓";
         }
@@ -352,7 +372,7 @@ drawHoverInfoCard() {
 
     // --- TAILLES RESPONSIVES ---
     const bigSize = this.neckHeight * 0.22;   // remplace /5
-    const smallSize = this.neckHeight * 0.11; // remplace /10
+    const smallSize = this.neckHeight * 0.10; // remplace /10
 
     // --- MARGES RESPONSIVES ---
     const padX = cardWidth * 0.08;
@@ -379,11 +399,11 @@ drawHoverInfoCard() {
     let by = y + cardHeight - padY;
 
     // MILIEU : COORDONNÉES (centré)
-    // textAlign(CENTER, CENTER);
-    // textSize(smallSize);
-    // let midY = y + cardHeight / 2;
-    // let midX = x + cardWidth / 2;
-    // text(`[${cordeName},case ${fret}]`, midX, midY);
+    textAlign((this.tonic ? CENTER : LEFT), CENTER);
+    textSize(smallSize*0.8);
+    let midY = y + cardHeight / 10;
+    let midX = x + cardWidth / 2;
+    text(`[${cordeName}, ${fret}]`, midX, midY);
 
 
     // BAS DROIT : INTERVALLE COURT + LONG
@@ -391,7 +411,7 @@ drawHoverInfoCard() {
     textSize(bigSize);
     text(intervalShort, rx, by - smallSize * 1.2);
 
-    textSize(smallSize);
+    textSize(smallSize*0.8);
     text(`${arrow} ${longName}`, rx, by);
 
     pop();
