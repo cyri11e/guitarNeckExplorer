@@ -399,7 +399,7 @@ drawHoverInfoCard() {
     let by = y + cardHeight - padY;
 
     // MILIEU : COORDONNÉES (centré)
-    textAlign((this.tonic ? CENTER : LEFT), CENTER);
+    textAlign((this.tonic ? CENTER : LEFT), TOP);
     textSize(smallSize*0.8);
     let midY = y + cardHeight / 10;
     let midX = x + cardWidth / 2;
@@ -407,7 +407,7 @@ drawHoverInfoCard() {
 
 
     // BAS DROIT : INTERVALLE COURT + LONG
-    textAlign(RIGHT, BOTTOM);
+    textAlign(RIGHT, CENTER);
     textSize(bigSize);
     text(intervalShort, rx, by - smallSize * 1.2);
 
