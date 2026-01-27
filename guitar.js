@@ -13,7 +13,7 @@ class Guitar{
         this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
         this.textSize = 0.8*this.noteMarkerDiameter
         this.markerPositions = [3, 5, 7, 9, 12];
-        this.openStringNotes = ['E', 'A', 'D', 'G', 'B', 'e'];
+        this.openStringNotes = ['E', 'A', 'D', 'G', 'B', 'E'];
         this.stringThickness = [1, 1.5, 2, 2.5, 3, 4]; // Épaisseurs des cordes du Mi aigu au Mi grave
         this.noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const startIndex = this.noteNames.indexOf('F');
