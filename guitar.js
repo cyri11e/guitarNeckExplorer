@@ -145,7 +145,7 @@ class Guitar{
         textSize(size * 0.55);
         noStroke();
         fill(255);
-        text("i", x + size / 2, y + size / 2);
+        drawTextCentered("i", x + size / 2, y + size / 2);
         pop();
 
         // Détection clic (inchangée)
@@ -232,8 +232,8 @@ intervalNameFromSemitones(n) {
 getLongIntervalName(shortName) {
     const map = {
         "P1": "Unisson",
-        "m2": "Seconde Mineure",
-        "M2": "Seconde Majeure",
+        "m2": "2nde Mineure",
+        "M2": "2nde Majeure",
         "m3": "Tierce Mineure",
         "M3": "Tierce Majeure",
         "P4": "Quarte Juste",
@@ -241,9 +241,9 @@ getLongIntervalName(shortName) {
         "P5": "Quinte Juste",
         "m6": "Sixte Mineure",
         "M6": "Sixte Majeure",
-        "m7": "Septième Mineure",
-        "M7": "Septième Majeure",
-        "P8": "Octave Parfaite"
+        "m7": "7ème Mineure",
+        "M7": "7ème Majeure",
+        "P8": "Octave"
     };
     return map[shortName] || "";
 }
@@ -276,7 +276,7 @@ drawHoverInfoCard() {
     if (!this.hoveredNote || this.infoMode === "none") return;
 
     // --- DIMENSIONS RESPONSIVES ---
-    const cardWidth = this.neckWidth * (this.tonic ? 0.20 : 0.10);     // ~160px proportionnel
+    const cardWidth = this.neckHeight * (this.tonic ? 0.65 : 0.32);     // ~160px proportionnel
     const cardHeight = this.neckHeight * (this.tonic ? 0.65 : 0.32);    // ~160px proportionnel
     const margin = this.neckWidth * 0.015;       // ~20px proportionnel
     let x, y;
@@ -296,7 +296,7 @@ drawHoverInfoCard() {
         const offsetY = V * 0.6;
 
         // Orientation horizontale
-        if (mouseX < this.neckX + this.neckWidth / 2) {
+        if (mouseX < this.neckX + 3* this.neckWidth / 4) {
             // curseur à gauche → panneau à droite
             x = snapX + offsetX;
         } else {
@@ -305,7 +305,7 @@ drawHoverInfoCard() {
         }
 
         // Orientation verticale
-        if (mouseY < this.neckY + this.neckHeight / 2) {
+        if (mouseY < this.neckY + this.neckHeight / 4) {
             // curseur en haut → panneau en bas
             y = snapY + offsetY;
         } else {
@@ -361,7 +361,7 @@ drawHoverInfoCard() {
             arrow = "↑";
         } else {
             const comp = this.intervalNameFromSemitones((12 - semitones) % 12);
-            intervalShort = `-${name}/+${comp}`;
+            intervalShort = `-${name}`;
             longName = this.getLongIntervalName(name);
             arrow = "↓";
         }
@@ -384,35 +384,35 @@ drawHoverInfoCard() {
 
     textAlign(LEFT, TOP);
     textSize(bigSize);
-    text(noteEN, lx, tyTop);
+    drawTextCentered(noteEN, lx, tyTop);
 
     textSize(smallSize);
-    text(noteFR, lx, tyTop + bigSize * 0.8);
+    drawTextCentered(noteFR, lx, tyTop + bigSize * 0.8);
 
     // HAUT DROIT : DEGRÉ
     let rx = x + cardWidth - padX;
     textAlign(RIGHT, TOP);
     textSize(bigSize);
-    text(degreeText, rx, tyTop);
+    drawTextCentered(degreeText, rx, tyTop);
 
     // MILIEU : COORDONNÉES
     let by = y + cardHeight - padY;
 
-    // MILIEU : COORDONNÉES (centré)
-    textAlign((this.tonic ? CENTER : LEFT), TOP);
-    textSize(smallSize*0.8);
-    let midY = y + cardHeight / 10;
-    let midX = x + cardWidth / 2;
-    text(`[${cordeName}, ${fret}]`, midX, midY);
+    // SOUS lE MANCHE
+    textAlign(CENTER, CENTER);
+    textSize(bigSize * 0.7);
+    let midX = this.neckX + this.neckWidth /2 ;
+    let midY = this.neckY + this.neckHeight * 1.3  ;
+    drawTextCentered(`[corde ${cordeName}, case ${fret}]`, midX, midY);
 
 
     // BAS DROIT : INTERVALLE COURT + LONG
     textAlign(RIGHT, CENTER);
     textSize(bigSize);
-    text(intervalShort, rx, by - smallSize * 1.2);
+    drawTextCentered(intervalShort, rx, by - smallSize * 1.2);
 
     textSize(smallSize*0.8);
-    text(`${arrow} ${longName}`, rx, by);
+    drawTextCentered(`${arrow} ${longName}`, rx, by);
 
     pop();
 }
@@ -430,7 +430,7 @@ drawHoverInfoCard() {
             let y = this.neckY - 30;
             let noteName = this.getNoteName(this.tonic.note);
             if (this.flatMode) noteName = this.swapEnharmonics(noteName);
-            text(noteName, x, y);
+            drawTextCentered(noteName, x, y);
             pop();
         }
     }
@@ -748,18 +748,18 @@ parseAlteration(input) {
         stroke(0)
         fill(255)
         // fill(25); // Couleur grise pour l'ombre
-        // text(noteName, x  - offset * 3 , y + offset + hoverPulse);
+        // drawTextCentered(noteName, x  - offset * 3 , y + offset + hoverPulse);
         // textSize(this.textSize * 0.7);
-        // text(octave, x + offset + this.textSize * 0.4, y + offset * 2 + hoverPulse + this.textSize * 0.4);
+        // drawTextCentered(octave, x + offset + this.textSize * 0.4, y + offset * 2 + hoverPulse + this.textSize * 0.4);
         // textSize(this.textSize * 0.8);
-        // text(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
+        // drawTextCentered(alteration, x + offset + this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         // fill(255); // Couleur blanche pour le texte
         textSize(this.textSize*0.8);
-        text(noteName, x  , y + hoverPulse);
+        drawTextCentered(noteName, x  , y + hoverPulse);
         textSize(this.textSize * 0.5);
-        text(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
+        drawTextCentered(octave, x + this.textSize * 0.4, y + hoverPulse + this.textSize * 0.4);
         textSize(this.textSize * 0.8);
-        text(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
+        drawTextCentered(alteration, x + this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
 
     renderDegreLabel(degreLabel, x, offset, y, hoverPulse) {
@@ -773,17 +773,17 @@ parseAlteration(input) {
         noStroke();
 
         // fill(25); // Couleur grise pour l'ombre
-        // text(degreeName, x + offset * 3 , y + hoverPulse + offset);
+        // drawTextCentered(degreeName, x + offset * 3 , y + hoverPulse + offset);
         // textSize(this.textSize );
-        // text(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
+        // drawTextCentered(alteration.replace('b', '♭'), x + offset - this.textSize * 0.4, y + offset + hoverPulse - this.textSize * 0.3);
         
         stroke(0)
         strokeWeight(2)
         fill(255); // Couleur blanche pour le texte
         textSize(this.textSize * 0.8);
-        text(degreeName, x  , y + hoverPulse);
+        drawTextCentered(degreeName, x  , y + hoverPulse);
         textSize(this.textSize *0.8 );
-        text(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
+        drawTextCentered(alteration.replace('b', '♭'), x - this.textSize * 0.4, y + hoverPulse - this.textSize * 0.3);
     }
 
     drawAllOccurrences(note, pulse, hover) {
@@ -1133,10 +1133,10 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         if (keyCode == 90) { // touche "Z" pour basculer le mode zoom
             this.zoomMode = !this.zoomMode;
             if (this.zoomMode) {
-                this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
+                this.noteMarkerDiameter = this.neckHeight/6 // Diamètre des pastilles de note
                 this.textSize = this.noteMarkerDiameter           
             } else {
-                this.noteMarkerDiameter = this.neckHeight/6 // Diamètre des pastilles de note
+                this.noteMarkerDiameter = this.neckHeight/5 // Diamètre des pastilles de note
                 this.textSize = this.noteMarkerDiameter 
                  }
         }
@@ -1298,18 +1298,18 @@ s
         textAlign(CENTER, CENTER);
         for (let i = 0; i < this.stringCount; i++) {
             let y = this.neckY + i * (this.neckHeight / (this.stringCount - 1));
-            text(this.openStringNotes[this.stringCount - 1 - i], this.neckX - 20, y);
+            drawTextCentered(this.openStringNotes[this.stringCount - 1 - i], this.neckX - 20, y);
         }
     }
 
     drawENotes() {
         fill(150);
-        textSize(this.textSize);
+        textSize(this.textSize /2 );
         textAlign(CENTER, CENTER);
         for (let i = 0; i < this.fretCount -1; i++) {
             let x = this.neckX + i * (this.neckWidth / (this.fretCount ));
             if (!this.ENoteNames[i].includes('#'))
-                text(this.ENoteNames[i], x + (this.neckWidth / (this.fretCount )/2), this.neckY +this.neckHeight *1.2 );
+                drawTextCentered(this.ENoteNames[i], x + (this.neckWidth / (this.fretCount )/2), this.neckY +this.neckHeight *1.1 );
         }
     }
 
@@ -1335,7 +1335,7 @@ s
             fill(0);
             textSize(this.textSize);
             textAlign(CENTER, CENTER);
-            text(note, buttonX + buttonWidth / 2 - 2.5, buttonY + buttonHeight / 2);
+            drawTextCentered(note, buttonX + buttonWidth / 2 - 2.5, buttonY + buttonHeight / 2);
             
             pop();
         }
@@ -1595,15 +1595,26 @@ s
     }
 
     drawMarkers() {
-        fill(200);
+        fill(100);
         noStroke();
         for (let i of this.markerPositions) {
             let x = this.neckX + i * (this.neckWidth / this.fretCount) - (this.neckWidth / this.fretCount) / 2;
             if (i === 12) {
+                fill(100)
                 ellipse(x, this.neckY + 0.9 * this.neckHeight , this.markerDiameter, this.markerDiameter);
                 ellipse(x, this.neckY + 0.7 *  this.neckHeight , this.markerDiameter, this.markerDiameter);
+                fill(255)
+                drawTextCentered('1',x,this.neckY + 0.7 * this.neckHeight)
+                drawTextCentered('2',x,this.neckY + 0.9 * this.neckHeight)
+                
+
             } else {
+                fill(100)
                 ellipse(x, this.neckY + 0.9 * this.neckHeight , this.markerDiameter, this.markerDiameter);
+                fill(255)
+                noStroke()
+                textSize(this.markerDiameter*0.9)
+                drawTextCentered(i,x,this.neckY + 0.9 * this.neckHeight)
             }
         }
     }

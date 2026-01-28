@@ -25,13 +25,24 @@ let mic;
 let volumeThreshold = 0.001
 let noteFrequency
 let noteVolume 
+let myFont
 
 let intervalButtons = []; // boutons multi-états pour intervalles
+
+function drawTextCentered(txt, x, y, tweak = -6) {
+  const offsetY = (textAscent() - textDescent()) / 2 + tweak;
+  text(txt, x, y - offsetY);
+}
+
+
+function preload() { myFont = loadFont("FreeSans.ttf"); }
 
 function setup() {
     wH = windowHeight;
     wW = windowWidth;
     createCanvas(wW, wH);
+    //textFont(myFont);
+    
     // muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
     // muteButton.position(10, 10);
     // muteButton.mousePressed(toggleMic);
