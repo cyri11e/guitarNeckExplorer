@@ -423,10 +423,10 @@ drawHoverInfoCard() {
         if (this.tonic) {
             push();
             fill(255, 0, 0); // Rouge pour la tonique
-            textSize(this.textSize * 1.4);
+            textSize(this.textSize * 1.8);
             textStyle(BOLD);
             textAlign(CENTER, CENTER);
-            let x = this.neckX + this.neckWidth / 2;
+            let x = this.neckX + this.neckWidth / 6;
             let y = this.neckY - 30;
             let noteName = this.getNoteName(this.tonic.note);
             if (this.flatMode) noteName = this.swapEnharmonics(noteName);

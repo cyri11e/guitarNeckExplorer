@@ -35,7 +35,7 @@ function drawTextCentered(txt, x, y, tweak = -6) {
 }
 
 
-function preload() { myFont = loadFont("FreeSans.ttf"); }
+//function preload() { myFont = loadFont("FreeSans.ttf"); }
 
 function setup() {
     wH = windowHeight;
@@ -43,9 +43,24 @@ function setup() {
     createCanvas(wW, wH);
     //textFont(myFont);
     
-    // muteButton = createButton('<i class="fas fa-microphone-slash"></i>');
-    // muteButton.position(10, 10);
-    // muteButton.mousePressed(toggleMic);
+    let toolbar = select('#toolbar');
+    toolbar.style(`
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+
+        display: flex;
+        gap: 2px;
+        padding: 8px 12px;
+        background: rgba(0,0,0,0.45);
+        border-radius: 10px;
+        backdrop-filter: blur(6px);
+        z-index: 9999;
+    `);
+
+    
+
 
     // Création du manche de guitare AVANT le contrôle de mode segment
     guitar = new Guitar(13);
@@ -58,7 +73,7 @@ function setup() {
     helpPopup = new HelpPopup();
 
     selectionModeButton = createButton('Affichage: all');
-    selectionModeButton.position(200, 10);
+    selectionModeButton.parent(toolbar);
     selectionModeButton.style('padding', '6px 10px');
     selectionModeButton.mousePressed(toggleSelectionMode);
     updateSelectionModeButton();
@@ -66,41 +81,16 @@ function setup() {
 
     // Toggle Maj/min
     majorMinorToggle = createButton('Maj');
-    majorMinorToggle.position(410, 10);
+    majorMinorToggle.parent(toolbar);
     majorMinorToggle.style('padding', '6px 10px');
     majorMinorToggle.mousePressed(toggleMajorMinor);
 
     // 3-état : Accords / Penta / Gamme
     scaleTypeButton = createButton('note');
-    scaleTypeButton.position(340, 10);
+    scaleTypeButton.parent(toolbar);
     scaleTypeButton.style('padding', '6px 10px');
     scaleTypeButton.mousePressed(toggleScaleType);
     updateScaleTypeButton();
-
-    clearButton = createButton('Vider');
-    clearButton.position(500, 10);
-    clearButton.style('padding', '6px 10px');
-    clearButton.mousePressed(clearSelection);
-
-    // sensitivitySlider = createSlider(0, 1, volumeThreshold, 0.001);
-    // sensitivitySlider.position(10, 60);
-    // sensitivitySlider.style('width', '200px');
-    // sensitivitySlider.input(() => {
-    //     let value = sensitivitySlider.value();
-    //     console.log('Sensitivity Slider Value:', value);
-    //     detector.setSensitivity(value);
-    // });
-  
-    // Démarrer l'AudioContext lorsque la page est chargée
-    // userStartAudio().then(() => {
-    //     // Initialiser le contexte audio et le micro après que l'utilisateur ait interagi
-    //     audioContext = getAudioContext();
-    //     mic = new p5.AudioIn();
-    //     mic.start();
-    // });
-
-    //detector = new MultiPitchDetector();
-    //volumeControl = new VolumeControl(detector);
 
     // Boutons multi-états pour intervalles 1 à 7
     const intervalLabels = [
@@ -113,22 +103,31 @@ function setup() {
         ['7', 'b7'],  // 7
         ['8']         // 8 octave
     ];
-    // Positionnement à droite du bouton "Vider"
-    let baseX = 500 + clearButton.width + 10; // 10px d'espace après "Vider"
-    let baseY = 10;
-    let btnWidth = 38; // largeur fixe pour coller les boutons
-    for (let i = 0; i < 8; i++) {
-        let btn = createButton(intervalLabels[i][0]);
-        btn.position(baseX + i * btnWidth, baseY);
-        btn.style('padding', '6px 0px');
-        btn.style('width', btnWidth + 'px');
-        btn.style('font-weight', 'bold');
-        btn.style('margin', '0');
-        btn.style('border-radius', '0');
-        btn.mousePressed(() => toggleIntervalButton(i + 1));
-        intervalButtons.push(btn);
-    }
-    updateIntervalButtons();
+
+// 1) Boutons d’intervalles
+for (let i = 0; i < 8; i++) {
+    let btn = createButton(intervalLabels[i][0]);
+    btn.style('margin', '0');
+    btn.style('border-radius', '0');
+    btn.style('padding', '6px 0');
+    btn.style('width', '25px');
+    btn.style('display', 'inline-block');
+    btn.mousePressed(() => toggleIntervalButton(i + 1));
+    btn.parent(toolbar);   
+    intervalButtons.push(btn);
+}
+
+// 2) Bouton "Vider" à la fin
+clearButton = createButton('Vider');
+clearButton.style('margin', '0');
+clearButton.style('border-radius', '0');
+clearButton.style('padding', '6px 10px');
+clearButton.style('display', 'inline-block');
+clearButton.mousePressed(clearSelection);
+clearButton.parent(toolbar);  
+
+
+
 } 
 
 function updateSelectionModeButton() {
