@@ -29,7 +29,7 @@ let myFont
 
 let intervalButtons = []; // boutons multi-états pour intervalles
 
-function drawTextCentered(txt, x, y, tweak = -6) {
+function drawTextCentered(txt, x, y, tweak = -5) {
   const offsetY = (textAscent() - textDescent()) / 2 + tweak;
   text(txt, x, y - offsetY);
 }
