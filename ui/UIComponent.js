@@ -19,9 +19,30 @@ class UIComponent {
     this.hover = false;
     this.shortcutKey = null; // ex: 'a'
     this.shortcutCode = null; // ex: ENTER
+    // --- ETAT ---
+    this.onChange = null;
     // --- DEBUG ---
     this.debug = false;
   }
+  
+    // Façade harmonisée
+    get state() {
+        return 0; // valeur par défaut pour les composants sans état
+    }
+
+set state(v) {
+    if (this.value === v) return;
+    this._previousState = this.value;  // <--- on mémorise l'ancien état
+    this.setValue(v);
+}
+
+
+    // API publique générique
+    setState(v) {
+        this.state = v;
+    }
+
+
   
   normalizeSP(inPanel = false) {
     // 1. rien → 100%
@@ -84,6 +105,23 @@ class UIComponent {
     );
   }
 
+  //------------ETAT--------------
+triggerChange(newState) {
+    console.log(
+        "%c[TRIGGER] from " + this.constructor.name +
+        "  id=" + (this.id ?? "none") +
+        "  state=" + newState,
+        "color:#ff8800; font-weight:bold;"
+    );
+
+    if (this.onChange) {
+        this.onChange(newState);
+    }
+
+  //  UIManager.onComponentChange(this, newState);
+}
+
+  
   // -------------------------------------------------------
   // INTERACTIONS UTILISATEUR
   // -------------------------------------------------------

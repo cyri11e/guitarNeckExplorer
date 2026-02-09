@@ -1,6 +1,8 @@
 class Panel extends UIComponent {
   constructor(xp, yp, hp, config = {}) {
     super();
+    this.components = new Set();
+ // console.log('check fill component', this.components)
 
     this.xp = xp;
     this.yp = yp;

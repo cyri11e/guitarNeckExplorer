@@ -1,120 +1,123 @@
-let panel;
+let panel, panel2;
 let knob1, knob2;
 let lcd;
-let dummyBox;
-const MODE_OPTIONS = {
-  1: ["Majeur", "Mineur", "Diminué", "Augmenté"],
-  2: ["Maj7", "7", "m7", "m7b5", "dim7", "mMaj7"],
-  3: ["Majeure", "Mineure"],
-  4: [
-    "Ionien",
-    "Dorien",
-    "Phrygien",
-    "Lydien",
-    "Mixolydien",
-    "Eolien",
-    "Locrien",
-  ],
-};
+let uiRules;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
+  // --- GESTIONNAIRE DE RÈGLES ---
+  uiRules = new UIInteractionManager();
+
+  // --- PANEL ---
   panel = new Panel(10, 10, 20, {
     isDraggable: true,
     isZoomable: true,
   });
   panel.debug = false;
 
-  knob1 = new Knob(0, 0, 100, {
-    hideBottom: true,
-    items: [
-      { symbol: "C", label: "Curseur" },
-      { symbol: "N", label: "Notes" },
-      { symbol: "T", label: "Octaves" },
-    ],
-    shortcutKey: 'c'
+
+
+  // 👉 NOUVEAU PANEL
+  panel2 = new Panel(10, 40, 20, {
+    isDraggable: true,
+    isZoomable: true,
   });
+  panel2.debug = false;
 
-  knob2 = new Knob(0, 0, 100, {
-    hideBottom: true,
-    items: [
-      { symbol: "1", label: "Unique" },
-      { symbol: "3", label: "Triade" },
-      { symbol: "4", label: "Tetrade" },
-      { symbol: "5", label: "Pentatonique" },
-      { symbol: "7", label: "Diatonique" },
-    ],
-    shortcutKey: 'g'
-  });
+  // --- KNOBS ---
+  knob1 = new Knob(0, 0, 100, KNOB1_OPTIONS);
+  knob2 = new Knob(0, 0, 100, KNOB2_OPTIONS);
 
-  lcd = new LCDSelector(0, 0, 100, {
-      items: ["Majeur", "Mineur", "Diminué", "Augmenté"],
-      shortcutKey: 'm'   // touche M active ce LCD
-  });
+  knob1.debug = false;
+  knob2.debug = false;
 
-  lcd.debug = true;
-
-  // OFF par défaut
+  // --- LCD ---
+  lcd = new LCDSelector(0, 0, 100, LCD_OPTIONS);
+  lcd.debug = false;
   lcd.setOnOff(false);
   lcd.setItems([]);
-
-  knob1.debug = true;
-  knob2.debug = true;
 
   panel.add(knob1);
   panel.add(knob2);
   panel.add(lcd);
 
+  // --- SWITCHES ---
+  SWITCH_CONFIG.forEach((c) => {
+    let sw = new Switch(0, 0, 0, {
+      title: c.title,
+      topLabel: c.top,
+      bottomLabel: c.bottom,
+      color: "#aa0000",
+      shortcutKey: c.title,
+      ratio: 0.35,
+      debug: false,
+    });
+    panel.add(sw);
+  });
 
-dummyBox = new PinkBox(0, 0, 100, { ratio: 1 });
-// sp = 80% de la hauteur du panel
-// ratio = 1.5 → rectangle horizontal
+  // --- Metal Switch : # / ♭ ---
+  // --- Metal Switch : # / ♭ ---
+  const metalSharpFlat = new MetalSwitch(
+    0,
+    0,
+    100, // xp, yp, sp (comme tes autres composants)
+    METALSWITCH_CONFIG
+  );
 
-panel.add(dummyBox);
+  window.metalSharpFlat = metalSharpFlat;
+
+  panel2.add(metalSharpFlat);
+
+  const marker = new MarkerSelector(0, 0, 100, {
+    title: "C",
+    shortcutKey: "p",
+  });
+
+  panel2.add(marker);
 
   panel.updateResponsive();
+  panel2.updateResponsive();
+  // --- REGISTER PANEL (tous les composants automatiquement) ---
+  uiRules.register(panel);
+  uiRules.register(panel2);
+
+  // --- CHARGER LES RÈGLES DEPUIS LE FICHIER CONFIG ---
+  UI_RULES.forEach((rule) => uiRules.addRule(rule));
 }
 
 function draw() {
   background(230);
-  // --- LIAISON LCD ↔ POTARD 13457 ---
-  let modeIndex = knob2.index; // knob2 = ton potard 13457
-
-  if (modeIndex === 0) {
-    lcd.setOnOff(false);
-    lcd.setMode(0,[]);
-  } else {
-    lcd.setOnOff(true);
-    lcd.setMode(modeIndex, MODE_OPTIONS[modeIndex]);
-
-  }
 
   panel.updateResponsive();
   panel.updateHover(mouseX, mouseY);
   panel.draw();
+  panel2.updateResponsive();
+  panel2.updateHover(mouseX, mouseY);
+  panel2.draw();
 }
 
 function mousePressed() {
   panel.mousePressed(mouseX, mouseY);
+  panel2.mousePressed(mouseX, mouseY);
 }
 
 function mouseDragged() {
   panel.mouseDragged(mouseX, mouseY);
+  panel2.mouseDragged(mouseX, mouseY);
 }
-
 function mouseReleased() {
   panel.mouseReleased(mouseX, mouseY);
+  panel2.mouseReleased(mouseX, mouseY);
 }
-
-
 function mouseWheel(e) {
   panel.mouseWheel(e);
+  panel2.mouseWheel(e);
 }
-
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   panel.updateResponsive();
+  panel2.updateResponsive();
 }
 function keyPressed() {
   UIManager.handleShortcut(key, keyCode);
