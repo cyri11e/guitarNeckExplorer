@@ -1,46 +1,82 @@
 class App {
     constructor() {
         this.ui = new UIInteractionManager();
-        this.components = [];
 
-        this.needsRedraw = true;
-
-        // Ajout automatique du panel test
-        const panel = new Panel(25, 25, 50, 1.5, {
+        // Panel unique (ta structure d’origine)
+        this.panel = new Panel(25, 25, 50, 1.5, {
             isDraggable: true,
             isZoomable: true
         });
 
-        this.add(panel);
-    }
+        // ⭐ lien App <-> UIComponent pour invalidate()
+        this.panel.app = this;
 
-    add(component) {
-        this.components.push(component);
-        this.ui.register(component);
-        component.updateResponsive();
-        this.invalidate();
+        // Responsive initial
+        this.panel.updateResponsive();
+        this.ui.register(this.panel);
+
+        // Cycle de rendu
+        this.needsRedraw = true;
+
+        // Debug / profiling
+        this.debug = true;
+        this.redrawCount = 0;
+        this.lastFPS = 0;
+        this._lastTime = millis();
+        this._frameCounter = 0;
     }
 
     update() {
+        // Ta structure d’origine : on ne fait quelque chose
+        // que si needsRedraw est vrai
         if (!this.needsRedraw) return;
+
         this.needsRedraw = false;
+        this.redrawCount++;   // ⭐ un redraw logique de plus
     }
 
     display() {
+        // FPS
+        this._frameCounter++;
+        const now = millis();
+        if (now - this._lastTime > 500) {
+            this.lastFPS = (this._frameCounter * 1000) / (now - this._lastTime);
+            this._frameCounter = 0;
+            this._lastTime = now;
+        }
+
         background(60);
         fill(255);
         textSize(20);
         text('test', 20, 20);
 
-        for (let c of this.components) {
-            c.draw();
+        this.panel.draw();
+
+        if (this.debug) {
+            this.drawDebugHUD();
         }
+
+        // ⭐ FIN DU REDRAW
+        this.needsRedraw = false;
+    }
+
+
+
+    drawDebugHUD() {
+        push();
+        fill(255, 200, 0);
+        textSize(14);
+        text(
+            `redraw: ${this.redrawCount}   fps: ${this.lastFPS.toFixed(1)}`,
+            20,
+            height - 20
+        );
+        pop();
     }
 
     resize() {
-        for (let c of this.components) {
-            c.updateResponsive();
-        }
+        // Ta logique d’origine
+        this.panel.updateResponsive();
         this.invalidate();
     }
 
@@ -48,7 +84,10 @@ class App {
         this.needsRedraw = true;
     }
 
-    // EVENTS délégués
+    // ============================================================
+    // EVENTS délégués à UIInteractionManager (inchangés)
+    // ============================================================
+
     mousePressed(x, y)  { this.ui.mousePressed(x, y); }
     mouseReleased(x, y) { this.ui.mouseReleased(x, y); }
     mouseMoved(x, y)    { this.ui.mouseMoved(x, y); }

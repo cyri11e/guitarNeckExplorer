@@ -6,7 +6,6 @@ class UIComponent {
         this.yp = 0;
         this.sp = 100;      // taille relative (% du parent)
         this.aspectRatio = 1; // largeur = hauteur * aspectRatio
-  
 
         // Position / taille absolues
         this.x = 0;
@@ -32,6 +31,9 @@ class UIComponent {
         this.needsRedraw = true;
         this.debug = true;
         this.wheelActive = false;
+
+        // ⭐ AJOUT : référence vers App
+        this.app = null;
     }
 
     // ============================================================
@@ -77,7 +79,6 @@ class UIComponent {
 
         this.computeLayout();
     }
-
 
     computeLayout() {}
 
@@ -187,6 +188,11 @@ class UIComponent {
 
     invalidate() {
         this.needsRedraw = true;
+
+        // ⭐ AJOUT : prévenir App
+        if (this.app) {
+            this.app.invalidate();
+        }
     }
 
     // ============================================================

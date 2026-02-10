@@ -6,9 +6,12 @@ function setup() {
 }
 
 function draw() {
-    app.update();
-    app.display();
+    if (app.needsRedraw) {
+        app.update();
+        app.display();
+    }
 }
+
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
