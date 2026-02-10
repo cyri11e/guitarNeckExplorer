@@ -1,15 +1,30 @@
+// Panel.js
 class Panel extends UIComponent {
-
-    constructor(xp, yp, sp, aspectRatio =1, config = {}) {
+    constructor(cfg) {
         super();
 
-        this.setResponsive(xp, yp, sp);
-        this.aspectRatio = aspectRatio;
-        this.isDraggable = config.isDraggable ?? true;
-        this.isZoomable  = config.isZoomable  ?? true;
+        this.setResponsive(cfg.xp, cfg.yp, cfg.sp);
+        this.aspectRatio = cfg.aspectRatio;
+        this.visible = cfg.visible;
+        this.debug   = cfg.debug;
 
-        this.children = [];
-        this.debug = true;
+        this.isDraggable = cfg.isDraggable;
+        this.isZoomable  = cfg.isZoomable;
+
+        this.children = []
+    }
+
+    toggleVisible() { 
+        this.visible = !this.visible; 
+    }
+
+    onShortcut() {
+        this.toggleVisible();    
+    }
+    onClick() {
+        if (this.toggleOnClick) {
+            this.toggleVisible();
+        }
     }
 
     add(component) {
@@ -25,19 +40,25 @@ class Panel extends UIComponent {
     }
 
     draw() {
-        push();
-        fill(40);
-        stroke(200);
-        rect(this.x, this.y, this.w, this.h, 8);
-        pop();
+        // Fond du panel (contenu logique)
+        if (this.visible) {
+            push();
+            fill(40);
+            stroke(200);
+            rect(this.x, this.y, this.w, this.h, 8);
+            pop();
+        }
 
+        // Debug toujours visible, même si le panel est invisible
         this.drawDebugRect();
         this.drawDebugInfo();
 
+        // Enfants : on les laisse décider eux-mêmes de leur visibilité
         for (let c of this.children) {
             c.draw();
         }
     }
+
 
     drawDebugInfo() {
         if (!this.debug) return;

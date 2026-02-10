@@ -39,5 +39,9 @@ function mouseWheel(e) {
 
 function mouseClicked()  { app.mouseClicked(mouseX, mouseY); }
 
-function keyPressed()    { app.keyPressed(key, keyCode); }
+function keyPressed() {
+    UIManager.handleShortcut(key, keyCode);
+    app.invalidate();
+}
+
 function keyReleased()   { app.keyReleased(key, keyCode); }

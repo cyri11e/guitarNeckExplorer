@@ -3,10 +3,9 @@ class App {
         this.ui = new UIInteractionManager();
 
         // Panel unique (ta structure d’origine)
-        this.panel = new Panel(25, 25, 50, 1.5, {
-            isDraggable: true,
-            isZoomable: true
-        });
+        this.panel = new Panel(UI_CONFIG.panel);
+        this.panel.shortcutKey = UI_CONFIG.panel.toggleShortcut;
+        UIManager.register(this.panel);
 
         // ⭐ lien App <-> UIComponent pour invalidate()
         this.panel.app = this;
@@ -14,6 +13,8 @@ class App {
         // Responsive initial
         this.panel.updateResponsive();
         this.ui.register(this.panel);
+
+        
 
         // Cycle de rendu
         this.needsRedraw = true;
@@ -93,7 +94,11 @@ class App {
     mouseMoved(x, y)    { this.ui.mouseMoved(x, y); }
     mouseDragged(x, y)  { this.ui.mouseDragged(x, y); }
     mouseWheel(e)       { return this.ui.mouseWheel(e); }
-    mouseClicked(x, y)  { this.ui.mouseClicked(x, y); }
+    mouseClicked(x, y) {
+        UIManager.handleClick(x, y);
+        this.invalidate();
+    }
+
     keyPressed(k, kc)   { this.ui.keyPressed(k, kc); }
     keyReleased(k, kc)  { this.ui.keyReleased(k, kc); }
 }
