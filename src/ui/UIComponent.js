@@ -258,22 +258,34 @@ mouseDragged(mx, my) {
     return true;
 }
 
-mouseReleased() {
+mouseReleased(mx, my) {
+    const wasDragging = this.dragging;
     this.isPressed = false;
-    // on NE remet PAS dragging ici
-    // sinon mouseClicked croira que c’est un clic
-}
+    this.dragging = false;
 
-mouseClicked(mx, my) {
-    // si un vrai drag a eu lieu → PAS un clic
-    if (this.dragging) return false;
-
-    if (this.containsRect(mx, my)) {
+    // pas de drag + relâché dedans → clic
+    if (!wasDragging && this.containsRect(mx, my)) {
         this.onClick?.();
-        return true;
+        return true;    // consommé
     }
-    return false;
+
+    return wasDragging; // consommé si drag
 }
+
+
+
+
+
+// mouseClicked(mx, my) {
+//     // si un vrai drag a eu lieu → PAS un clic
+//     if (this.dragging) return false;
+
+//     if (this.containsRect(mx, my)) {
+//         this.onClick?.();
+//         return true;
+//     }
+//     return false;
+// }
 
 
 

@@ -2,14 +2,21 @@ class UIInteractionManager {
 
     constructor() {
         this.components = [];
+        this.shortcuts = {};
+        this.captureOwner = null;   // 🔥 composant qui a capturé la souris
+        this.mouseIsDown = false;
     }
 
     // ============================================================
-    // REGISTER COMPONENTS
+    // REGISTER / UNREGISTER
     // ============================================================
 
     register(component) {
         this.components.push(component);
+
+        if (component.shortcutKey) {
+            this.shortcuts[component.shortcutKey.toLowerCase()] = component;
+        }
     }
 
     unregister(component) {
@@ -17,56 +24,149 @@ class UIInteractionManager {
     }
 
     // ============================================================
-    // EVENT ROUTING
+    // MOUSE EVENTS WITH CAPTURE
     // ============================================================
 
     mousePressed(mx, my) {
-        for (let c of this.components) {
-            if (c.mousePressed(mx, my)) return true;
+        this.mouseIsDown = true;
+
+        // top → bottom
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+
+            if (c.mousePressed?.(mx, my)) {
+                this.captureOwner = c;   // 🔥 capture
+                return true;
+            }
         }
+
+        return false;
+    }
+
+    mouseDragged(mx, my) {
+        if (this.captureOwner) {
+            // 🔥 seul le captureOwner reçoit le drag
+            return this.captureOwner.mouseDragged?.(mx, my) || false;
+        }
+
+        // fallback (rare)
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseDragged?.(mx, my)) return true;
+        }
+
         return false;
     }
 
     mouseReleased(mx, my) {
-        for (let c of this.components) c.mouseReleased(mx, my);
-    }
+        this.mouseIsDown = false;
 
-    mouseMoved(mx, my) {
-        for (let c of this.components) c.mouseMoved(mx, my);
-    }
-
-    mouseDragged(mx, my) {
-        for (let c of this.components) {
-            if (c.mouseDragged(mx, my)) return true;
+        if (this.captureOwner) {
+            // 🔥 seul le captureOwner reçoit le release
+            const consumed = this.captureOwner.mouseReleased?.(mx, my) || false;
+            this.captureOwner = null;
+            return consumed;
         }
+
+        // fallback (rare)
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseReleased?.(mx, my)) return true;
+        }
+
+        return false;
+    }
+
+    mouseClicked(mx, my) {
+        // 🔥 un clic n'existe QUE si pas de drag + pas de capture
+        if (this.captureOwner) return false;
+
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseClicked?.(mx, my)) return true;
+        }
+
         return false;
     }
 
     mouseWheel(event) {
-        for (let c of this.components) {
-            if (c.mouseWheel(event)) return true;
+        // pas de capture pour wheel
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseWheel?.(event)) return true;
         }
         return false;
     }
 
-mouseClicked(mx, my) {
-    for (let c of this.components) {
-        c.mouseClicked?.(mx, my);
-    }
-    return false;
-}
-
+    // ============================================================
+    // KEYBOARD + SHORTCUTS
+    // ============================================================
 
     keyPressed(k, kc) {
-        for (let c of this.components) {
+        const lower = k.toLowerCase();
+
+        // Shortcuts directs
+        if (this.shortcuts[lower]) {
+            this.shortcuts[lower].onShortcut?.();
+            return true;
+        }
+
+        // Sinon propagation normale (z-index)
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
             if (c.keyPressed?.(k, kc)) return true;
         }
+
         return false;
     }
 
     keyReleased(k, kc) {
-        for (let c of this.components) {
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
             if (c.keyReleased?.(k, kc)) return true;
+        }
+        return false;
+    }
+
+    // ============================================================
+    // SHORTCUTS (ancienne API, mais en z-index)
+    // ============================================================
+
+    handleShortcut(k, code) {
+        const lower = k.toLowerCase();
+
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+
+            if (c.shortcutKey && lower === c.shortcutKey.toLowerCase()) {
+                c.onShortcut?.();
+                return true;
+            }
+
+            if (c.shortcutCode && code === c.shortcutCode) {
+                c.onShortcut?.();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ============================================================
+    // CLICK LOGIQUE (z-index)
+    // ============================================================
+
+    handleClick(x, y) {
+        // 🔥 un click logique ne doit PAS passer si captureOwner existe
+        if (this.captureOwner) return false;
+
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+
+            if (c.containsRect?.(x, y)) {
+                c.onClick?.();
+                return true;
+            }
         }
         return false;
     }
@@ -76,35 +176,12 @@ mouseClicked(mx, my) {
     // ============================================================
 
     invalidateAll() {
-        for (let c of this.components) c.invalidate();
+        for (let c of this.components) c.invalidate?.();
     }
 
     // ============================================================
-    // 🔥 AJOUT : MÉTHODES DE UIManager (sans rien retirer)
+    // RULE DISPATCH
     // ============================================================
-
-    handleShortcut(k, code) {
-        for (let c of this.components) {
-
-            // touche caractère
-            if (c.shortcutKey && k.toLowerCase() === c.shortcutKey.toLowerCase()) {
-                c.onShortcut?.();
-            }
-
-            // touche keyCode
-            if (c.shortcutCode && code === c.shortcutCode) {
-                c.onShortcut?.();
-            }
-        }
-    }
-
-    handleClick(x, y) {
-        for (let c of this.components) {
-            if (c.containsRect?.(x, y)) {
-                c.onClick?.();
-            }
-        }
-    }
 
     onComponentChange(component, newState) {
         console.log(

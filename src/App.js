@@ -1,32 +1,65 @@
 class App {
     constructor() {
-        //  Ton moteur UI physique + logique fusionné
+
+        // Manager d'interactions
         this.ui = new UIInteractionManager();
 
-        //  Création du panel
-        this.panel = new Panel(UI_CONFIG.panel);
-        this.panel2 = new Panel(UI_CONFIG.panel2);
+        // Tous les composants UI (z-index = ordre d'arrivée)
+        this.components = [];
 
-        //  Déclaration des raccourcis
-        this.panel.shortcutKey = UI_CONFIG.panel.toggleShortcut;
-        this.panel2.shortcutKey = UI_CONFIG.panel2.toggleShortcut;
+        // ============================================================
+        // AUTO-CREATION DEPUIS UI_CONFIG
+        // ============================================================
 
-        //  Enregistrement
-        this.ui.register(this.panel);
-        this.ui.register(this.panel2);
+        for (const key in UI_CONFIG) {
+            const cfg = UI_CONFIG[key];
 
-        //  Lien App → composants
-        this.panel.app = this;
-        this.panel2.app = this;
+            // sécurité : cfg doit exister et avoir un type
+            if (!cfg || !cfg.type) continue;
 
-        //  Responsive initial
-        this.panel.updateResponsive();
-        this.panel2.updateResponsive();
+            let comp = null;
 
-        //  Cycle de rendu
+            // mapping type → classe
+            switch (cfg.type) {
+                case "panel":
+                    comp = new Panel(cfg);
+                    break;
+
+                // futur :
+                // case "knob": comp = new Knob(cfg); break;
+                // case "switch": comp = new Switch(cfg); break;
+
+                default:
+                    console.warn("Type inconnu:", cfg.type, "pour", key);
+                    continue;
+            }
+
+            // nom interne
+            comp.name = key;
+
+            // shortcut éventuel
+            if (cfg.toggleShortcut) {
+                comp.shortcutKey = cfg.toggleShortcut;
+            }
+
+            // lien vers App
+            comp.app = this;
+
+            // ajout dans la pile (z-index)
+            this.components.push(comp);
+
+            // enregistrement dans UIManager
+            this.ui.register(comp);
+
+            // responsive initial
+            comp.updateResponsive();
+        }
+
+        // ============================================================
+        // DEBUG / RENDERING
+        // ============================================================
+
         this.needsRedraw = true;
-
-        // Debug
         this.debug = true;
         this.redrawCount = 0;
         this.lastFPS = 0;
@@ -44,34 +77,27 @@ class App {
         this.redrawCount++;
     }
 
-display() {
-    // FPS
-    this._frameCounter++;
-    const now = millis();
-    if (now - this._lastTime > 500) {
-        this.lastFPS = (this._frameCounter * 1000) / (now - this._lastTime);
-        this._frameCounter = 0;
-        this._lastTime = now;
+    display() {
+        // FPS
+        this._frameCounter++;
+        const now = millis();
+        if (now - this._lastTime > 500) {
+            this.lastFPS = (this._frameCounter * 1000) / (now - this._lastTime);
+            this._frameCounter = 0;
+            this._lastTime = now;
+        }
+
+        background(60);
+
+        // dessin bottom → top
+        for (const c of this.components) {
+            c.draw();
+        }
+
+        if (this.debug) this.drawDebugHUD();
+
+        this.needsRedraw = false;
     }
-
-    background(60);
-
-    //  TON TEXTE "test" REMIS ICI 
-    push();
-    fill(255);
-    textSize(20);
-    text("test", 50, 50);
-    pop();
-
-    //  Dessin du panel
-    this.panel.draw();
-    this.panel2.draw();
-
-    if (this.debug) this.drawDebugHUD();
-
-    this.needsRedraw = false;
-}
-
 
     drawDebugHUD() {
         push();
@@ -90,7 +116,9 @@ display() {
     // ============================================================
 
     resize() {
-        this.panel.updateResponsive();
+        for (const c of this.components) {
+            c.updateResponsive();
+        }
         this.invalidate();
     }
 
@@ -114,12 +142,8 @@ display() {
     }
 
     keyPressed(k, kc) {
-        //  shortcuts logiques
         this.ui.handleShortcut(k, kc);
-
-        //  shortcuts physiques (si un composant les gère)
         this.ui.keyPressed(k, kc);
-
         this.invalidate();
     }
 
