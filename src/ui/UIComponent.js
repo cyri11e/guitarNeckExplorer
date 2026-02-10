@@ -23,6 +23,10 @@ class UIComponent {
         this.dragging = false;
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
+        this.isPressed = false;
+        this.pressX = 0;
+        this.pressY = 0;
+
 
         // Zoom
         this.zoomFactor = 1;
@@ -146,29 +150,6 @@ class UIComponent {
     // INTERACTIONS SOURIS (façade : appellent les méthodes métier)
     // ============================================================
 
-    mousePressed(mx, my) {
-        if (!this.isDraggable) return false;
-        if (!this.containsRect(mx, my)) return false;
-
-        this.dragging = true;
-        this.dragOffsetX = mx - this.x;
-        this.dragOffsetY = my - this.y;
-        return true;
-    }
-
-    mouseDragged(mx, my) {
-        if (!this.dragging) return false;
-
-        const nx = mx - this.dragOffsetX;
-        const ny = my - this.dragOffsetY;
-
-        this.moveToAbsolute(nx, ny);   // <-- ordre métier clair
-        return true;
-    }
-
-    mouseReleased() {
-        this.dragging = false;
-    }
 
     mouseWheel(event) {
         if (!this.isZoomable) return false;
@@ -232,7 +213,70 @@ class UIComponent {
     // ============================================================
 
     mouseMoved(mx, my) { return false; }
-    mouseClicked(mx, my) { return false; }
+
+// ============================================================
+// INTERACTIONS SOURIS — VERSION PROPRE ET FIABLE
+// ============================================================
+
+mousePressed(mx, my) {
+    if (!this.containsRect(mx, my)) return false;
+
+    this.isPressed = true;
+    this.dragging = false;      // pas encore un vrai drag
+    this.pressX = mx;
+    this.pressY = my;
+
+    if (this.isDraggable) {
+        this.dragOffsetX = mx - this.x;
+        this.dragOffsetY = my - this.y;
+    }
+
+    return true;
+}
+
+mouseDragged(mx, my) {
+    if (!this.isPressed) return false;
+
+    // Détection d’un vrai drag
+    const dx = mx - this.pressX;
+    const dy = my - this.pressY;
+    const dist2 = dx * dx + dy * dy;
+
+    const DRAG_THRESHOLD = 4; // 2px
+    if (!this.dragging && dist2 < DRAG_THRESHOLD * DRAG_THRESHOLD) {
+        return false; // pas encore un vrai drag
+    }
+
+    this.dragging = true;
+
+    if (this.isDraggable) {
+        const nx = mx - this.dragOffsetX;
+        const ny = my - this.dragOffsetY;
+        this.moveToAbsolute(nx, ny);
+    }
+
+    return true;
+}
+
+mouseReleased() {
+    this.isPressed = false;
+    // on NE remet PAS dragging ici
+    // sinon mouseClicked croira que c’est un clic
+}
+
+mouseClicked(mx, my) {
+    // si un vrai drag a eu lieu → PAS un clic
+    if (this.dragging) return false;
+
+    if (this.containsRect(mx, my)) {
+        this.onClick?.();
+        return true;
+    }
+    return false;
+}
+
+
+
     keyPressed(k, kc) { return false; }
     keyReleased(k, kc) { return false; }
 }

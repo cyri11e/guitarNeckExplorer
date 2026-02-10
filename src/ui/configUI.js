@@ -18,5 +18,22 @@ const UI_CONFIG = {
         // Comportements
         toggleOnClick: true,
         toggleShortcut: "v"
+    },
+
+    panel2: {
+        xp: 60,
+        yp: 25,
+        sp: 40,
+        aspectRatio: 1.2,
+
+        visible: true,
+        debug: true,
+
+        isDraggable: true,
+        isZoomable: true,
+
+        toggleOnClick: true,
+        toggleShortcut: "w"
     }
+
 };

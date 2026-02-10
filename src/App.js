@@ -1,25 +1,32 @@
 class App {
     constructor() {
+        //  Ton moteur UI physique + logique fusionné
         this.ui = new UIInteractionManager();
 
-        // Panel unique (ta structure d’origine)
+        //  Création du panel
         this.panel = new Panel(UI_CONFIG.panel);
+        this.panel2 = new Panel(UI_CONFIG.panel2);
+
+        //  Déclaration des raccourcis
         this.panel.shortcutKey = UI_CONFIG.panel.toggleShortcut;
-        UIManager.register(this.panel);
+        this.panel2.shortcutKey = UI_CONFIG.panel2.toggleShortcut;
 
-        // ⭐ lien App <-> UIComponent pour invalidate()
-        this.panel.app = this;
-
-        // Responsive initial
-        this.panel.updateResponsive();
+        //  Enregistrement
         this.ui.register(this.panel);
+        this.ui.register(this.panel2);
 
-        
+        //  Lien App → composants
+        this.panel.app = this;
+        this.panel2.app = this;
 
-        // Cycle de rendu
+        //  Responsive initial
+        this.panel.updateResponsive();
+        this.panel2.updateResponsive();
+
+        //  Cycle de rendu
         this.needsRedraw = true;
 
-        // Debug / profiling
+        // Debug
         this.debug = true;
         this.redrawCount = 0;
         this.lastFPS = 0;
@@ -27,40 +34,43 @@ class App {
         this._frameCounter = 0;
     }
 
+    // ============================================================
+    // RENDERING
+    // ============================================================
+
     update() {
-        // Ta structure d’origine : on ne fait quelque chose
-        // que si needsRedraw est vrai
         if (!this.needsRedraw) return;
-
         this.needsRedraw = false;
-        this.redrawCount++;   // ⭐ un redraw logique de plus
+        this.redrawCount++;
     }
 
-    display() {
-        // FPS
-        this._frameCounter++;
-        const now = millis();
-        if (now - this._lastTime > 500) {
-            this.lastFPS = (this._frameCounter * 1000) / (now - this._lastTime);
-            this._frameCounter = 0;
-            this._lastTime = now;
-        }
-
-        background(60);
-        fill(255);
-        textSize(20);
-        text('test', 20, 20);
-
-        this.panel.draw();
-
-        if (this.debug) {
-            this.drawDebugHUD();
-        }
-
-        // ⭐ FIN DU REDRAW
-        this.needsRedraw = false;
+display() {
+    // FPS
+    this._frameCounter++;
+    const now = millis();
+    if (now - this._lastTime > 500) {
+        this.lastFPS = (this._frameCounter * 1000) / (now - this._lastTime);
+        this._frameCounter = 0;
+        this._lastTime = now;
     }
 
+    background(60);
+
+    //  TON TEXTE "test" REMIS ICI 
+    push();
+    fill(255);
+    textSize(20);
+    text("test", 50, 50);
+    pop();
+
+    //  Dessin du panel
+    this.panel.draw();
+    this.panel2.draw();
+
+    if (this.debug) this.drawDebugHUD();
+
+    this.needsRedraw = false;
+}
 
 
     drawDebugHUD() {
@@ -75,8 +85,11 @@ class App {
         pop();
     }
 
+    // ============================================================
+    // RESPONSIVE
+    // ============================================================
+
     resize() {
-        // Ta logique d’origine
         this.panel.updateResponsive();
         this.invalidate();
     }
@@ -86,7 +99,7 @@ class App {
     }
 
     // ============================================================
-    // EVENTS délégués à UIInteractionManager (inchangés)
+    // EVENTS → UIInteractionManager
     // ============================================================
 
     mousePressed(x, y)  { this.ui.mousePressed(x, y); }
@@ -94,11 +107,23 @@ class App {
     mouseMoved(x, y)    { this.ui.mouseMoved(x, y); }
     mouseDragged(x, y)  { this.ui.mouseDragged(x, y); }
     mouseWheel(e)       { return this.ui.mouseWheel(e); }
-    mouseClicked(x, y) {
-        UIManager.handleClick(x, y);
+
+    mouseClicked(x, y)  { 
+        this.ui.mouseClicked(x, y);
         this.invalidate();
     }
 
-    keyPressed(k, kc)   { this.ui.keyPressed(k, kc); }
-    keyReleased(k, kc)  { this.ui.keyReleased(k, kc); }
+    keyPressed(k, kc) {
+        //  shortcuts logiques
+        this.ui.handleShortcut(k, kc);
+
+        //  shortcuts physiques (si un composant les gère)
+        this.ui.keyPressed(k, kc);
+
+        this.invalidate();
+    }
+
+    keyReleased(k, kc) {
+        this.ui.keyReleased(k, kc);
+    }
 }

@@ -1,4 +1,3 @@
-// Panel.js
 class Panel extends UIComponent {
     constructor(cfg) {
         super();
@@ -11,16 +10,20 @@ class Panel extends UIComponent {
         this.isDraggable = cfg.isDraggable;
         this.isZoomable  = cfg.isZoomable;
 
-        this.children = []
+        this.toggleOnClick = cfg.toggleOnClick;
+
+        this.children = [];
     }
 
     toggleVisible() { 
         this.visible = !this.visible; 
+        this.invalidate();
     }
 
     onShortcut() {
-        this.toggleVisible();    
+        this.toggleVisible();
     }
+
     onClick() {
         if (this.toggleOnClick) {
             this.toggleVisible();
@@ -40,7 +43,6 @@ class Panel extends UIComponent {
     }
 
     draw() {
-        // Fond du panel (contenu logique)
         if (this.visible) {
             push();
             fill(40);
@@ -49,16 +51,11 @@ class Panel extends UIComponent {
             pop();
         }
 
-        // Debug toujours visible, même si le panel est invisible
         this.drawDebugRect();
         this.drawDebugInfo();
 
-        // Enfants : on les laisse décider eux-mêmes de leur visibilité
-        for (let c of this.children) {
-            c.draw();
-        }
+        for (let c of this.children) c.draw();
     }
-
 
     drawDebugInfo() {
         if (!this.debug) return;
