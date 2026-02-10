@@ -1,34 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head> 
-    <script src="https://unpkg.com/ml5@0.3.1/dist/ml5.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.1/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.1/addons/p5.sound.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/webmidi@latest/dist/iife/webmidi.iife.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <meta charset="utf-8" />
-  </head>
-  <body>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Guitar UI Framework</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
 
 
-    <main>
-    </main>
-    <script src="ui/UIComponent.js"></script>
-    <script src="ui/UIPanel.js"></script>
-    <script src="ui/UIKnob.js"></script>
-    <script src="ui/UISwitch.js"></script>
-    <script src="ui/UILCDSelector.js"></script>
-    <script src="ui/UIColorMarker.js"></script>
-    <script src="ui/UIManager.js"></script>
-    <script src="ui/UIInteractionManager.js"></script>
-    <script src="ui/config-ui.js"></script>
-    <script src="pitchDetector.js"></script>
-    <script src="midi.js"></script>
-    <script src="guitar.js"></script>
-    <script src="helpPopup.js"></script>
-    <script src="volumeControl.js"></script>
-    <script src="intervalTable.js"></script>
+    <!-- p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
+    <!-- App -->
+    <script src="src/App.js"></script>
+
+    <!-- UI Core -->
+    <script src="src/ui/UIComponent.js"></script>
+    <script src="src/ui/Panel.js"></script>
+    <script src="src/ui/UIInteractionManager.js"></script> <!--
+    <script src="src/ui/Knob.js"></script>
+    <script src="src/ui/Switch.js"></script>
+    <script src="src/ui/MetalSwitch.js"></script>
+    <script src="src/ui/MarkerSelector.js"></script>
+    <script src="src/ui/LCDSelector.js"></script>
+    <script src="src/ui/HelpPopup.js"></script> -->
+
+    <!-- Guitar Engine -->
+    <!-- <script src="src/guitar/Guitar.js"></script>
+    <script src="src/guitar/GuitarLayout.js"></script>
+    <script src="src/guitar/GuitarState.js"></script>
+    <script src="src/guitar/GuitarRenderer.js"></script>
+    <script src="src/guitar/GuitarTheory.js"></script>
+    <script src="src/guitar/GuitarConstants.js"></script>
+
+    <!-- Audio 
+    <script src="src/audio/AudioEngine.js"></script>
+    <script src="src/audio/PitchDetection.js"></script>
+    <script src="src/audio/MidiInput.js"></script> -->
+
+    <!-- Sketch -->
     <script src="sketch.js"></script>
-  </body>
+</head>
+<body></body>
 </html>
