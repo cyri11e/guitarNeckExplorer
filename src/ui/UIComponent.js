@@ -5,6 +5,8 @@ class UIComponent {
         this.xp = 0;
         this.yp = 0;
         this.sp = 100;      // taille relative (% du parent)
+        this.aspectRatio = 1; // largeur = hauteur * aspectRatio
+  
 
         // Position / taille absolues
         this.x = 0;
@@ -67,12 +69,15 @@ class UIComponent {
         this.x = px + pw * (this.xp / 100);
         this.y = py + ph * (this.yp / 100);
 
-        // Taille absolue = taille relative * taille parent * zoom
-        this.w = pw * (this.sp / 100) * this.zoomFactor;
+        // Hauteur = sp% de la hauteur du parent * zoom
         this.h = ph * (this.sp / 100) * this.zoomFactor;
+
+        // Largeur imposée par le ratio
+        this.w = this.h * this.aspectRatio;
 
         this.computeLayout();
     }
+
 
     computeLayout() {}
 

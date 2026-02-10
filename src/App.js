@@ -1,16 +1,24 @@
 class App {
     constructor() {
         this.ui = new UIInteractionManager();
+        this.components = [];
 
-        this.panel = new Panel(25, 25, 50, {
+        this.needsRedraw = true;
+
+        // Ajout automatique du panel test
+        const panel = new Panel(25, 25, 50, 1.5, {
             isDraggable: true,
             isZoomable: true
         });
 
-        this.panel.updateResponsive();
-        this.ui.register(this.panel);
+        this.add(panel);
+    }
 
-        this.needsRedraw = true;
+    add(component) {
+        this.components.push(component);
+        this.ui.register(component);
+        component.updateResponsive();
+        this.invalidate();
     }
 
     update() {
@@ -24,24 +32,23 @@ class App {
         textSize(20);
         text('test', 20, 20);
 
-        this.panel.draw();
+        for (let c of this.components) {
+            c.draw();
+        }
     }
 
-    // resize() {
-    //     this.panel.hasBeenPositioned = false;
-    //     this.panel.updateResponsive();
-    //     this.invalidate();
-    // }
     resize() {
-    // NE RIEN TOUCHER si l’utilisateur a déjà déplacé/zoomé
-    this.panel.updateResponsive(); // safe car updateResponsive respecte hasBeenPositioned
-}
-
+        for (let c of this.components) {
+            c.updateResponsive();
+        }
+        this.invalidate();
+    }
 
     invalidate() {
         this.needsRedraw = true;
     }
 
+    // EVENTS délégués
     mousePressed(x, y)  { this.ui.mousePressed(x, y); }
     mouseReleased(x, y) { this.ui.mouseReleased(x, y); }
     mouseMoved(x, y)    { this.ui.mouseMoved(x, y); }

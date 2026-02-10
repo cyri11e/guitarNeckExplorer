@@ -1,10 +1,10 @@
 class Panel extends UIComponent {
 
-    constructor(xp, yp, sp, config = {}) {
+    constructor(xp, yp, sp, aspectRatio =1, config = {}) {
         super();
 
         this.setResponsive(xp, yp, sp);
-
+        this.aspectRatio = aspectRatio;
         this.isDraggable = config.isDraggable ?? true;
         this.isZoomable  = config.isZoomable  ?? true;
 
