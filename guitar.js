@@ -61,8 +61,22 @@ class Guitar{
           this.scaleType = 'note'; // 'accords' | 'penta' | 'gamme'
           // Facteur de transparence (0 = aucun, 1 = maximum)
           this.transparencyFactor = 1.2;
-          this.segmentColor = ['#0080ff4d','#f700ff5a','#1eff0050','#fe030346','#fafe038b','#ff80004d']
-          this.segmentColorIndex = 0
+          // 12 couleurs pour les 12 notes (correspondant au marker)
+          this.segmentColor = [
+            '#ff1414b3', // 0: Red (C)
+            '#ff525ab3', // 1: Orange-Red
+            '#ffa50ab3', // 2: Orange (D)
+            '#ffd20ab3', // 3: Gold
+            '#c8c80ab3', // 4: Yellow
+            '#90ee90b3', // 5: Light Green
+            '#48a97fb3', // 6: Green (E)
+            '#1428ffb3', // 7: Blue
+            '#4467c0b3', // 8: Dark Blue
+            '#4b0a82b3', // 9: Purple
+            '#6f15a8b3', // 10: Violet
+            '#9410d3b3'  // 11: Magenta
+          ];
+          this.segmentColorIndex = 0;
           this.degreMode = false;
           this.blankMode = false; // Mode blank : notes masquées, pastilles noires
           this.tonicMode = false; // Mode tonic : pastille noire, contour rouge pour la tonique
@@ -426,7 +440,7 @@ drawHoverInfoCard() {
             textSize(this.textSize * 1.8);
             textStyle(BOLD);
             textAlign(CENTER, CENTER);
-            let x = this.neckX + this.neckWidth / 6;
+            let x = this.neckWidth /2 ;
             let y = this.neckY - 30;
             let noteName = this.getNoteName(this.tonic.note);
             if (this.flatMode) noteName = this.swapEnharmonics(noteName);
@@ -515,21 +529,28 @@ drawHoverInfoCard() {
                 noteColor = color(255, 0, 0); // Rouge si pas de tonique
 
             fill(noteColor);
+            
+            console.log('>> drawHoveredNote: selectionMode=', this.selectionMode, 'note=', this.hoveredNote.note);
 
             // Mode 'all' : octaves + intervalles + occurrences
             if (this.selectionMode === 'all') {
+                console.log('  >> calling drawAllOctaves + drawAllIntervals + drawAllOccurrences');
                 this.drawAllOctaves(this.hoveredNote, null, true);
                 this.drawAllIntervals(this.hoveredNote, this.intervals, null, true);
                 this.drawAllOccurrences(this.hoveredNote, null, true);
             }
             // Mode 'exact' : note exacte + intervalles exacts (pas d'octaves)
             else if (this.selectionMode === 'exact') {
+                console.log('  >> calling drawExactIntervals + drawExactOccurrences');
                 this.drawExactIntervals(this.hoveredNote, this.intervals, null, true);
                 this.drawExactOccurrences(this.hoveredNote, null, true);
             }
-            // Mode 'single' : uniquement la note exacte survolée (pas d'intervalles, pas d'autres notes)
+            // Mode 'single' : uniquement la note exacte survolée + les intervalles sélectionnés
             else if (this.selectionMode === 'single') {
+                console.log('  >> calling drawNoteOnFretboard + drawIntervalsOnly');
                 this.drawNoteOnFretboard(this.hoveredNote.note, this.hoveredNote.string, this.hoveredNote.fret, null, true);
+                // Ajouter les intervalles sélectionnés même en mode single (mais PAS les unissons)
+                this.drawIntervalsOnly(this.hoveredNote, this.intervals, null, true);
             }
         }
     }
@@ -587,11 +608,14 @@ drawHoverInfoCard() {
         // Appliquer le filtre d'affichage selon selectionMode SEULEMENT en mode single
         if (this.selectionMode === 'single' && this.hoveredNote && this.clickedNotes.length === 0 && this.intervals.length === 0) {
             const isSamePosition = (this.hoveredNote.string === string && this.hoveredNote.fret === fret && this.hoveredNote.note === note);
+            console.log('FILTER CHECK single mode: note=', note, 'pos=', string, '-', fret, 'hoveredPos=', this.hoveredNote.string, '-', this.hoveredNote.fret, 'isSame=', isSamePosition);
             // En mode single, on n'affiche que la note survolée exacte
             if (!isSamePosition) {
                 pop();
                 return;
             }
+        } else if (this.selectionMode === 'single') {
+            console.log('FILTER SKIP (not all conditions met): clickedNotes.length=', this.clickedNotes.length, 'intervals.length=', this.intervals.length);
         }
 
         // Transparence proportionnelle à la distance du curseur (TOUJOURS appliquée si hoveredNote existe)
@@ -802,6 +826,7 @@ parseAlteration(input) {
       }
 
     drawExactOccurrences(note, pulse, hover) {
+        console.log('drawExactOccurrences called! selectionMode=', this.selectionMode);
         push()
         // Dessiner uniquement la note exacte (avec octave)
         noStroke();
@@ -857,6 +882,35 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
     pop();
 }
 
+
+    // Afficher SEULEMENT les intervalles, sans la note de base (pour mode 'single')
+    drawIntervalsOnly(note, intervals = [], pulse, hover) {
+        push();
+        noStroke();
+        
+        // Si pas d'intervalles, ne rien afficher
+        if (!intervals || intervals.length === 0) {
+            pop();
+            return;
+        }
+        
+        // Parcourir toutes les cordes et frettes pour dessiner seulement les intervalles
+        for (let string = 0; string < this.stringCount; string++) {
+            for (let fret = 0; fret < this.fretCount + 1; fret++) {
+                let currentNote = this.getNoteFromCoordinates(string, fret);
+                
+                // Vérifier si c'est un intervalle (mais PAS la note de base)
+                if (currentNote !== note.note && intervals.some(interval => {
+                    let transposedNote = this.transpose(note.note, interval);
+                    return currentNote === transposedNote;
+                })) {
+                    fill(color(this.noteColors[this.calculeDegreeChromatique(this.tonic||this.hoveredNote, {note : currentNote })]));
+                    this.drawNoteOnFretboard(currentNote, string, fret, pulse, hover);
+                }
+            }
+        }
+        pop();
+    }
 
     drawExactIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         push();
@@ -1051,7 +1105,7 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
         return highlightedMatrix;
     }
       
-    handleCheckboxChange(interval) {
+    handleCheckboxChange(interval) { // ne devrait plus exister 
         const intervalMap = {
             2: [2, 1], // seconde majeure et mineure
             3: [4, 3], // tierce majeure et mineure
@@ -1128,7 +1182,6 @@ drawAllIntervals(note, intervals = [0, 4, 7], pulse, hover) {
                 this.tonicMode = false; // Tonic → Note
             }
         }
-        if (keyCode == 66) this.flatMode = !this.flatMode; // touche "B" pour commuter le mode bémol
         
         if (keyCode == 90) { // touche "Z" pour basculer le mode zoom
             this.zoomMode = !this.zoomMode;

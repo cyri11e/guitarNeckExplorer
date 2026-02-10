@@ -3,17 +3,15 @@ let wW
 let selectedNotes = []
 let liveNotes = []
 let micMuted = true;
-let muteButton;
-let segmentModeControl; // Nouveau contrôle graphique pour mode segment
-let selectionModeButton;
+// UI Panels et Composants
+let panel, panel2;
+let knob1, knob2;
+let lcd;
+let marker;
+let uiRules;
 
-let majorMinorToggle; // <-- nouveau : toggle Maj/min
-let scaleTypeButton; // <-- nouveau : 3-état Accords/Penta/Gamme
-let clearButton;
 let guitar
-let sensitivitySlider;
 let volumeLevel = 0;
-let volumeControl;
 let helpPopup; // Popup d'aide
 
 // pitch detection
@@ -27,8 +25,6 @@ let noteFrequency
 let noteVolume 
 let myFont
 
-let intervalButtons = []; // boutons multi-états pour intervalles
-
 function drawTextCentered(txt, x, y, tweak = -5) {
   const offsetY = (textAscent() - textDescent()) / 2 + tweak;
   text(txt, x, y - offsetY);
@@ -41,124 +37,100 @@ function setup() {
     wH = windowHeight;
     wW = windowWidth;
     createCanvas(wW, wH);
-    //textFont(myFont);
-    
-    let toolbar = select('#toolbar');
-    toolbar.style(`
-        position: fixed;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-
-        display: flex;
-        gap: 2px;
-        padding: 8px 12px;
-        background: rgba(0,0,0,0.45);
-        border-radius: 10px;
-        backdrop-filter: blur(6px);
-        z-index: 9999;
-    `);
 
     
-
-
     // Création du manche de guitare AVANT le contrôle de mode segment
     guitar = new Guitar(13);
 
+    // ===== INITIALISATION DES PANNEAUX UI =====
+    // Gestionnaire de règles UI
+    uiRules = new UIInteractionManager();
 
-    // Contrôle graphique pour le mode segment avec couleurs et alpha
-    segmentModeControl = new SegmentModeControl(10, 10, guitar);
+    // Panel 1 : Contrôle des notes (knobs, LCD, switches intervalles)
+    panel = new Panel(1, 1, 10, {
+        isDraggable: true,
+        isZoomable: true,
+    });
+    panel.debug = false;
+
+    // Panel 2 : Contrôle avancé (metal switch + marker segment)
+    panel2 = new Panel(60, 1, 10, {
+        isDraggable: true,
+        isZoomable: true,
+    });
+    panel2.debug = false;
+
+    // ===== PANEL 1 : CONTRÔLE DES NOTES =====
+    // Knob1 : C/N/T (Curseur / Notes / Octaves)
+    knob1 = new Knob(0, 0, 100, KNOB1_OPTIONS);
+    knob1.debug = false;
+    panel.add(knob1);
+
+    // Knob2 : 1/3/4/5/7 (Unique / Triade / Tétrade / Pentatonique / Diatonique)
+    knob2 = new Knob(0, 0, 100, KNOB2_OPTIONS);
+    knob2.debug = false;
+    panel.add(knob2);
+
+    // LCD : Sous-catégories (Maj/Min/Diminué/Augmenté, etc.)
+    lcd = new LCDSelector(0, 0, 100, LCD_OPTIONS);
+    lcd.debug = false;
+    lcd.setOnOff(false);
+    lcd.setItems([]);
+    panel.add(lcd);
+
+    // Switches d'intervalles (remplacent les boutons HTML)
+    SWITCH_CONFIG.forEach((config) => {
+        let sw = new Switch(0, 0, 100, {
+            title: config.title,
+            topLabel: config.top,
+            bottomLabel: config.bottom,
+            color: "#aa0000",
+            shortcutKey: config.title,
+            ratio: 0.35,
+            debug: false,
+        });
+        panel.add(sw);
+    });
+
+    // ===== PANEL 2 : CONTRÔLE AVANCÉ =====
+    // Metal Switch : # / ♭
+    const metalSharpFlat = new MetalSwitch(
+        0, 0, 100,
+        METALSWITCH_CONFIG
+    );
+    metalSharpFlat.debug = false;
+    
+    // Initialiser le MetalSwitch selon l'état initial de guitar
+    // state = 0 → flat mode (♭)
+    // state = 1 → sharp mode (♯)
+    metalSharpFlat.state = guitar.flatMode ? 0 : 1;
+    
+    panel2.add(metalSharpFlat);
+
+    // Marker : Mode Segment ON/OFF + Color Picker
+    marker = new MarkerSelector(0, 0, 100, {
+        title: "Segment",
+        shortcutKey: "p",
+    });
+    marker.debug = false;
+    panel2.add(marker);
+
+    // Enregistrer les panneaux
+    uiRules.register(panel);
+    uiRules.register(panel2);
+
+    // Charger les règles UI depuis config
+    if (typeof UI_RULES !== 'undefined') {
+        UI_RULES.forEach((rule) => uiRules.addRule(rule));
+    }
     
     // Popup d'aide
-    helpPopup = new HelpPopup();
-
-    selectionModeButton = createButton('Affichage: all');
-    selectionModeButton.parent(toolbar);
-    selectionModeButton.style('padding', '6px 10px');
-    selectionModeButton.mousePressed(toggleSelectionMode);
-    updateSelectionModeButton();
-
-
-    // Toggle Maj/min
-    majorMinorToggle = createButton('Maj');
-    majorMinorToggle.parent(toolbar);
-    majorMinorToggle.style('padding', '6px 10px');
-    majorMinorToggle.mousePressed(toggleMajorMinor);
-
-    // 3-état : Accords / Penta / Gamme
-    scaleTypeButton = createButton('note');
-    scaleTypeButton.parent(toolbar);
-    scaleTypeButton.style('padding', '6px 10px');
-    scaleTypeButton.mousePressed(toggleScaleType);
-    updateScaleTypeButton();
-
-    // Boutons multi-états pour intervalles 1 à 7
-    const intervalLabels = [
-        ['1'],        // 1
-        ['2', 'b2'],  // 2
-        ['3', 'b3'],  // 3
-        ['4', '#4'],  // 4
-        ['5', 'b5'],  // 5
-        ['6', 'b6'],  // 6
-        ['7', 'b7'],  // 7
-        ['8']         // 8 octave
-    ];
-
-// 1) Boutons d’intervalles
-for (let i = 0; i < 8; i++) {
-    let btn = createButton(intervalLabels[i][0]);
-    btn.style('margin', '0');
-    btn.style('border-radius', '0');
-    btn.style('padding', '6px 0');
-    btn.style('width', '25px');
-    btn.style('display', 'inline-block');
-    btn.mousePressed(() => toggleIntervalButton(i + 1));
-    btn.parent(toolbar);   
-    intervalButtons.push(btn);
-}
-
-// 2) Bouton "Vider" à la fin
-clearButton = createButton('Vider');
-clearButton.style('margin', '0');
-clearButton.style('border-radius', '0');
-clearButton.style('padding', '6px 10px');
-clearButton.style('display', 'inline-block');
-clearButton.mousePressed(clearSelection);
-clearButton.parent(toolbar);  
+    helpPopup = new HelpPopup();  
 
 
 
 } 
 
-function updateSelectionModeButton() {
-    if (!selectionModeButton || !guitar) return;
-
-    const mode = guitar.selectionMode || 'single';
-
-    selectionModeButton.html('Affichage: ' + mode);
-
-    if (mode === 'single') {
-        selectionModeButton.style('background-color', '#222');
-        selectionModeButton.style('color', '#fff');
-    } else {
-        selectionModeButton.style('background-color', '');
-        selectionModeButton.style('color', '');
-    }
-}
-
-
-function toggleMic() {
-    micMuted = !micMuted;
-    if (micMuted) {
-      muteButton.html('<i class="fas fa-microphone"></i>');
-      // Arrêter le micro
-      detector.mic.stop();
-    } else {
-      muteButton.html('<i class="fas fa-microphone-slash"></i>');
-      // Démarrer le micro
-      detector.mic.start();
-    }
-  }
 
 // La fonction toggleSegmentMode est maintenant gérée par SegmentModeControl
 // On la garde pour la compatibilité avec les touches clavier
@@ -170,39 +142,30 @@ function toggleSegmentMode() {
 
 
 
-// Nouveau : bascule cyclique entre 'all' -> 'exact' -> 'single'
-function toggleSelectionMode() {
-    const modes = ['all', 'exact', 'single'];
-    let current = guitar.selectionMode;
-    const next = modes[(modes.indexOf(current) + 1) % modes.length];
-
-    guitar.selectionMode = next;
-
-    updateSelectionModeButton();
-}
-
-
 function windowResized() {
     // gestion reponsive
     wW = windowWidth
     wH = windowHeight
     resizeCanvas(wW, wH);
     guitar.resize()
+    if (panel) panel.updateResponsive();
+    if (panel2) panel2.updateResponsive();
     console.log('resize')
 }
 
 function mouseMoved(){
+    if (panel) panel.updateHover(mouseX, mouseY);
+    if (panel2) panel2.updateHover(mouseX, mouseY);
     if (guitar) {
         guitar.mouseMoved();
     }
 }
 
 function mouseDragged() {
-    // Priorité au slider du contrôle de mode segment
-    if (segmentModeControl && segmentModeControl.sliderDragging && segmentModeControl.isMouseOverSlider()) {
-        segmentModeControl.mouseDragged();
-        return false;
-    }
+    // Priorité aux panneaux UI
+    if (panel && panel.mouseDragged(mouseX, mouseY)) return false;
+    if (panel2 && panel2.mouseDragged(mouseX, mouseY)) return false;
+    
     // Sinon, laisser la guitare gérer le drag
     if (guitar) {
         guitar.mouseMoved();
@@ -211,14 +174,18 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
-    if (segmentModeControl) {
-        segmentModeControl.mouseReleased();
-    }
+    if (panel) panel.mouseReleased(mouseX, mouseY);
+    if (panel2) panel2.mouseReleased(mouseX, mouseY);
 }
 //     }
 // }
 
 function keyPressed(){
+    // Gestion des raccourcis UI
+    if (typeof UIManager !== 'undefined') {
+        UIManager.handleShortcut(key, keyCode);
+    }
+    
     // Touche H pour l'aide
     if (keyCode == 72) { // 72 = H
         if (helpPopup) {
@@ -243,13 +210,31 @@ function keyReleased(){
     }
 }
 
+function mouseWheel(event) {
+    // Priorité aux panneaux pour le zoom
+    if (panel && panel.mouseWheel(event)) {
+        return false;
+    }
+    if (panel2 && panel2.mouseWheel(event)) {
+        return false;
+    }
+    // Sinon, laisser la guitare gérer
+    return false;
+}
 function draw() {
     // ici on ne s'occupe que de l affichage
     guitar.display(selectedNotes)
     
-    // Afficher le contrôle du mode segment
-    if (segmentModeControl) {
-        segmentModeControl.display();
+    // ===== RENDU UI PANELS =====
+    if (panel) {
+        panel.updateResponsive();
+        panel.updateHover(mouseX, mouseY);
+        panel.draw();
+    }
+    if (panel2) {
+        panel2.updateResponsive();
+        panel2.updateHover(mouseX, mouseY);
+        panel2.draw();
     }
     
     // Afficher le popup d'aide
@@ -277,15 +262,35 @@ function draw() {
 }
 
 
+// Flag de capture UI
+let uiCapturedClick = false;
+
+function mousePressed() {
+    // Priorité aux panneaux UI
+    if (panel && panel.mousePressed(mouseX, mouseY)) {
+        uiCapturedClick = true;
+        console.log('%c[UI CAPTURED] Panel 1', 'color:#00ff00');
+        return false;
+    }
+    if (panel2 && panel2.mousePressed(mouseX, mouseY)) {
+        uiCapturedClick = true;
+        console.log('%c[UI CAPTURED] Panel 2', 'color:#00ff00');
+        return false;
+    }
+    uiCapturedClick = false;
+    return true;
+}
+
 function mouseClicked() {
-    // Priorité au popup d'aide
-    if (helpPopup && helpPopup.mousePressed()) {
+    // Si l'UI a capturé le clic, NE PAS continuer
+    if (uiCapturedClick) {
+        console.log('%c[CLICK BLOCKED] UI already captured', 'color:#ff0000');
         return false;
     }
     
-    // Priorité au contrôle du mode segment
-    if (segmentModeControl && segmentModeControl.mousePressed()) {
-        return false; // Empêcher propagation
+    // Priorité au popup d'aide
+    if (helpPopup && helpPopup.mousePressed()) {
+        return false;
     }
     
     // Vérifier si un bouton d'accord ouvert est cliqué
@@ -438,170 +443,25 @@ function noteReleased(midiNote) {
       guitar.setMidiNotes(liveNotes)
 }
 
-function toggleMajorMinor() {
-   if (guitar) {
-       guitar.isMajor = !guitar.isMajor;
-       majorMinorToggle.html(guitar.isMajor ? 'Maj' : 'min');
-       majorMinorToggle.style('background-color', guitar.isMajor ? '' : '#666');
-       // mettre à jour les intervals selon le type courant
-       updateIntervalsFromMode();
-   }
-}
-
-function toggleScaleType() {
-    if (!guitar) return;
-
-    const types = ['note', 'accords', 'penta', 'gamme'];
-    let currentIndex = types.indexOf(guitar.scaleType);
-    if (currentIndex === -1) currentIndex = 0; // sécurité
-
-    let nextIndex = (currentIndex + 1) % types.length;
-    guitar.scaleType = types[nextIndex];
-
-    // 🔥 RÈGLE DEMANDÉE : exact → all si multi-sélection
-    if (guitar.scaleType !== 'note' && guitar.selectionMode === 'single') {
-        guitar.selectionMode = 'all';
-        updateSelectionModeButton();
-    }
-
-    updateScaleTypeButton();
-    updateIntervalsFromMode();
-}
-
-
-
-
-function updateIntervalsFromMode() {
-   if (!guitar) return;
-   const scaleType = guitar.scaleType || 'accords';
-   const isMajor = guitar.isMajor;
-   let intervals = [];
-   
-   if (scaleType === 'accords') {
-       intervals = isMajor ? guitar.majorChord : guitar.minorChord;
-   } else if (scaleType === 'penta') {
-       intervals = isMajor ? guitar.majorPentatonicScale : guitar.minorPentatonicScale;
-   } else if (scaleType === 'gamme') {
-       intervals = isMajor ? guitar.majorScale : guitar.minorScale;
-   }
-   guitar.intervals = [...intervals];
-   updateIntervalButtons();
-}
-
-function setIntervals(intervals) {
-   if (guitar) {
-       guitar.intervals = [...intervals];
-   }
-}
-
-function clearSelection() {
-   if (guitar) {
-       if (guitar.segmentMode) {
-           // Mode segment : vider les segments
-           guitar.segments = [];
-           guitar._segmentBuffer = [];
-       } else {
-           // Mode note : vider les notes et intervalles
-           guitar.intervals = [];
-           guitar.clickedNotes = [];
-           guitar.tonic = null;
-       }
-   }
-   guitar.resetIntervalButtons(); // MAJ visuelle des boutons
-   updateIntervalButtons();
-}
-
 // --- NOUVEAU : INTERVALLES MULTI-ETATS ---
 
 function toggleIntervalButton(n) {
-   // n = 1 à 8
-   if (!guitar) return;
-   const intervalMap = {
-       1: [0],        // 1
-       2: [2, 1],     // 2, b2
-       3: [4, 3],     // 3, b3
-       4: [5, 6],     // 4, #4
-       5: [7, 6],     // 5, b5
-       6: [9, 8],     // 6, b6
-       7: [11, 10],   // 7, b7
-       8: [12]        // 8 octave
-   };
-   let intervals = intervalMap[n];
-   let current = intervals.find(val => guitar.intervals.includes(val));
-   // cycle : inactif -> majeur -> altéré -> inactif
-   if (!current) {
-       // aucun actif, activer majeur
-       guitar.intervals.push(intervals[0]);
-   } else if (current === intervals[0] && intervals[1] !== undefined) {
-       // majeur actif, passer à altéré
-       guitar.intervals = guitar.intervals.filter(val => val !== intervals[0]);
-       guitar.intervals.push(intervals[1]);
-   } else if (intervals[1] !== undefined) {
-        // altéré actif, désactiver tout
-        guitar.intervals = guitar.intervals.filter(val => val !== intervals[1]);
-   } else {
-      // octave (pas d'altéré), désactiver
-      guitar.intervals = guitar.intervals.filter(val => val !== intervals[0]);
-   }
-   updateIntervalButtons();
-}
+   // n = 1 à 7 (numéro du switch)
+   // Cette fonction modifie le switch correspondant, qui déclenche la RÈGLE de sync
+   
+   if (!UIManager || !UIManager.components) return;
+   
+   // Trouver le switch avec le titre "n"
+   const switches = UIManager.components.filter(c => c instanceof Switch && !c.isPassive);
+   const targetSwitch = switches.find(sw => parseInt(sw.title) === n);
+   
+   if (!targetSwitch) return;
+   
+   // Cycle : 0 (inactif) → 1 (majeur/normal) → 2 (altéré/mineur) → 0
+   targetSwitch.state = (targetSwitch.state + 1) % 3;
 
-function updateScaleTypeButton() {
-    const mode = guitar.scaleType;
-
-    // Mettre le label
-    scaleTypeButton.html(mode.charAt(0).toUpperCase() + mode.slice(1));
-
-    // Style optionnel (tu peux ajuster)
-    if (mode === 'note') {
-        scaleTypeButton.style('background-color', '#222');
-        scaleTypeButton.style('color', '#fff');
-    } else {
-        scaleTypeButton.style('background-color', '');
-        scaleTypeButton.style('color', '');
-    }
 }
 
 
-function updateIntervalButtons() {
-   if (!guitar) return;
-   const intervalMap = {
-       1: [0],        // 1
-       2: [2, 1],     // 2, b2
-       3: [4, 3],     // 3, b3
-       4: [5, 6],     // 4, #4
-       5: [7, 6],     // 5, b5
-       6: [9, 8],     // 6, b6
-       7: [11, 10],   // 7, b7
-       8: [12]        // 8 octave
-   };
-   const intervalLabels = [
-       ['1'],
-       ['2', 'b2'],
-       ['3', 'b3'],
-       ['4', '#4'],
-       ['5', 'b5'],
-       ['6', 'b6'],
-       ['7', 'b7'],
-       ['8']
-   ];
-   for (let i = 0; i < 8; i++) {
-       let intervals = intervalMap[i + 1];
-       let btn = intervalButtons[i];
-       let label = intervalLabels[i][0];
-       let minorLabel = intervalLabels[i][1];
-       if (guitar.intervals.includes(intervals[0])) {
-           btn.html(label);
-           btn.style('background-color', '#2ecc40');
-           btn.style('color', '#fff');
-       } else if (intervals[1] !== undefined && guitar.intervals.includes(intervals[1])) {
-           btn.html(minorLabel);
-           btn.style('background-color', '#ff9800');
-           btn.style('color', '#fff');
-       } else {
-           btn.html(label);
-           btn.style('background-color', '#eee');
-           btn.style('color', '#888');
-       }
-   }
-}
+
+

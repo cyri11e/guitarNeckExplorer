@@ -431,9 +431,127 @@ console.log(
     sw5.state = pattern[4];
     sw6.state = pattern[5];
 
+},
+
+// ============================================================
+// RÈGLES DE SYNCHRONISATION AVEC LA GUITARE
+// ============================================================
+
+// RÈGLE : KNOB1 (C/N/T) synchronise le mode d'affichage de la guitare
+// Index 0 = Curseur (single) : affiche que la note sous le curseur
+// Index 1 = Notes (exact) : affiche la note exact
+// Index 2 = Octaves (all) : affiche toutes les notes identiques + octaves
+(components, source, newState) => {
+    const knobs = components.filter(c => c instanceof Knob);
+    const knob1 = knobs[0]; // Premier knob = C/N/T
+    if (!knob1) return;
+    if (source !== knob1) return;
+    
+    // Mapper l'index du knob1 aux modes de sélection
+    const modes = ['single', 'exact', 'all'];
+    if (typeof guitar !== 'undefined' && guitar) {
+        guitar.selectionMode = modes[newState] || 'single';
+    }
+},
+
+// RÈGLE : Marker ON/OFF synchronise le mode segment de la guitare
+// NE SE DÉCLENCHE QUE quand le state (-1 ou 1) change, pas pour les changements de couleur
+(components, source, newState) => {
+    const marker = components.find(c => c instanceof MarkerSelector);
+    if (!marker) return;
+    if (source !== marker) return;
+    
+    // Ignorer les appels de triggerChange avec _colorChangeCounter
+    // On check seulement si newState est -1 ou 1 (le vrai state du marker)
+    if (newState !== -1 && newState !== 1) return;
+    
+    // Mettre à jour guitar.segmentMode
+    if (typeof guitar !== 'undefined' && guitar) {
+        guitar.segmentMode = (newState === 1);
+    }
+},
+
+// RÈGLE : Couleur du Marker synchronise l'index de couleur pour les nouveaux segments
+(components, source, newState) => {
+    const marker = components.find(c => c instanceof MarkerSelector);
+    if (!marker) return;
+    if (source !== marker) return;
+    
+    // Synchroniser le colorIndex pour que les nouveaux segments utilisent la bonne couleur
+    // Cette règle se déclenche à chaque changement de couleur (newState = _colorChangeCounter)
+    if (typeof guitar !== 'undefined' && guitar && marker._state === 1) {
+        guitar.segmentColorIndex = marker.activeColorIndex;
+    }
+},
+
+// RÈGLE FINALE : Synchroniser l'état RÉEL des switches vers guitar.intervals
+// Cette règle s'exécute APRÈS les règles qui modifient les switches
+// Elle calcule guitar.intervals basé sur l'état actuel de chaque switch
+(components, source, newState) => {
+    // Ne s'exécute QUE si la source est un Switch
+    if (!(source instanceof Switch)) return;
+    if (source.isPassive) return;
+    
+    // Ne s'exécute que si guitar existe
+    if (typeof guitar === 'undefined' || !guitar) return;
+    
+    // Mapping : pour chaque switch et son état, quel interval en semitones
+    const switchToInterval = {
+        1: { 1: 0, 2: 0 },      // Switch 1 = Unison/Fondamentale
+        2: { 1: 2, 2: 1 },      // Switch 2 = Seconde (majeure ou mineure)
+        3: { 1: 4, 2: 3 },      // Switch 3 = Tierce (majeure ou mineure)
+        4: { 1: 5, 2: 4 },      // Switch 4 = Quarte (juste ou augmentée)
+        5: { 1: 7, 2: 6 },      // Switch 5 = Quinte (juste ou diminuée)
+        6: { 1: 9, 2: 8 },      // Switch 6 = Sixte (majeure ou mineure)
+        7: { 1: 11, 2: 10 }     // Switch 7 = Septième (majeure ou mineure)
+    };
+    
+    // Récupérer TOUS les switches et lire leur état RÉEL
+    const switches = components.filter(c => c instanceof Switch && !c.isPassive);
+    const intervals = [];
+    
+    // Pour chaque switch potentiel de 1 à 7
+    for (let switchNum = 1; switchNum <= 7; switchNum++) {
+        const sw = switches.find(s => parseInt(s.title) === switchNum);
+        if (!sw) continue;
+        
+        // Si ce switch est actif (état 1 ou 2), ajouter l'interval correspondant
+        if (sw.state === 1 || sw.state === 2) {
+            const interval = switchToInterval[switchNum][sw.state];
+            if (interval !== undefined) {
+                intervals.push(interval);
+            }
+        }
+    }
+    
+    // Mettre à jour guitar.intervals avec l'état réel
+    guitar.intervals = intervals;
+    
+    console.log(
+        "%c[GUITAR SYNC] intervals updated from switches: " + intervals.join(", "),
+        "color:#ff00ff; font-weight:bold;"
+    );
+},
+
+// RÈGLE : MetalSwitch (♯/♭) synchronise avec guitar.flatMode
+// state = 0 (bas) → ♭ → guitar.flatMode = true
+// state = 1 (haut) → ♯ → guitar.flatMode = false
+(components, source, newState) => {
+    const metalSwitch = components.find(c => c instanceof MetalSwitch);
+    if (!metalSwitch) return;
+    if (source !== metalSwitch) return;
+    
+    // Synchroniser vers la guitare
+    if (typeof guitar !== 'undefined' && guitar) {
+        // state = 0 → flat mode (true)
+        // state = 1 → sharp mode (false)
+        guitar.flatMode = (newState === 0);
+        console.log(
+            "%c[METALSWITCH SYNC] flatMode=" + guitar.flatMode + " (state=" + newState + ")",
+            "color:#00ff00; font-weight:bold;"
+        );
+    }
 }
-
-
 
 ];
 

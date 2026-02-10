@@ -23,6 +23,8 @@ class MarkerSelector extends UIComponent {
         ];
 
         this.activeColor = this.noteColors[0];
+        this.activeColorIndex = 0;  // Tracker l'index de la couleur active
+        this._colorChangeCounter = 0;  // Tracker les changements de couleur
 
         this.setResponsive(xp, yp, sp, config);
         UIManager.register(this);
@@ -56,6 +58,9 @@ class MarkerSelector extends UIComponent {
                     my >= d.y && my <= d.y + d.h
                 ) {
                     this.activeColor = this.noteColors[d.colorIndex];
+                    this.activeColorIndex = d.colorIndex;  // Tracker l'index
+                    this._colorChangeCounter++;  // Incrémenter pour déclencher la règle UI
+                    this.triggerChange(this._colorChangeCounter);  // Déclencher le changement
                     this.state = 1;
                     return;
                 }
@@ -75,7 +80,8 @@ class MarkerSelector extends UIComponent {
     }
 
     draw() {
-
+        push();
+        
         this.drawDebugRect();
 
         const W = this.w;
@@ -219,5 +225,7 @@ class MarkerSelector extends UIComponent {
                 circle(x0 + W - dotSize * 0.3, y, dotSize);
             }
         }
+       pop(); 
     }
+    
 }

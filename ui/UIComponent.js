@@ -168,11 +168,12 @@ triggerChange(newState) {
   // -------------------------------------------------------
   drawDebugRect() {
     if (!this.debug || !this.hover) return;
-
+    push();
     noFill();
     stroke(255, 0, 0);
     strokeWeight(2);
     rect(this.x, this.y, this.w, this.h);
+    pop();
   }
   
 }

@@ -108,7 +108,7 @@ draw() {
       return true;
     }
 
-    return true;
+    return false;
   }
 
   mouseDragged(mx, my) {
