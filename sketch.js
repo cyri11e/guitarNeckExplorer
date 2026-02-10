@@ -15,15 +15,23 @@ function windowResized() {
     app.resize();
 }
 
+// ROUTAGE DES ÉVÉNEMENTS P5 → APP → UIInteractionManager
+
 function mousePressed()  { app.mousePressed(mouseX, mouseY); }
 function mouseReleased() { app.mouseReleased(mouseX, mouseY); }
 function mouseMoved()    { app.mouseMoved(mouseX, mouseY); }
 function mouseDragged()  { app.mouseDragged(mouseX, mouseY); }
+
 function mouseWheel(e) {
+    // ⭐ EXACTEMENT comme ton ancien sketch :
+    // si un composant consomme → on bloque le comportement navigateur
     if (app.mouseWheel(e)) {
-        return false; //  bloque le zoom navigateur
+        return false;
     }
-    return false; 
+
+    // ⭐ même si rien ne consomme, tu avais "return false" dans ton ancien sketch
+    // ce qui empêche le navigateur de zoomer/scroll
+    return false;
 }
 
 function mouseClicked()  { app.mouseClicked(mouseX, mouseY); }

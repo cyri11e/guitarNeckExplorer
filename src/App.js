@@ -2,13 +2,12 @@ class App {
     constructor() {
         this.ui = new UIInteractionManager();
 
-        // Create a panel centered, 50% of screen
         this.panel = new Panel(25, 25, 50, {
             isDraggable: true,
             isZoomable: true
         });
-        this.panel.updateResponsive();
 
+        this.panel.updateResponsive();
         this.ui.register(this.panel);
 
         this.needsRedraw = true;
@@ -21,13 +20,15 @@ class App {
 
     display() {
         background(60);
-        stroke(255);
+        fill(255);
         textSize(20);
-        text('test',20,20);
-        this.panel.draw();   // <-- OK
+        text('test', 20, 20);
+
+        this.panel.draw();
     }
 
     resize() {
+        this.panel.hasBeenPositioned = false;
         this.panel.updateResponsive();
         this.invalidate();
     }
@@ -36,17 +37,12 @@ class App {
         this.needsRedraw = true;
     }
 
-    // ROUTAGE DES ÉVÉNEMENTS
     mousePressed(x, y)  { this.ui.mousePressed(x, y); }
     mouseReleased(x, y) { this.ui.mouseReleased(x, y); }
     mouseMoved(x, y)    { this.ui.mouseMoved(x, y); }
     mouseDragged(x, y)  { this.ui.mouseDragged(x, y); }
-    mouseWheel(e) {
-        return this.ui.mouseWheel(e);
-    }
-
+    mouseWheel(e)       { return this.ui.mouseWheel(e); }
     mouseClicked(x, y)  { this.ui.mouseClicked(x, y); }
-
     keyPressed(k, kc)   { this.ui.keyPressed(k, kc); }
     keyReleased(k, kc)  { this.ui.keyReleased(k, kc); }
 }

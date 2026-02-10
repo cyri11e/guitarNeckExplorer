@@ -1,12 +1,10 @@
 class UIComponent {
 
     constructor() {
-        // --- Responsive placement (percentages) ---
-        this.xp = 0;     // position X en %
-        this.yp = 0;     // position Y en %
-        this.sp = 100;   // scale en %
+        this.xp = 0;
+        this.yp = 0;
+        this.sp = 100;
 
-        // --- Layout en pixels ---
         this.x = 0;
         this.y = 0;
         this.w = 0;
@@ -14,7 +12,6 @@ class UIComponent {
 
         this.parent = null;
 
-        // --- Interaction ---
         this.hover = false;
         this.isDraggable = false;
         this.isZoomable = false;
@@ -23,35 +20,28 @@ class UIComponent {
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
 
-        // --- Redraw system ---
+        this.zoomFactor = 1;
+
         this.needsRedraw = true;
-
-        // --- Debug ---
         this.debug = true;
+        this.wheelActive = false;
 
-        // --- State ---
-        this.state = null;
-    }
-
-
-    debugLog(...args) {
-        if (this.debug) console.log(...args);
+        // Modèle B : responsive initial seulement
+        this.hasBeenPositioned = false;
     }
 
     // ============================================================
-    // RESPONSIVE
+    // RESPONSIVE INITIAL
     // ============================================================
 
     setResponsive(xp, yp, sp) {
         this.xp = xp;
         this.yp = yp;
         this.sp = sp;
-        this.invalidate();
     }
 
     updateResponsive() {
         let px, py, pw, ph;
-
 
         if (this.parent) {
             px = this.parent.x;
@@ -59,64 +49,41 @@ class UIComponent {
             pw = this.parent.w;
             ph = this.parent.h;
         } else {
-            // Pas de parent → on se base sur la fenêtre
             px = 0;
             py = 0;
             pw = windowWidth;
             ph = windowHeight;
         }
-this.debugLog("updateResponsive pw,ph =", pw, ph);
-        this.w = pw * (this.sp / 100);
-        this.h = ph * (this.sp / 100);
 
-        this.x = px + pw * (this.xp / 100);
-        this.y = py + ph * (this.yp / 100);
+        // Taille responsive initiale
+        if (!this.hasBeenPositioned) {
+            this.w = pw * (this.sp / 100);
+            this.h = ph * (this.sp / 100);
+        }
+
+        // Position responsive initiale
+        if (!this.hasBeenPositioned) {
+            this.x = px + pw * (this.xp / 100);
+            this.y = py + ph * (this.yp / 100);
+        }
 
         this.computeLayout();
     }
 
-
-
-    computeLayout() {
-        // Surchargé par les enfants
-    }
+    computeLayout() {}
 
     // ============================================================
-    // REDRAW
+    // HIT TEST
     // ============================================================
 
-    invalidate() {
-        this.needsRedraw = true;
-        if (this.parent && this.parent.invalidate) {
-            this.parent.invalidate();
-        }
+    containsRect(mx, my) {
+        return (
+            mx >= this.x &&
+            mx <= this.x + this.w &&
+            my >= this.y &&
+            my <= this.y + this.h
+        );
     }
-
-    // ============================================================
-    // HOVER
-    // ============================================================
-
-    containsRect(mx, my, x, y, w, h) {
-        return mx >= x && mx <= x + w && my >= y && my <= y + h;
-    }
-
-    updateHover(mx, my) {
-        const inside = this.containsRect(mx, my, this.x, this.y, this.w, this.h);
-
-        if (inside && !this.hover) {
-            this.hover = true;
-            this.onHoverStart();
-            this.invalidate();
-        }
-        else if (!inside && this.hover) {
-            this.hover = false;
-            this.onHoverEnd();
-            this.invalidate();
-        }
-    }
-
-    onHoverStart() {}
-    onHoverEnd() {}
 
     // ============================================================
     // DRAG
@@ -125,10 +92,12 @@ this.debugLog("updateResponsive pw,ph =", pw, ph);
     mousePressed(mx, my) {
         if (!this.isDraggable) return false;
 
-        if (this.containsRect(mx, my, this.x, this.y, this.w, this.h)) {
+        if (this.containsRect(mx, my)) {
             this.dragging = true;
             this.dragOffsetX = mx - this.x;
             this.dragOffsetY = my - this.y;
+
+            this.hasBeenPositioned = true;
             return true;
         }
         return false;
@@ -140,6 +109,7 @@ this.debugLog("updateResponsive pw,ph =", pw, ph);
         this.x = mx - this.dragOffsetX;
         this.y = my - this.dragOffsetY;
 
+        this.hasBeenPositioned = true;
         this.invalidate();
         return true;
     }
@@ -149,42 +119,40 @@ this.debugLog("updateResponsive pw,ph =", pw, ph);
     }
 
     // ============================================================
-    // ZOOM
+    // ZOOM LIBRE (Modèle B)
     // ============================================================
 
     mouseWheel(event) {
         if (!this.isZoomable) return false;
+        if (!this.containsRect(mouseX, mouseY)) return false;
 
-        // ⭐ indispensable : vérifier que la souris est sur le composant
-        if (!this.containsRect(mouseX, mouseY, this.x, this.y, this.w, this.h)) {
-            return false;
-        }
+        this.wheelActive = true;
 
         const factor = event.delta > 0 ? 0.95 : 1.05;
-        this.zoom(factor);
 
-        return true; // consommé
-    }
+        // Zoom centré
+        let localX = mouseX - this.x;
+        let localY = mouseY - this.y;
 
+        this.w *= factor;
+        this.h *= factor;
 
-    zoom(factor) {
-        this.sp *= factor;
+        this.x = mouseX - localX * factor;
+        this.y = mouseY - localY * factor;
+
+        this.zoomFactor *= factor;
+        this.hasBeenPositioned = true;
+
         this.invalidate();
+        return true;
     }
 
     // ============================================================
-    // STATE
+    // INVALIDATION
     // ============================================================
 
-    setState(v) {
-        if (this.state === v) return;
-        this.state = v;
-        this.triggerChange(v);
-        this.invalidate();
-    }
-
-    triggerChange(v) {
-        // UIInteractionManager écoutera ça
+    invalidate() {
+        this.needsRedraw = true;
     }
 
     // ============================================================
@@ -196,7 +164,6 @@ this.debugLog("updateResponsive pw,ph =", pw, ph);
         push();
         noFill();
         stroke(255, 0, 0);
-        strokeWeight(1);
         rect(this.x, this.y, this.w, this.h);
         pop();
     }
@@ -207,17 +174,26 @@ this.debugLog("updateResponsive pw,ph =", pw, ph);
         fill(255, 0, 0);
         noStroke();
         textSize(12);
-        text(`(${this.x.toFixed(0)}, ${this.y.toFixed(0)})`, this.x + 5, this.y + 15);
+        text(
+            `(${this.x.toFixed(0)}, ${this.y.toFixed(0)}) wheel:${this.wheelActive}`,
+            this.x + 5,
+            this.y + 15
+        );
         pop();
     }
 
-    // ============================================================
-    // DRAW
-    // ============================================================
-
     draw() {
-        // Surchargé par les enfants
         this.drawDebugRect();
         this.drawDebugInfo();
     }
+
+    // ============================================================
+    // EVENTS (méthodes vides pour éviter les erreurs)
+    // ============================================================
+
+    mouseMoved(mx, my) { return false; }
+    mouseClicked(mx, my) { return false; }
+    keyPressed(k, kc) { return false; }
+    keyReleased(k, kc) { return false; }
+
 }
