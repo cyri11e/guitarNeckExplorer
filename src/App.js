@@ -27,11 +27,16 @@ class App {
         this.panel.draw();
     }
 
+    // resize() {
+    //     this.panel.hasBeenPositioned = false;
+    //     this.panel.updateResponsive();
+    //     this.invalidate();
+    // }
     resize() {
-        this.panel.hasBeenPositioned = false;
-        this.panel.updateResponsive();
-        this.invalidate();
-    }
+    // NE RIEN TOUCHER si l’utilisateur a déjà déplacé/zoomé
+    this.panel.updateResponsive(); // safe car updateResponsive respecte hasBeenPositioned
+}
+
 
     invalidate() {
         this.needsRedraw = true;

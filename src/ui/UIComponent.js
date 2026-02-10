@@ -1,10 +1,12 @@
 class UIComponent {
 
     constructor() {
+        // Position / taille relatives
         this.xp = 0;
         this.yp = 0;
-        this.sp = 100;
+        this.sp = 100;      // taille relative (% du parent)
 
+        // Position / taille absolues
         this.x = 0;
         this.y = 0;
         this.w = 0;
@@ -12,6 +14,7 @@ class UIComponent {
 
         this.parent = null;
 
+        // Interaction
         this.hover = false;
         this.isDraggable = false;
         this.isZoomable = false;
@@ -20,18 +23,17 @@ class UIComponent {
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
 
+        // Zoom
         this.zoomFactor = 1;
 
+        // Rendering / debug
         this.needsRedraw = true;
         this.debug = true;
         this.wheelActive = false;
-
-        // Modèle B : responsive initial seulement
-        this.hasBeenPositioned = false;
     }
 
     // ============================================================
-    // RESPONSIVE INITIAL
+    // RESPONSIVE : relatif -> absolu
     // ============================================================
 
     setResponsive(xp, yp, sp) {
@@ -40,37 +42,86 @@ class UIComponent {
         this.sp = sp;
     }
 
-    updateResponsive() {
-        let px, py, pw, ph;
-
+    _getParentFrame() {
         if (this.parent) {
-            px = this.parent.x;
-            py = this.parent.y;
-            pw = this.parent.w;
-            ph = this.parent.h;
+            return {
+                px: this.parent.x,
+                py: this.parent.y,
+                pw: this.parent.w,
+                ph: this.parent.h
+            };
         } else {
-            px = 0;
-            py = 0;
-            pw = windowWidth;
-            ph = windowHeight;
+            return {
+                px: 0,
+                py: 0,
+                pw: windowWidth,
+                ph: windowHeight
+            };
         }
+    }
 
-        // Taille responsive initiale
-        if (!this.hasBeenPositioned) {
-            this.w = pw * (this.sp / 100);
-            this.h = ph * (this.sp / 100);
-        }
+    updateResponsive() {
+        const { px, py, pw, ph } = this._getParentFrame();
 
-        // Position responsive initiale
-        if (!this.hasBeenPositioned) {
-            this.x = px + pw * (this.xp / 100);
-            this.y = py + ph * (this.yp / 100);
-        }
+        // Position absolue = position relative * taille parent
+        this.x = px + pw * (this.xp / 100);
+        this.y = py + ph * (this.yp / 100);
+
+        // Taille absolue = taille relative * taille parent * zoom
+        this.w = pw * (this.sp / 100) * this.zoomFactor;
+        this.h = ph * (this.sp / 100) * this.zoomFactor;
 
         this.computeLayout();
     }
 
     computeLayout() {}
+
+    // ============================================================
+    // UTILITAIRES POSITION / ZOOM (métier)
+    // ============================================================
+
+    _updateRelativeFromAbsolute() {
+        const { px, py, pw, ph } = this._getParentFrame();
+
+        this.xp = ((this.x - px) / pw) * 100;
+        this.yp = ((this.y - py) / ph) * 100;
+    }
+
+    moveBy(dx, dy) {
+        this.x += dx;
+        this.y += dy;
+        this._updateRelativeFromAbsolute();
+        this.invalidate();
+    }
+
+    moveToAbsolute(nx, ny) {
+        this.x = nx;
+        this.y = ny;
+        this._updateRelativeFromAbsolute();
+        this.invalidate();
+    }
+
+    applyZoomAt(factor, cx, cy) {
+        // cx, cy : point de zoom en coordonnées absolues (ex: mouseX, mouseY)
+        if (factor === 1) return;
+
+        // position locale avant zoom (0..1)
+        const localX = (cx - this.x) / this.w;
+        const localY = (cy - this.y) / this.h;
+
+        // nouvelle taille
+        this.w *= factor;
+        this.h *= factor;
+
+        // repositionner pour garder le point sous la souris
+        this.x = cx - localX * this.w;
+        this.y = cy - localY * this.h;
+
+        this.zoomFactor *= factor;
+
+        this._updateRelativeFromAbsolute();
+        this.invalidate();
+    }
 
     // ============================================================
     // HIT TEST
@@ -86,41 +137,32 @@ class UIComponent {
     }
 
     // ============================================================
-    // DRAG
+    // INTERACTIONS SOURIS (façade : appellent les méthodes métier)
     // ============================================================
 
     mousePressed(mx, my) {
         if (!this.isDraggable) return false;
+        if (!this.containsRect(mx, my)) return false;
 
-        if (this.containsRect(mx, my)) {
-            this.dragging = true;
-            this.dragOffsetX = mx - this.x;
-            this.dragOffsetY = my - this.y;
-
-            this.hasBeenPositioned = true;
-            return true;
-        }
-        return false;
+        this.dragging = true;
+        this.dragOffsetX = mx - this.x;
+        this.dragOffsetY = my - this.y;
+        return true;
     }
 
     mouseDragged(mx, my) {
         if (!this.dragging) return false;
 
-        this.x = mx - this.dragOffsetX;
-        this.y = my - this.dragOffsetY;
+        const nx = mx - this.dragOffsetX;
+        const ny = my - this.dragOffsetY;
 
-        this.hasBeenPositioned = true;
-        this.invalidate();
+        this.moveToAbsolute(nx, ny);   // <-- ordre métier clair
         return true;
     }
 
     mouseReleased() {
         this.dragging = false;
     }
-
-    // ============================================================
-    // ZOOM LIBRE (Modèle B)
-    // ============================================================
 
     mouseWheel(event) {
         if (!this.isZoomable) return false;
@@ -130,20 +172,7 @@ class UIComponent {
 
         const factor = event.delta > 0 ? 0.95 : 1.05;
 
-        // Zoom centré
-        let localX = mouseX - this.x;
-        let localY = mouseY - this.y;
-
-        this.w *= factor;
-        this.h *= factor;
-
-        this.x = mouseX - localX * factor;
-        this.y = mouseY - localY * factor;
-
-        this.zoomFactor *= factor;
-        this.hasBeenPositioned = true;
-
-        this.invalidate();
+        this.applyZoomAt(factor, mouseX, mouseY);  // <-- ordre métier clair
         return true;
     }
 
@@ -175,7 +204,7 @@ class UIComponent {
         noStroke();
         textSize(12);
         text(
-            `(${this.x.toFixed(0)}, ${this.y.toFixed(0)}) wheel:${this.wheelActive}`,
+            `(${this.x.toFixed(0)}, ${this.y.toFixed(0)}) zoom:${this.zoomFactor.toFixed(2)}`,
             this.x + 5,
             this.y + 15
         );
@@ -188,12 +217,11 @@ class UIComponent {
     }
 
     // ============================================================
-    // EVENTS (méthodes vides pour éviter les erreurs)
+    // EVENTS VIDES
     // ============================================================
 
     mouseMoved(mx, my) { return false; }
     mouseClicked(mx, my) { return false; }
     keyPressed(k, kc) { return false; }
     keyReleased(k, kc) { return false; }
-
 }
