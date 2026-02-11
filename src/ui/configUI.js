@@ -28,6 +28,22 @@ const UI_CONFIG = {
         toggleShortcut: "w"
     },
 
+guitar1: {
+    type: "guitar",
+    xp: 10,
+    yp: 10,
+    sp: 20,
+    aspectRatio: 8,
+    debug: true,
+    isDraggable: true,
+    isZoomable: true,
+    woodColor: "maple",
+    orientation: "horizontal",
+    toggleOrientationShortcut: "o"   // NEW
+}
+
+
+
     // // Exemple futur : un knob
     // Knob_freq: {
     //     type: "knob",

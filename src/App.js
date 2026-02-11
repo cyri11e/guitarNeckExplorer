@@ -25,6 +25,11 @@ class App {
                     comp = new Panel(cfg);
                     break;
 
+                case "guitar":
+                    comp = new Guitar(cfg);
+                    break;
+
+
                 // futur :
                 // case "knob": comp = new Knob(cfg); break;
                 // case "switch": comp = new Switch(cfg); break;
@@ -41,6 +46,9 @@ class App {
             if (cfg.toggleShortcut) {
                 comp.shortcutKey = cfg.toggleShortcut;
             }
+            if (cfg.toggleOrientationShortcut) {
+                comp.toggleOrientationShortcut = cfg.toggleOrientationShortcut;
+            }
 
             // lien vers App
             comp.app = this;
@@ -50,6 +58,7 @@ class App {
 
             // enregistrement dans UIManager
             this.ui.register(comp);
+
 
             // responsive initial
             comp.updateResponsive();

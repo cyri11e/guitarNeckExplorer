@@ -23,9 +23,18 @@ class UIInteractionManager {
         this.components = this.components.filter(c => c !== component);
     }
 
+
+
     // ============================================================
     // MOUSE EVENTS WITH CAPTURE
     // ============================================================
+
+    mouseMoved(x, y) {
+        for (const comp of this.components) {
+            if (comp.mouseMoved) comp.mouseMoved(x, y);
+        }
+    }
+
 
     mousePressed(mx, my) {
         this.mouseIsDown = true;
@@ -110,6 +119,16 @@ class UIInteractionManager {
             this.shortcuts[lower].onShortcut?.();
             return true;
         }
+
+        // Guitar orientation toggle
+        for (let c of this.components) {
+            if (c.toggleOrientationShortcut &&
+                lower === c.toggleOrientationShortcut.toLowerCase()) {
+                c.toggleOrientation?.();
+                return true;
+            }
+        }
+
 
         // Sinon propagation normale (z-index)
         for (let i = this.components.length - 1; i >= 0; i--) {
