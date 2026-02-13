@@ -5,7 +5,6 @@ class Guitar extends UIComponent {
 
         this.aspectRatio = cfg.aspectRatio ?? 8;
         this.woodColor   = cfg.woodColor   ?? "maple";
-        this.orientation = cfg.orientation ?? "horizontal";
 
         this.isDraggable = cfg.isDraggable ?? true;
         this.isZoomable  = cfg.isZoomable  ?? true;
@@ -18,7 +17,7 @@ class Guitar extends UIComponent {
     }
 
     // ============================================================
-    // RESPONSIVE (géométrie interne TOUJOURS horizontale)
+    // RESPONSIVE (géométrie interne horizontale)
     // ============================================================
 
     updateResponsive() {
@@ -29,9 +28,11 @@ class Guitar extends UIComponent {
 
         const base = ph * (this.sp / 100) * this.zoomFactor;
 
-        this.h = base;               // épaisseur
-        this.w = this.h * this.aspectRatio; // longueur
+        this.h = base;                     // épaisseur du manche
+        this.w = this.h * this.aspectRatio; // longueur du manche
     }
+
+    computeLayout() {}
 
     // ============================================================
     // GETTERS LOGIQUES
@@ -45,20 +46,20 @@ class Guitar extends UIComponent {
     }
 
     getNutRect() {
-        const t = this.getThickness();
+        const t = this.h;
         const nutW = t / 20;
         return { x: this.x + nutW, y: this.y, w: nutW, h: t };
     }
 
     getNutShadowRect() {
         const nut = this.getNutRect();
-        const s = this.getThickness() / 200;
+        const s = this.h / 200;
         return { x: nut.x - s, y: nut.y, w: s, h: nut.h };
     }
 
     getNutShadowRectRight() {
         const nut = this.getNutRect();
-        const s = this.getThickness() / 100;
+        const s = this.h / 100;
         return { x: nut.x + nut.w, y: nut.y, w: s, h: nut.h };
     }
 
@@ -67,7 +68,7 @@ class Guitar extends UIComponent {
     // ============================================================
 
     getStringThickness(i) {
-        const t = this.getThickness();
+        const t = this.h;
         return (t * 0.020) - (i / 5) * (t * 0.012);
     }
 
@@ -79,8 +80,8 @@ class Guitar extends UIComponent {
 
     getStrings() {
         const arr = [];
-        const t = this.getThickness();
-        const L = this.getLength();
+        const t = this.h;
+        const L = this.w;
 
         const usable = t * 0.95;
         const margin = (t - usable) / 2;
@@ -104,12 +105,9 @@ class Guitar extends UIComponent {
         const off = t * 1.5;
         const size = t * 0.8;
 
-        const r = { x: s.x, y: s.y + off, w: s.w, h: size };
-        const rr = this.mapRect(r);
-
         fill(0, 20);
         noStroke();
-        rect(rr.x, rr.y, rr.w, rr.h);
+        rect(s.x, s.y + off, s.w, size);
     }
 
     drawStringShadows() {
@@ -126,15 +124,12 @@ class Guitar extends UIComponent {
             const s = strings[i];
 
             // sombre
-            let r = this.mapRect(s);
             fill(150);
-            rect(r.x, r.y, r.w, r.h);
+            rect(s.x, s.y, s.w, s.h);
 
             // highlight
-            const h = { x: s.x, y: s.y, w: s.w, h: s.h * 0.4 };
-            r = this.mapRect(h);
             fill(230);
-            rect(r.x, r.y, r.w, r.h);
+            rect(s.x, s.y, s.w, s.h * 0.4);
         }
     }
 
@@ -144,8 +139,8 @@ class Guitar extends UIComponent {
 
     getFrets() {
         const arr = [];
-        const t = this.getThickness();
-        const L = this.getLength();
+        const t = this.h;
+        const L = this.w;
 
         const count = 12;
         const fw = t * 0.05;
@@ -162,61 +157,21 @@ class Guitar extends UIComponent {
 
         for (const f of frets) {
             // ombre
-            let r = this.mapRect({
-                x: f.x - f.w * 0.3,
-                y: f.y,
-                w: f.w * 1.6,
-                h: f.h
-            });
             fill(0, 40);
-            rect(r.x, r.y, r.w, r.h);
+            rect(f.x - f.w * 0.3, f.y, f.w * 1.6, f.h);
 
             // métal
-            r = this.mapRect(f);
             fill(220);
-            rect(r.x, r.y, r.w, r.h);
+            rect(f.x, f.y, f.w, f.h,f.w *0.3);
 
-            // highlight
-            const h = {
-                x: f.x,
-                y: f.y,
-                w: f.w * 0.8,
-                h: f.h * 0.25
-            };
-            r = this.mapRect(h);
+            // reflet clair
             fill(255);
-            rect(r.x, r.y, r.w, r.h);
+            rect(f.x, f.y, f.w * 0.8, f.h * 0.25,f.h * 0.25,0,0);
+
+            //reflet sombre
+            fill(100);
+            rect(f.x +f.w *0.3, f.y +f.w *0.3, f.w * 0.6, f.h * 0.97, f.w *0.98);
         }
-    }
-
-    // ============================================================
-    // ROTATION LOGIQUE (projection 90°)
-    // ============================================================
-
-    mapPoint(x, y) {
-        if (this.orientation === "horizontal") return { x, y };
-
-        const x0 = this.x;
-        const y0 = this.y;
-        const L  = this.getLength();
-
-        return {
-            x: x0 + (y - y0),
-            y: y0 + (L - (x - x0))
-        };
-    }
-
-    mapRect(r) {
-        if (this.orientation === "horizontal") return r;
-
-        const p = this.mapPoint(r.x, r.y);
-
-        return {
-            x: p.x,
-            y: p.y,
-            w: r.h,
-            h: r.w
-        };
     }
 
     // ============================================================
@@ -236,11 +191,11 @@ class Guitar extends UIComponent {
 
     draw() {
         // manche
-        let r = this.mapRect(this.getNeckRect());
+        const neck = this.getNeckRect();
         fill(this.getWoodFill());
         stroke(40);
         strokeWeight(2);
-        rect(r.x, r.y, r.w, r.h);
+        rect(neck.x, neck.y, neck.w, neck.h);
 
         // ombres cordes
         this.drawStringShadows();
@@ -249,34 +204,26 @@ class Guitar extends UIComponent {
         this.drawFrets();
 
         // sillet
-        r = this.mapRect(this.getNutRect());
+        const nut = this.getNutRect();
         fill(240);
         noStroke();
-        rect(r.x, r.y, r.w, r.h);
+        rect(nut.x, nut.y, nut.w, nut.h);
 
         // cordes
         this.drawStrings();
 
         // ombres sillet
-        r = this.mapRect(this.getNutShadowRect());
+        const ns = this.getNutShadowRect();
         fill(0, 50);
-        rect(r.x, r.y, r.w, r.h);
+        rect(ns.x, ns.y, ns.w, ns.h);
 
-        r = this.mapRect(this.getNutShadowRectRight());
+        const nsr = this.getNutShadowRectRight();
         fill(0, 35);
-        rect(r.x, r.y, r.w, r.h);
+        rect(nsr.x, nsr.y, nsr.w, nsr.h);
 
         if (this.debug) {
             this.drawDebugRect();
             this.drawDebugInfo();
         }
-    }
-
-    toggleOrientation() {
-        this.orientation =
-            (this.orientation === "horizontal") ? "vertical" : "horizontal";
-
-        this.updateResponsive();
-        this.invalidate();
     }
 }
