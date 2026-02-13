@@ -67,7 +67,7 @@ class Panel extends UIComponent {
 
         let lines = [
             `Panel`,
-            `hover: ${this.hover}`,
+            `hover: ${this.isHovered}`,
             `drag: ${this.dragging}`,
             `wheel: ${this.wheelActive}`,
             `x:${this.x.toFixed(0)} y:${this.y.toFixed(0)}`,

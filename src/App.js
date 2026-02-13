@@ -3,8 +3,16 @@ class App {
 
         // Manager d'interactions
         this.ui = new UIInteractionManager();
-
-        // Tous les composants UI (z-index = ordre d'arrivée)
+        // --- Théorie musicale --- 
+        this.theory = new MusicTheory(); 
+        this.theory.useFlats = true;
+        // --- Théorie instrumentale --- 
+        this.instrument = new InstrumentTheory({ 
+            tuning: ["E2","A2","D3","G3","B3","E4"], 
+            fretCount: 24, 
+            musicTheory: this.theory
+        });
+            // Tous les composants UI (z-index = ordre d'arrivée)
         this.components = [];
 
         // ============================================================
@@ -27,6 +35,8 @@ class App {
 
                 case "guitar":
                     comp = new Guitar(cfg);
+                    comp.theory = this.theory;
+                    comp.instrument = this.instrument;
                     break;
 
 

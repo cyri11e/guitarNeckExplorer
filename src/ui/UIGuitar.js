@@ -86,7 +86,6 @@ fromScreen(x, y) {
     let fret = null;
     let string = null;
 
-    // CASE
     for (const c of this.cases) {
         if (x >= c.x1 && x <= c.x2) {
             fret = c.index;
@@ -94,7 +93,6 @@ fromScreen(x, y) {
         }
     }
 
-    // STRING
     let bestDy = Infinity;
     for (const s of this.strings) {
         const dy = Math.abs(y - s.y);
@@ -106,11 +104,12 @@ fromScreen(x, y) {
 
     if (fret == null || string == null) return null;
 
-        this.invalidate();   // 🔥 redraw UNIQUEMENT si la pastille change
+    this.hoveredNote = { fret, string };   // 🔥 FIX
+    this.invalidate();
 
-
-    return { fret, string };
+    return this.hoveredNote;
 }
+
 
 
     // ------------------------------------------------------------

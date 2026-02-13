@@ -167,32 +167,61 @@ class GuitarRenderer {
         }
     }
 
-
-    // curseur 
-drawHoverDot() {
+drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
     const g = this.g;
 
-    // 🔥 NE DESSINE QUE SI LA SOURIS EST DANS LE MANCHE
-    if (!g.hover) return;
+    // Position sur le manche
+    const c = g.cases[fret];
+    const s = g.strings[string - 1];
+    if (!c || !s) return;
 
-    const hit = g.fromScreen(mouseX, mouseY);
-    if (!hit) return;
+    const x = c.xc;
+    const y = s.y;
 
-    const c = g.cases[hit.fret];
-    const s = g.strings[hit.string - 1];
+    const t = g.getThickness();
+    const r = t * (isHover ? 0.16 : 0.18);
 
-    const cx = c.xc;
-    const cy = s.y;
+    // Couleur
+    if (color) fill(color);
+    else fill(isHover ? "yellow" : "red");
 
-    const r = c.h * 0.15;
-
-    push();
     noStroke();
-    fill(255, 255, 0, 180);
-    ellipse(cx, cy, r, r);
-    pop();
+    circle(x, y, r);
+
+    // Label
+    textAlign(CENTER, CENTER);
+    textSize(t * 0.12);
+    fill(0);
+    text(label, x, y);
 }
 
+drawHoverDot() {
+    if (!this.g.isHovered) return;
+    const h = this.g.hoveredNote;
+    if (!h) return;
+
+    const stringIndex = h.string - 1;   // 🔥 FIX
+    const fret = h.fret;
+
+    const n = this.g.instrument.getNoteAt(stringIndex, fret);
+    const label = this.g.theory.getNoteName(n.index);
+
+    this.drawNoteOnFretboard(label, h.string, h.fret, null, true);
+}
+
+drawPinnedNotes() {
+    for (let p of this.g.pinnedNotes) {
+        const stringIndex = p.string - 1;   // 🔥 FIX
+        const fret = p.fret;
+
+        const n = this.g.instrument.getNoteAt(stringIndex, fret);
+        const label = this.g.theory.getNoteName(n.index);
+
+        this.drawNoteOnFretboard(label, p.string, p.fret, null, false);
+    }
+}
+
+                            
 drawOpenStringLabels() {
     const g = this.g;
     const names = ["E", "B", "G", "D", "A", "E"]; // corde 1 → aiguë
@@ -212,24 +241,6 @@ drawOpenStringLabels() {
     }
 }
 
-drawPinnedNotes() {
-    const g = this.g;
-
-    for (const n of g.pinnedNotes) {
-        const c = g.cases[n.fret];
-        const s = g.strings[n.string - 1];
-
-        const cx = c.xc;
-        const cy = s.y;
-        const r = c.h * 0.18;
-
-        push();
-        noStroke();
-        fill(0, 200, 255, 200); // bleu translucide
-        ellipse(cx, cy, r, r);
-        pop();
-    }
-}
 
 
     // ------------------------------------------------------------
@@ -247,7 +258,7 @@ drawDebugInfo() {
     const ratio = (w / h).toFixed(2);
 
     // Interaction
-    const hover    = g.hover;
+    const isHovered    = g.isHovered;
     const pressed  = g.isPressed;
     const dragging = g.dragging;
 
@@ -276,7 +287,7 @@ drawDebugInfo() {
         `frets: ${g.fretCount}\n` +
         `cases: ${g.cases.length}\n\n` +
 
-        `hover: ${hover}\n` +
+        `hover: ${isHovered}\n` +
         `pressed: ${pressed}\n` +
         `dragging: ${dragging}\n` +
         `mouse: ${mx}, ${my}\n` +

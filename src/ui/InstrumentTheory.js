@@ -21,19 +21,13 @@ class InstrumentTheory {
         this.tuning = tuning.map(t => this.parseNoteName(t));
     }
 
-    // ------------------------------------------------------------
-    // PARSING DES NOMS DE NOTES (ex: "E2", "F#3", "Bb4")
-    // ------------------------------------------------------------
-
     parseNoteName(name) {
-        // Exemple : "F#3"
         const match = name.match(/^([A-G])([#b]?)(\d)$/);
         if (!match) throw new Error("Invalid note name: " + name);
 
         const [, letter, accidental, octaveStr] = match;
         const octave = parseInt(octaveStr);
 
-        // Trouver l'index chromatique
         const candidates = this.theory.NOTES.filter(n =>
             n.sharp === letter + accidental || n.flat === letter + accidental
         );
@@ -52,10 +46,6 @@ class InstrumentTheory {
         };
     }
 
-    // ------------------------------------------------------------
-    // CONVERSION STRING/FRET → NOTE
-    // ------------------------------------------------------------
-
     getNoteAt(stringIndex, fret) {
         const open = this.tuning[stringIndex];
         const midi = open.midi + fret;
@@ -69,10 +59,6 @@ class InstrumentTheory {
             octave: Math.floor(midi / 12) - 1
         };
     }
-
-    // ------------------------------------------------------------
-    // OCCURRENCES D’UNE NOTE SUR LE MANCHE
-    // ------------------------------------------------------------
 
     getOccurrences(noteIndex) {
         const out = [];
@@ -89,10 +75,6 @@ class InstrumentTheory {
         return out;
     }
 
-    // ------------------------------------------------------------
-    // OCCURRENCES D’UNE GAMME SUR LE MANCHE
-    // ------------------------------------------------------------
-
     getScaleOccurrences(scaleIndices) {
         const out = [];
 
@@ -106,17 +88,9 @@ class InstrumentTheory {
         return out;
     }
 
-    // ------------------------------------------------------------
-    // OCCURRENCES D’UN ACCORD SUR LE MANCHE
-    // ------------------------------------------------------------
-
     getChordOccurrences(chordIndices) {
         return this.getScaleOccurrences(chordIndices);
     }
-
-    // ------------------------------------------------------------
-    // TRANSPOSITION DE L’ACCORDAGE
-    // ------------------------------------------------------------
 
     transpose(semitones) {
         this.tuning = this.tuning.map(t => {

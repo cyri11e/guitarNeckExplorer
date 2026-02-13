@@ -16,7 +16,7 @@ class UIComponent {
         this.parent = null;
 
         // Interaction
-        this.hover = false;
+        this.isHovered = false;
         this.isDraggable = false;
         this.isZoomable = false;
 
@@ -215,7 +215,7 @@ class UIComponent {
 mouseMoved(mx, my) {
     const inside = this.containsRect(mx, my);
 
-        this.hover = inside;
+        this.isHovered = inside;
         this.invalidate();   // ← redessine le composant
 
 

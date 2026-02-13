@@ -38,8 +38,8 @@ guitar1: {
     isDraggable: true,
     isZoomable: true,
     fretCount: 22,
-    inlayStyle: 'trapeze',
-    woodColor: "rosewood",
+    inlayStyle: 'dot',
+    woodColor: "maple",
     orientation: "horizontal",
     toggleOrientationShortcut: "o"   // NEW
 }
