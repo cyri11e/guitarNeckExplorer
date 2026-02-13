@@ -212,7 +212,16 @@ class UIComponent {
     // EVENTS VIDES
     // ============================================================
 
-    mouseMoved(mx, my) { return false; }
+mouseMoved(mx, my) {
+    const inside = this.containsRect(mx, my);
+
+        this.hover = inside;
+        this.invalidate();   // ← redessine le composant
+
+
+    return inside;
+}
+
 
 // ============================================================
 // INTERACTIONS SOURIS — VERSION PROPRE ET FIABLE
@@ -271,23 +280,6 @@ mouseReleased(mx, my) {
 
     return wasDragging; // consommé si drag
 }
-
-
-
-
-
-// mouseClicked(mx, my) {
-//     // si un vrai drag a eu lieu → PAS un clic
-//     if (this.dragging) return false;
-
-//     if (this.containsRect(mx, my)) {
-//         this.onClick?.();
-//         return true;
-//     }
-//     return false;
-// }
-
-
 
     keyPressed(k, kc) { return false; }
     keyReleased(k, kc) { return false; }

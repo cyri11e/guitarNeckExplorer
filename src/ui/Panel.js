@@ -50,9 +50,9 @@ class Panel extends UIComponent {
             rect(this.x, this.y, this.w, this.h, 8);
             pop();
         }
-
-        this.drawDebugRect();
-        this.drawDebugInfo();
+        super.draw();
+       // this.drawDebugRect();
+        // this.drawDebugInfo();
 
         for (let c of this.children) c.draw();
     }

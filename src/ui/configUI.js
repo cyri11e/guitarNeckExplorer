@@ -37,7 +37,9 @@ guitar1: {
     debug: true,
     isDraggable: true,
     isZoomable: true,
-    woodColor: "maple",
+    fretCount: 22,
+    inlayStyle: 'superstrat',
+    woodColor: "rosewood",
     orientation: "horizontal",
     toggleOrientationShortcut: "o"   // NEW
 }
