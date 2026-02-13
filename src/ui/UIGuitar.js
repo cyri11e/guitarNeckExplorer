@@ -41,7 +41,8 @@ class Guitar extends UIComponent {
         this.geometry.projectGeometry();
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
-// corde 1 = E aiguë, corde 6 = E grave
+        // corde 1 = E aiguë, corde 6 = E grave
+        this.pinnedNotes = []; // { fret, string }
 
     }
 
@@ -121,4 +122,30 @@ fromScreen(x, y) {
         this.renderer.draw();
         super.draw();
     }
+
+    //interactions 
+    togglePinnedNote(fret, string) {
+        const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);
+
+        if (idx >= 0) {
+            // déjà épinglée → on retire
+            this.pinnedNotes.splice(idx, 1);
+        } else {
+            // pas encore → on ajoute
+            this.pinnedNotes.push({ fret, string });
+        }
+
+        this.invalidate(); // redraw
+    }
+
+    mouseClicked(mx, my) {
+        if (!this.containsRect(mx, my)) return false;
+
+        const hit = this.fromScreen(mx, my);
+        if (!hit) return false;
+
+        this.togglePinnedNote(hit.fret, hit.string);
+        return true;
+    }
+
 }

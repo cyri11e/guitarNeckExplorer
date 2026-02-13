@@ -212,6 +212,25 @@ drawOpenStringLabels() {
     }
 }
 
+drawPinnedNotes() {
+    const g = this.g;
+
+    for (const n of g.pinnedNotes) {
+        const c = g.cases[n.fret];
+        const s = g.strings[n.string - 1];
+
+        const cx = c.xc;
+        const cy = s.y;
+        const r = c.h * 0.18;
+
+        push();
+        noStroke();
+        fill(0, 200, 255, 200); // bleu translucide
+        ellipse(cx, cy, r, r);
+        pop();
+    }
+}
+
 
     // ------------------------------------------------------------
     // DEBUG
@@ -291,6 +310,7 @@ drawDebugInfo() {
         this.drawFrets();
         this.drawStrings();
         this.drawOpenStringLabels();
+        this.drawPinnedNotes();
         this.drawHoverDot();
 
         if (g.debug) this.drawDebugInfo();
