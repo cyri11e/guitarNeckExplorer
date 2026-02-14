@@ -97,7 +97,7 @@ onClick() {
         };
     }
 
-    updateHover(mx, my) {
+    updateHover(evt) {
         let extraW = this.w * (this.hitboxScale - 1);
         let extraH = this.h * (this.hitboxScale - 1);
 
@@ -108,12 +108,12 @@ onClick() {
 
         this.hoverDrag.hitZone = { x, y, w, h };
 
-        let inside = mx >= x && mx <= x + w && my >= y && my <= y + h;
+        let inside = evt.mx >= x && evt.mx <= x + w && evt.y >= y && evt.y <= y + h;
         this.hover = inside;
         this.hoverDrag.isHovered = inside;
     }
 
-containsRect(mx, my) {
+containsRect(evt) {
     // centre réel du knob (pas le centre du composant)
     const topP = 0.25;
     const circleP = 0.50;
@@ -127,7 +127,7 @@ containsRect(mx, my) {
     // rayon réel du knob
     const r = min(this.w, circleH) / 2;
 
-    return dist(mx, my, cx, cy) <= r * this.hitboxScale;
+    return dist(evt.x, evt.y, cx, cy) <= r * this.hitboxScale;
 }
 
 

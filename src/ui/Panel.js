@@ -97,43 +97,43 @@ updateChildrenLayout() {
     // -------------------------------------------------------
     // INTERACTIONS
     // -------------------------------------------------------
-    mousePressed(mx, my) {
-        if (!this.containsRect(mx, my)) return false;
+    mousePressed(evt) {
+        if (!this.containsRect(evt)) return false;
 
         // Enfants d'abord
         for (let c of this.children) {
-            if (c.mousePressed(mx, my)) return true;
+            if (c.mousePressed(evt)) return true;
         }
 
         // Drag du panel
-        return super.mousePressed(mx, my);
+        return super.mousePressed(evt);
     }
 
-    mouseDragged(mx, my) {
+    mouseDragged(evt) {
         // Drag du panel
-        if (super.mouseDragged(mx, my)) {
+        if (super.mouseDragged(evt)) {
             this.updateChildrenLayout();
             return true;
         }
 
         // Drag d’un enfant
         for (let c of this.children) {
-            if (c.mouseDragged(mx, my)) return true;
+            if (c.mouseDragged(evt)) return true;
         }
 
         return false;
     }
 
-    mouseReleased(mx, my) {
-        super.mouseReleased(mx, my);
-        for (let c of this.children) c.mouseReleased(mx, my);
+    mouseReleased(evt) {
+        super.mouseReleased(evt);
+        for (let c of this.children) c.mouseReleased(evt);
     }
 
-    mouseWheel(e) {
-        if (!this.containsRect(mouseX, mouseY)) return false;
+    mouseWheel(evt) {
+        if (!this.containsRect(evt)) return false;
 
-        const factor = e.delta > 0 ? 0.95 : 1.05;
-        this.applyZoomAt(factor, mouseX, mouseY);
+        const factor = evt.delta > 0 ? 0.95 : 1.05;
+        this.applyZoomAt(factor, evt.x, evt.y);
 
         this.updateChildrenLayout();
         return true;

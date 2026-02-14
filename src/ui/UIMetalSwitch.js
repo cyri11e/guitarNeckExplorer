@@ -63,7 +63,7 @@ set state(v) {
         return true;
     }
 
-containsRect(mx, my) {
+containsRect(evt) {
 
     // centre du switch
     const cx = this.x + this.w / 2;
@@ -86,10 +86,10 @@ containsRect(mx, my) {
     const hitH = hexR * 2;
 
     return (
-        mx >= hitX &&
-        mx <= hitX + hitW &&
-        my >= hitY &&
-        my <= hitY + hitH
+        evt.x >= hitX &&
+        evt.x <= hitX + hitW &&
+        evt.y >= hitY &&
+        evt.y <= hitY + hitH
     );
 }
 

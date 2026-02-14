@@ -28,84 +28,113 @@ class UIInteractionManager {
     // ============================================================
     // MOUSE EVENTS WITH CAPTURE
     // ============================================================
+_buildEvent(mx, my) {
+    return {
+        x: mx,
+        y: my,
+        shift: keyIsDown(SHIFT),
+        alt: keyIsDown(ALT),
+        ctrl: keyIsDown(CONTROL),
+        button: mouseButton
+    };
+}
 
-    mouseMoved(x, y) {
-        for (const comp of this.components) {
-            if (comp.mouseMoved) comp.mouseMoved(x, y);
+mouseMoved(mx, my) {
+    const evt = this._buildEvent(mx, my);
+
+    for (const c of this.components) {
+        c.mouseMoved?.(evt);
+    }
+}
+
+
+
+ mousePressed(mx, my) {
+    this.mouseIsDown = true;
+
+    const evt = this._buildEvent(mx, my);
+
+    // top → bottom
+    for (let i = this.components.length - 1; i >= 0; i--) {
+        const c = this.components[i];
+
+        if (c.mousePressed?.(evt)) {
+            this.captureOwner = c;
+            return true;
         }
     }
 
+    return false;
+}
 
-    mousePressed(mx, my) {
-        this.mouseIsDown = true;
 
-        // top → bottom
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
+mouseDragged(mx, my) {
+    const evt = this._buildEvent(mx, my);
 
-            if (c.mousePressed?.(mx, my)) {
-                this.captureOwner = c;   // 🔥 capture
-                return true;
-            }
-        }
-
-        return false;
+    if (this.captureOwner) {
+        return this.captureOwner.mouseDragged?.(evt) || false;
     }
 
-    mouseDragged(mx, my) {
-        if (this.captureOwner) {
-            // 🔥 seul le captureOwner reçoit le drag
-            return this.captureOwner.mouseDragged?.(mx, my) || false;
-        }
-
-        // fallback (rare)
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
-            if (c.mouseDragged?.(mx, my)) return true;
-        }
-
-        return false;
+    for (let i = this.components.length - 1; i >= 0; i--) {
+        const c = this.components[i];
+        if (c.mouseDragged?.(evt)) return true;
     }
 
-    mouseReleased(mx, my) {
-        this.mouseIsDown = false;
+    return false;
+}
 
-        if (this.captureOwner) {
-            // 🔥 seul le captureOwner reçoit le release
-            const consumed = this.captureOwner.mouseReleased?.(mx, my) || false;
-            this.captureOwner = null;
-            return consumed;
-        }
 
-        // fallback (rare)
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
-            if (c.mouseReleased?.(mx, my)) return true;
-        }
+mouseReleased(mx, my) {
+    this.mouseIsDown = false;
 
-        return false;
+    const evt = this._buildEvent(mx, my);
+
+    if (this.captureOwner) {
+        const consumed = this.captureOwner.mouseReleased?.(evt) || false;
+        this.captureOwner = null;
+        return consumed;
     }
 
-    mouseClicked(mx, my) {
-        // 🔥 un clic n'existe QUE si pas de drag + pas de capture
-        if (this.captureOwner) return false;
-
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
-            if (c.mouseClicked?.(mx, my)) return true;
-        }
-
-        return false;
+    for (let i = this.components.length - 1; i >= 0; i--) {
+        const c = this.components[i];
+        if (c.mouseReleased?.(evt)) return true;
     }
 
-    mouseWheel(event) {
-        // pas de capture pour wheel
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
-            if (c.mouseWheel?.(event)) return true;
-        }
-        return false;
+    return false;
+}
+
+
+mouseClicked(mx, my) {
+    if (this.captureOwner) return false;
+
+    const evt = this._buildEvent(mx, my);
+
+    for (let i = this.components.length - 1; i >= 0; i--) {
+        const c = this.components[i];
+        if (c.mouseClicked?.(evt)) return true;
     }
+
+    return false;
+}
+
+
+mouseWheel(event) {
+    const evt = {
+        x: mouseX,
+        y: mouseY,
+        delta: event.delta,
+        shift: keyIsDown(SHIFT),
+        alt: keyIsDown(ALT),
+        ctrl: keyIsDown(CONTROL)
+    };
+
+    for (let i = this.components.length - 1; i >= 0; i--) {
+        const c = this.components[i];
+        if (c.mouseWheel?.(evt)) return true;
+    }
+    return false;
+}
+
 
     // ============================================================
     // KEYBOARD + SHORTCUTS

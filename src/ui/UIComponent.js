@@ -137,12 +137,12 @@ class UIComponent {
     // HIT TEST
     // ============================================================
 
-    containsRect(mx, my) {
+    containsRect(evt) {
         return (
-            mx >= this.x &&
-            mx <= this.x + this.w &&
-            my >= this.y &&
-            my <= this.y + this.h
+            evt.x >= this.x &&
+            evt.x <= this.x + this.w &&
+            evt.y >= this.y &&
+            evt.y <= this.y + this.h
         );
     }
 
@@ -151,17 +151,18 @@ class UIComponent {
     // ============================================================
 
 
-    mouseWheel(event) {
-        if (!this.isZoomable) return false;
-        if (!this.containsRect(mouseX, mouseY)) return false;
+mouseWheel(evt) {
+    if (!this.isZoomable) return false;
+    if (!this.containsRect(evt)) return false;
 
-        this.wheelActive = true;
+    this.wheelActive = true;
 
-        const factor = event.delta > 0 ? 0.95 : 1.05;
+    const factor = evt.delta > 0 ? 0.95 : 1.05;
 
-        this.applyZoomAt(factor, mouseX, mouseY);  // <-- ordre métier clair
-        return true;
-    }
+    this.applyZoomAt(factor, evt.x, evt.y);
+    return true;
+}
+
 
     // ============================================================
     // INVALIDATION
@@ -212,8 +213,8 @@ class UIComponent {
     // EVENTS VIDES
     // ============================================================
 
-mouseMoved(mx, my) {
-    const inside = this.containsRect(mx, my);
+mouseMoved(evt) {
+    const inside = this.containsRect(evt);
 
         this.isHovered = inside;
         this.invalidate();   // ← redessine le composant
@@ -245,28 +246,28 @@ triggerChange(newState) {
 // INTERACTIONS SOURIS — VERSION PROPRE ET FIABLE
 // ============================================================
 
-mousePressed(mx, my) {
-    if (!this.containsRect(mx, my)) return false;
+mousePressed(evt) {
+    if (!this.containsRect(evt)) return false;
 
     this.isPressed = true;
     this.dragging = false;      // pas encore un vrai drag
-    this.pressX = mx;
-    this.pressY = my;
+    this.pressX = evt.x;
+    this.pressY = evt.y;
 
     if (this.isDraggable) {
-        this.dragOffsetX = mx - this.x;
-        this.dragOffsetY = my - this.y;
+        this.dragOffsetX = evt.x - this.x;
+        this.dragOffsetY = evt.y - this.y;
     }
 
     return true;
 }
 
-mouseDragged(mx, my) {
+mouseDragged(evt) {
     if (!this.isPressed) return false;
 
     // Détection d’un vrai drag
-    const dx = mx - this.pressX;
-    const dy = my - this.pressY;
+    const dx = evt.x - this.pressX;
+    const dy = evt.y - this.pressY;
     const dist2 = dx * dx + dy * dy;
 
     const DRAG_THRESHOLD = 4; // 2px
@@ -277,21 +278,21 @@ mouseDragged(mx, my) {
     this.dragging = true;
 
     if (this.isDraggable) {
-        const nx = mx - this.dragOffsetX;
-        const ny = my - this.dragOffsetY;
+        const nx = evt.x - this.dragOffsetX;
+        const ny = evt.y - this.dragOffsetY;
         this.moveToAbsolute(nx, ny);
     }
 
     return true;
 }
 
-mouseReleased(mx, my) {
+mouseReleased(evt) {
     const wasDragging = this.dragging;
     this.isPressed = false;
     this.dragging = false;
 
     // pas de drag + relâché dedans → clic
-    if (!wasDragging && this.containsRect(mx, my)) {
+    if (!wasDragging && this.containsRect(evt)) {
         this.onClick?.();
         return true;    // consommé
     }

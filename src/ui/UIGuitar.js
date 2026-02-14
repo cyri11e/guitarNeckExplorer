@@ -148,30 +148,30 @@ onNoteClicked(noteIndex) {
 
     // 🔥 Ajout : gestion propre du drag/click
 
-    mousePressed(mx, my) {
+    mousePressed(evt) {
         this.wasDragged = false; // reset
-        return super.mousePressed(mx, my);
+        return super.mousePressed(evt);
     }
 
-    mouseDragged(mx, my) {
+    mouseDragged(evt) {
         this.wasDragged = true; // un vrai drag a eu lieu
-        return super.mouseDragged(mx, my);
+        return super.mouseDragged(evt);
     }
 
-    mouseReleased(mx, my) {
-        return super.mouseReleased(mx, my);
+    mouseReleased(evt) {
+        return super.mouseReleased(evt);
     }
 
-    mouseClicked(mx, my) {
+    mouseClicked(evt) {
         // 🔥 Empêche le pin si un drag a eu lieu
         if (this.wasDragged) {
             this.wasDragged = false;
             return false;
         }
 
-        if (!this.containsRect(mx, my)) return false;
+        if (!this.containsRect(evt)) return false;
 
-        const hit = this.fromScreen(mx, my);
+        const hit = this.fromScreen(evt.x, evt.y);
         if (!hit) return false;
 
         this.togglePinnedNote(hit.fret, hit.string);
