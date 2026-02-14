@@ -221,6 +221,24 @@ mouseMoved(mx, my) {
 
     return inside;
 }
+// ============================================================
+// TRIGGER DE CHANGEMENT D'ÉTAT (pour UI_RULES)
+// ============================================================
+triggerChange(newState) {
+
+    // Log optionnel
+    console.log(
+        "%c[TRIGGER] " + this.constructor.name +
+        " state=" + newState,
+        "color:#ff8800; font-weight:bold;"
+    );
+
+    // Dispatch vers UIInteractionManager
+    if (window.UIManager &&
+        typeof UIManager.onComponentChange === "function") {
+        UIManager.onComponentChange(this, newState);
+    }
+}
 
 
 // ============================================================
@@ -284,3 +302,4 @@ mouseReleased(mx, my) {
     keyPressed(k, kc) { return false; }
     keyReleased(k, kc) { return false; }
 }
+

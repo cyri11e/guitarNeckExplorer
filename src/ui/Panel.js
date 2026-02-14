@@ -1,85 +1,141 @@
 class Panel extends UIComponent {
-    constructor(cfg) {
+
+    constructor(cfg = {}) {
         super();
 
-        this.setResponsive(cfg.xp, cfg.yp, cfg.sp);
-        this.aspectRatio = cfg.aspectRatio;
-        this.visible = cfg.visible;
-        this.debug   = cfg.debug;
+        // Position / taille relatives
+        this.xp = cfg.xp ?? 0;
+        this.yp = cfg.yp ?? 0;
+        this.sp = cfg.sp ?? 20;
+        this.aspectRatio = cfg.aspectRatio ?? 1.5;
 
-        this.isDraggable = cfg.isDraggable;
-        this.isZoomable  = cfg.isZoomable;
+        // Drag / zoom
+        this.isDraggable = cfg.isDraggable ?? true;
+        this.isZoomable  = cfg.isZoomable  ?? true;
 
-        this.toggleOnClick = cfg.toggleOnClick;
-
+        // Enfants
         this.children = [];
+
+        // Responsive initial
+        this.setResponsive(this.xp, this.yp, this.sp);
+        this.updateResponsive();
     }
 
-    toggleVisible() { 
-        this.visible = !this.visible; 
-        this.invalidate();
+    // -------------------------------------------------------
+    // AJOUT D’UN ENFANT
+    // -------------------------------------------------------
+    add(child) {
+        child.parent = this;          // ⭐ hiérarchie UIComponent
+        child.isDraggable = false;    // ⭐ le panel gère le drag global
+        child.isZoomable  = false;    // ⭐ idem
+        this.children.push(child);
+        child.updateResponsive();     // ⭐ recalcul dans le panel
     }
 
-    onShortcut() {
-        this.toggleVisible();
+    // -------------------------------------------------------
+    // RESPONSIVE
+    // -------------------------------------------------------
+    updateResponsive() {
+        super.updateResponsive();     // calcule x,y,w,h du panel
+        this.updateChildrenLayout();  // layout interne
     }
 
-    onClick() {
-        if (this.toggleOnClick) {
-            this.toggleVisible();
-        }
+updateChildrenLayout() {
+    if (this.children.length === 0) return;
+
+    const padding = this.h * 0.05;
+    let xCursor = this.x + padding;
+
+    for (let c of this.children) {
+
+        const ratio = c.aspectRatio ?? 1;
+
+        c.h = (this.h - padding * 2) * (c.sp / 100);
+        c.w = c.h * ratio;
+
+        c.x = xCursor;
+        c.y = this.y + padding;
+
+        xCursor += c.w + padding;
     }
 
-    add(component) {
-        component.parent = this;
-        this.children.push(component);
-        this.invalidate();
-    }
+    // ⭐ largeur dynamique
+    this.w = xCursor - this.x;
 
-    computeLayout() {
-        for (let c of this.children) {
-            c.updateResponsive();
-        }
-    }
+    // ⭐ ratio dynamique
+    this.aspectRatio = this.w / this.h;
+}
 
+
+    // -------------------------------------------------------
+    // DESSIN
+    // -------------------------------------------------------
     draw() {
-        if (this.visible) {
-            push();
-            fill(40);
-            stroke(200);
-            rect(this.x, this.y, this.w, this.h, 8);
-            pop();
-        }
         super.draw();
-       // this.drawDebugRect();
-        // this.drawDebugInfo();
+        // Fond
+        noStroke();
+        fill(20, 20, 20, 220);
+        rect(this.x, this.y, this.w, this.h, this.h * 0.05);
 
-        for (let c of this.children) c.draw();
+        // Contour métal
+        stroke(180);
+        strokeWeight(3* this.zoomFactor);
+        noFill();
+        rect(this.x, this.y, this.w, this.h, this.h * 0.05);
+
+        // Ombre portée
+        noStroke();
+        fill(0, 0, 0, 120);
+        rect(this.x + 4, this.y + 4, this.w, this.h, this.h * 0.05);
+
+        // Enfants
+        for (let c of this.children) {
+            c.draw();
+        }
     }
 
-    drawDebugInfo() {
-        if (!this.debug) return;
+    // -------------------------------------------------------
+    // INTERACTIONS
+    // -------------------------------------------------------
+    mousePressed(mx, my) {
+        if (!this.containsRect(mx, my)) return false;
 
-        push();
-        fill(255);
-        noStroke();
-        textSize(12);
-
-        let lines = [
-            `Panel`,
-            `hover: ${this.isHovered}`,
-            `drag: ${this.dragging}`,
-            `wheel: ${this.wheelActive}`,
-            `x:${this.x.toFixed(0)} y:${this.y.toFixed(0)}`,
-            `w:${this.w.toFixed(0)} h:${this.h.toFixed(0)}`
-        ];
-
-        let ty = this.y + 15;
-        for (let line of lines) {
-            text(line, this.x + 5, ty);
-            ty += 14;
+        // Enfants d'abord
+        for (let c of this.children) {
+            if (c.mousePressed(mx, my)) return true;
         }
 
-        pop();
+        // Drag du panel
+        return super.mousePressed(mx, my);
+    }
+
+    mouseDragged(mx, my) {
+        // Drag du panel
+        if (super.mouseDragged(mx, my)) {
+            this.updateChildrenLayout();
+            return true;
+        }
+
+        // Drag d’un enfant
+        for (let c of this.children) {
+            if (c.mouseDragged(mx, my)) return true;
+        }
+
+        return false;
+    }
+
+    mouseReleased(mx, my) {
+        super.mouseReleased(mx, my);
+        for (let c of this.children) c.mouseReleased(mx, my);
+    }
+
+    mouseWheel(e) {
+        if (!this.containsRect(mouseX, mouseY)) return false;
+
+        const factor = e.delta > 0 ? 0.95 : 1.05;
+        this.applyZoomAt(factor, mouseX, mouseY);
+
+        this.updateChildrenLayout();
+        return true;
     }
 }

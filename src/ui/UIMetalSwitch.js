@@ -32,17 +32,18 @@ class MetalSwitch extends UIComponent {
     // -----------------------------
     get state() { return this._state; }
 
-    set state(v) {
-        v = v ? 1 : 0;
-        if (this._state === v) return;
-        this._state = v;
+set state(v) {
+    v = v ? 1 : 0;
+    if (this._state === v) return;
+    this._state = v;
 
-        // redraw dans ton système
-        this.invalidate();
+    this.invalidate();
 
-        // si un jour tu veux des règles :
-        // this.app?.ui.onComponentChange?.(this, v);
-    }
+    // ⭐ indispensable pour déclencher les règles
+    this.onChange?.(v);
+}
+
+
 
     setState(v) { this.state = v; }
 
@@ -61,6 +62,36 @@ class MetalSwitch extends UIComponent {
         }
         return true;
     }
+
+containsRect(mx, my) {
+
+    // centre du switch
+    const cx = this.x + this.w / 2;
+
+    // zone centrale verticale (entre labels)
+    const topLabelH    = this.h * 0.22;
+    const bottomLabelH = this.h * 0.22;
+
+    const midY = this.y + topLabelH;
+    const midH = this.h - topLabelH - bottomLabelH;
+
+    // rayon du hexagone (même que dans draw)
+    const baseR = this.w * 0.3;
+    const hexR  = baseR + this.w * 0.04;
+
+    // hitbox = un carré autour du hexagone
+    const hitX = cx - hexR;
+    const hitY = midY + midH * 0.50 - hexR;
+    const hitW = hexR * 2;
+    const hitH = hexR * 2;
+
+    return (
+        mx >= hitX &&
+        mx <= hitX + hitW &&
+        my >= hitY &&
+        my <= hitY + hitH
+    );
+}
 
     // -----------------------------
     // RENDER (inchangé, sauf this.containsRect retiré)

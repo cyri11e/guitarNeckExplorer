@@ -1,33 +1,34 @@
 class App {
     constructor() {
 
-        // Manager d'interactions
+        // Managers
         this.ui = new UIInteractionManager();
-        // --- Théorie musicale --- 
-        this.theory = new MusicTheory(); 
+        this.rules = new RuleManager();
+
+        // Théorie musicale
+        this.theory = new MusicTheory();
         this.theory.useFlats = true;
-        // --- Théorie instrumentale --- 
-        this.instrument = new InstrumentTheory({ 
-            tuning: ["E2","A2","D3","G3","B3","E4"], 
-            fretCount: 24, 
+
+        // Théorie instrumentale
+        this.instrument = new InstrumentTheory({
+            tuning: ["E2","A2","D3","G3","B3","E4"],
+            fretCount: 24,
             musicTheory: this.theory
         });
-            // Tous les composants UI (z-index = ordre d'arrivée)
+
+        // Tous les composants UI (z-index)
         this.components = [];
 
         // ============================================================
-        // AUTO-CREATION DEPUIS UI_CONFIG
+        // 1) CRÉATION DES COMPOSANTS (mais PAS encore de hiérarchie)
         // ============================================================
 
         for (const key in UI_CONFIG) {
             const cfg = UI_CONFIG[key];
-
-            // sécurité : cfg doit exister et avoir un type
             if (!cfg || !cfg.type) continue;
 
             let comp = null;
 
-            // mapping type → classe
             switch (cfg.type) {
                 case "panel":
                     comp = new Panel(cfg);
@@ -39,42 +40,64 @@ class App {
                     comp.instrument = this.instrument;
                     break;
 
-                case "metalSwitch": 
+                case "metalSwitch":
                     comp = new MetalSwitch(cfg);
                     break;
-                // futur :
-                // case "knob": comp = new Knob(cfg); break;
-                // case "switch": comp = new Switch(cfg); break;
 
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;
             }
 
-            // nom interne
             comp.name = key;
-
-            // shortcut éventuel
-            if (cfg.toggleShortcut) {
-                comp.shortcutKey = cfg.toggleShortcut;
-            }
-            if (cfg.toggleOrientationShortcut) {
-                comp.toggleOrientationShortcut = cfg.toggleOrientationShortcut;
-            }
-
-            // lien vers App
             comp.app = this;
 
-            // ajout dans la pile (z-index)
+            if (cfg.toggleShortcut) comp.shortcutKey = cfg.toggleShortcut;
+            if (cfg.toggleOrientationShortcut) comp.toggleOrientationShortcut = cfg.toggleOrientationShortcut;
+
             this.components.push(comp);
 
-            // enregistrement dans UIManager
+            // Interaction manager
             this.ui.register(comp);
 
-
-            // responsive initial
             comp.updateResponsive();
         }
+
+        // ============================================================
+        // 2) CONSTRUCTION DE LA HIÉRARCHIE (Panel → enfants)
+        // ============================================================
+
+        for (const key in UI_CONFIG) {
+            const cfg = UI_CONFIG[key];
+            if (!cfg.children) continue;
+
+            const parent = this.components.find(c => c.name === key);
+            if (!parent) continue;
+
+            for (const childName of cfg.children) {
+                const child = this.components.find(c => c.name === childName);
+                if (child) {
+                    parent.add(child);
+                }
+            }
+
+            parent.updateChildrenLayout();
+            parent.updateResponsive();
+        }
+
+        // ============================================================
+        // 3) ENREGISTREMENT DES COMPOSANTS DANS RULEMANAGER
+        // ============================================================
+
+        for (const comp of this.components) {
+            this.rules.register(comp);
+        }
+
+        // ============================================================
+        // 4) CHARGEMENT DES RÈGLES
+        // ============================================================
+
+        UI_RULES.forEach(rule => this.rules.addRule(rule));
 
         // ============================================================
         // DEBUG / RENDERING
@@ -112,7 +135,7 @@ class App {
 
         // dessin bottom → top
         for (const c of this.components) {
-            c.draw();
+            c.draw();   // ⭐ Panels dessinent leurs enfants
         }
 
         if (this.debug) this.drawDebugHUD();
@@ -157,7 +180,7 @@ class App {
     mouseDragged(x, y)  { this.ui.mouseDragged(x, y); }
     mouseWheel(e)       { return this.ui.mouseWheel(e); }
 
-    mouseClicked(x, y)  { 
+    mouseClicked(x, y)  {
         this.ui.mouseClicked(x, y);
         this.invalidate();
     }

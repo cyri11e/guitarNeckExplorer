@@ -1,6 +1,6 @@
 const UI_CONFIG = {
 
-    panel: {
+    aspectPanel: {
         type: "panel",
         xp: 25,
         yp: 25,
@@ -11,19 +11,19 @@ const UI_CONFIG = {
         isDraggable: true,
         isZoomable: true,
         toggleOnClick: true,
-        toggleShortcut: "v"
+        //toggleShortcut: "v",
+        children: ["metalSwitch1"]
     },
 
-    metalSwitch1: {
-        type: "metalSwitch",
-        xp: 20,
-        yp: 50,
-        sp: 10,
-        title: "♯ / ♭",
-        topLabel: "♯",
-        bottomLabel: "♭",
-        toggleShortcut: "b"
-    },
+
+metalSwitch1: {
+    type: "metalSwitch",
+    sp: 100,     // % de la hauteur du panel
+    topLabel: "♯",
+    bottomLabel: "♭",
+    toggleShortcut: "b"
+},
+
 
     panel2: {
         type: "panel",
