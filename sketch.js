@@ -2,13 +2,12 @@ let app;
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
-    noLoop();
 
     app = new App();
 }
 
 function draw() {
-    clear(); // ou background(0)
+   // clear(); // ou background(0)
 
     if (app.needsRedraw) {
         app.update();
