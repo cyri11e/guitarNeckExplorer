@@ -6,7 +6,39 @@ class GuitarRenderer {
     constructor(guitar, style) {
         this.g = guitar;
         this.style = style;
+        this.detectPlatformAdjustments();
     }
+detectPlatformAdjustments() {
+    const ua = navigator.userAgent;
+
+    // Valeurs par défaut
+    this.altAdjustX = 0;
+    this.altAdjustY = 0;
+
+    // Windows → chasse plus large, altérations trop espacées
+    if (ua.includes("Windows")) {
+        this.altAdjustX = -1;
+        this.altAdjustY = -0.5;
+    }
+
+    // macOS → chasse plus serrée, altérations trop proches
+    else if (ua.includes("Mac OS")) {
+        this.altAdjustX = +0.5;
+        this.altAdjustY = 0;
+    }
+
+    // Linux → souvent rendu plus brut
+    else if (ua.includes("Linux")) {
+        this.altAdjustX = -0.5;
+        this.altAdjustY = -0.5;
+    }
+
+    // iOS / Android → fontes mobiles, altérations trop hautes
+    else if (/iPhone|iPad|Android/.test(ua)) {
+        this.altAdjustX = 0;
+        this.altAdjustY = +1;
+    }
+}
 
     // ------------------------------------------------------------
     // CORDES
@@ -195,36 +227,147 @@ drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
     text(label, x, y);
 }
 
+
+parseNoteLabel(label) {
+    label = label.trim();
+
+    // Normalisation des altérations
+    const flat  = ["b", "♭"];
+    const sharp = ["#", "♯"];
+
+    // Remplacement automatique
+    label = label
+        .replace(/^b(?=\d)/, "♭")   // b3 → ♭3
+        .replace(/b$/, "♭")         // Eb → E♭
+        .replace(/#/, "♯");         // C# → C♯
+
+    // Degré : ♭3, ♯5…
+    if (/^[♭♯]\d+$/.test(label)) {
+        return {
+            base: label.slice(1),
+            alt: label[0],
+            type: "degree"
+        };
+    }
+
+    // Note : C♯, E♭…
+    if (/^[A-G][♭♯]?$/.test(label)) {
+        return {
+            base: label[0],
+            alt: label.slice(1),
+            type: "note"
+        };
+    }
+
+    // Fallback
+    return { base: label, alt: "", type: "raw" };
+}
+
+drawNote(x, y, opts = {}) {
+    const {
+        fillColor = "white",
+        strokeColor = "black",
+        strokeW = 1,
+        shapeType = "circle",   // "circle" | "square"
+        opacity = 255,
+        hasShadow = false,
+        label = ""
+    } = opts;
+
+    const parsed = this.parseNoteLabel(label);
+    const { base, alt, type } = parsed;
+
+    const r = this.g.getThickness() * 0.18;
+
+    // --- ombre ---
+    if (hasShadow) {
+        noStroke();
+        fill(0, 40);
+        ellipse(x + 3, y + 3, r * 1.1, r * 1.1);
+    }
+
+    // --- forme ---
+    fill(fillColor);
+    stroke(strokeColor);
+    strokeWeight(strokeW);
+    tint(255, opacity);
+
+    if (shapeType === "square") {
+        rectMode(CENTER);
+        rect(x, y, r, r, r * 0.2);
+    } else {
+        circle(x, y, r);
+    }
+
+    // --- texte ---
+    noStroke();
+    fill(0);
+    textAlign(CENTER, CENTER);
+    textStyle(BOLD);
+    // base centrée
+    textSize(r * 0.75);
+    text(base, x, y);
+
+    // altération
+    if (alt) {
+        textSize(r * 0.65);
+
+        let ax = x;
+        let ay = y - r * 0.15;
+
+        // ajustement OS
+        ax += this.altAdjustX; 
+        ay += this.altAdjustY;
+
+        if (type === "degree") {
+            ax -= r * 0.35; // à gauche
+        } else {
+            ax += r * 0.35; // à droite
+        }
+
+        text(alt, ax, ay);
+    }
+    textStyle(NORMAL);
+}
+
+
 drawHoverDot() {
     if (!this.g.isHovered) return;
+
     const h = this.g.hoveredNote;
     if (!h) return;
 
-    const stringIndex = h.string - 1;   // 🔥 FIX
-    const fret = h.fret;
-
-    const n = this.g.instrument.getNoteAt(stringIndex, fret);
+    const pos = this.g.toScreen(h.fret, h.string);
+    const n = this.g.instrument.getNoteAt(h.string - 1, h.fret);
     const label = this.g.theory.getNoteName(n.index);
 
-    this.drawNoteOnFretboard(label, h.string, h.fret, null, true);
+    this.drawNote(pos.x, pos.y, {
+        fillColor: "yellow",
+        strokeColor: "black",
+        hasShadow: true,
+        label
+    });
 }
 
 drawPinnedNotes() {
     for (let p of this.g.pinnedNotes) {
-        const stringIndex = p.string - 1;   // 🔥 FIX
-        const fret = p.fret;
-
-        const n = this.g.instrument.getNoteAt(stringIndex, fret);
+        const pos = this.g.toScreen(p.fret, p.string);
+        const n = this.g.instrument.getNoteAt(p.string - 1, p.fret);
         const label = this.g.theory.getNoteName(n.index);
 
-        this.drawNoteOnFretboard(label, p.string, p.fret, null, false);
+        this.drawNote(pos.x, pos.y, {
+            fillColor: "red",
+            strokeColor: "black",
+            hasShadow: false,
+            label
+        });
     }
 }
 
-                            
+
 drawOpenStringLabels() {
     const g = this.g;
-    const names = ["E", "B", "G", "D", "A", "E"]; // corde 1 → aiguë
+    const names = ["E", "A", "D", "G", "B", "E"]; // corde 1 → aiguë
     const c0 = g.cases[0]; // case à vide
 
     const x = c0.xc;       // 🔥 même emplacement horizontal que la pastille

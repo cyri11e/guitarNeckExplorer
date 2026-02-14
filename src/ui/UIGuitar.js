@@ -41,9 +41,10 @@ class Guitar extends UIComponent {
         this.geometry.projectGeometry();
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
-        // corde 1 = E aiguë, corde 6 = E grave
         this.pinnedNotes = []; // { fret, string }
 
+        // 🔥 Ajout : flag anti-clic-après-drag
+        this.wasDragged = false;
     }
 
     // ------------------------------------------------------------
@@ -69,48 +70,45 @@ class Guitar extends UIComponent {
     // COORDONNÉES
     // ------------------------------------------------------------
 
-toScreen(caseIndex, stringIndex) {
-    const c = this.cases[caseIndex];
-    const s = this.strings[stringIndex - 1]; // index humain 1..6
+    toScreen(caseIndex, stringIndex) {
+        const c = this.cases[caseIndex];
+        const s = this.strings[stringIndex - 1];
 
-    if (!c || !s) return null;
+        if (!c || !s) return null;
 
-    return {
-        x: c.xc,
-        y: s.y
-    };
-}
-
-
-fromScreen(x, y) {
-    let fret = null;
-    let string = null;
-
-    for (const c of this.cases) {
-        if (x >= c.x1 && x <= c.x2) {
-            fret = c.index;
-            break;
-        }
+        return {
+            x: c.xc,
+            y: s.y
+        };
     }
 
-    let bestDy = Infinity;
-    for (const s of this.strings) {
-        const dy = Math.abs(y - s.y);
-        if (dy < bestDy) {
-            bestDy = dy;
-            string = s.index;
+    fromScreen(x, y) {
+        let fret = null;
+        let string = null;
+
+        for (const c of this.cases) {
+            if (x >= c.x1 && x <= c.x2) {
+                fret = c.index;
+                break;
+            }
         }
+
+        let bestDy = Infinity;
+        for (const s of this.strings) {
+            const dy = Math.abs(y - s.y);
+            if (dy < bestDy) {
+                bestDy = dy;
+                string = s.index;
+            }
+        }
+
+        if (fret == null || string == null) return null;
+
+        this.hoveredNote = { fret, string };
+        this.invalidate();
+
+        return this.hoveredNote;
     }
-
-    if (fret == null || string == null) return null;
-
-    this.hoveredNote = { fret, string };   // 🔥 FIX
-    this.invalidate();
-
-    return this.hoveredNote;
-}
-
-
 
     // ------------------------------------------------------------
     // DRAW
@@ -122,22 +120,45 @@ fromScreen(x, y) {
         super.draw();
     }
 
-    //interactions 
+    // ------------------------------------------------------------
+    // INTERACTIONS
+    // ------------------------------------------------------------
+
     togglePinnedNote(fret, string) {
         const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);
 
         if (idx >= 0) {
-            // déjà épinglée → on retire
             this.pinnedNotes.splice(idx, 1);
         } else {
-            // pas encore → on ajoute
             this.pinnedNotes.push({ fret, string });
         }
 
-        this.invalidate(); // redraw
+        this.invalidate();
+    }
+
+    // 🔥 Ajout : gestion propre du drag/click
+
+    mousePressed(mx, my) {
+        this.wasDragged = false; // reset
+        return super.mousePressed(mx, my);
+    }
+
+    mouseDragged(mx, my) {
+        this.wasDragged = true; // un vrai drag a eu lieu
+        return super.mouseDragged(mx, my);
+    }
+
+    mouseReleased(mx, my) {
+        return super.mouseReleased(mx, my);
     }
 
     mouseClicked(mx, my) {
+        // 🔥 Empêche le pin si un drag a eu lieu
+        if (this.wasDragged) {
+            this.wasDragged = false;
+            return false;
+        }
+
         if (!this.containsRect(mx, my)) return false;
 
         const hit = this.fromScreen(mx, my);
@@ -146,5 +167,4 @@ fromScreen(x, y) {
         this.togglePinnedNote(hit.fret, hit.string);
         return true;
     }
-
 }

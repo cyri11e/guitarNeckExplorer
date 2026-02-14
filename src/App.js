@@ -39,7 +39,9 @@ class App {
                     comp.instrument = this.instrument;
                     break;
 
-
+                case "metalSwitch": 
+                    comp = new MetalSwitch(cfg);
+                    break;
                 // futur :
                 // case "knob": comp = new Knob(cfg); break;
                 // case "switch": comp = new Switch(cfg); break;

@@ -14,7 +14,18 @@ const UI_CONFIG = {
         toggleShortcut: "v"
     },
 
-    panel1: {
+    metalSwitch1: {
+        type: "metalSwitch",
+        xp: 20,
+        yp: 50,
+        sp: 10,
+        title: "♯ / ♭",
+        topLabel: "♯",
+        bottomLabel: "♭",
+        toggleShortcut: "b"
+    },
+
+    panel2: {
         type: "panel",
         xp: 60,
         yp: 25,
