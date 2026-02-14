@@ -12,7 +12,7 @@ const UI_CONFIG = {
         isZoomable: true,
         toggleOnClick: true,
         //toggleShortcut: "v",
-        children: ["metalSwitch1"]
+        children: ["metalSwitch1","knob1","knob2"]
     },
 
 
@@ -53,7 +53,43 @@ guitar1: {
     woodColor: "maple",
     orientation: "horizontal",
     toggleOrientationShortcut: "o"   // NEW
+},
+
+
+knob1: {
+    type: "knob",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    hideBottom: true,
+            debug: true,
+        isDraggable: true,
+        isZoomable: true,
+    items: [
+        { symbol: "C", label: "Curseur" },
+        { symbol: "N", label: "Notes" },
+        { symbol: "T", label: "Octaves" },
+    ],
+    shortcutKey: 'c'
+},
+
+knob2: {
+    type: "knob",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    hideBottom: true,
+            debug: true,
+        isDraggable: true,
+        isZoomable: true,
+    items: [
+        { symbol: "N", label: "Note" },
+        { symbol: "D", label: "Degré" },
+        { symbol: "P", label: "Pastille" },
+    ],
+    shortcutKey: 'd'
 }
+
 
 
 

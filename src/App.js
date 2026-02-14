@@ -44,6 +44,10 @@ class App {
                     comp = new MetalSwitch(cfg);
                     break;
 
+                case "knob":
+                    comp = new Knob(cfg); 
+                    break;    
+                    
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;
