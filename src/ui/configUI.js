@@ -14,8 +14,7 @@ const UI_CONFIG = {
         //toggleShortcut: "v",
         children: ["knob1",
             "metalSwitch1",
-            "knob2",
-            "metalSwitch2"]
+            "knob2"]
     },
 
 
@@ -24,15 +23,9 @@ metalSwitch1: {
     sp: 100,     // % de la hauteur du panel
     topLabel: "♯",
     bottomLabel: "♭",
-    toggleShortcut: "b"
+    shortcutKey: "b"
 },
-metalSwitch2: {
-    type: "metalSwitch",
-    sp: 100,     // % de la hauteur du panel
-    topLabel: "♯T",
-    bottomLabel: "S",
-    toggleShortcut: "f"
-},
+
 
 
     panel2: {

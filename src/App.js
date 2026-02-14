@@ -93,9 +93,15 @@ class App {
         // 3) ENREGISTREMENT DES COMPOSANTS DANS RULEMANAGER
         // ============================================================
 
-        for (const comp of this.components) {
-            this.rules.register(comp);
-        }
+// 3) ENREGISTREMENT DES COMPOSANTS DANS RULEMANAGER
+// 3) ENREGISTREMENT DES COMPOSANTS DANS RULEMANAGER
+for (const comp of this.components) {
+    if (!comp.parent) {   // ← seulement les racines
+        this.rules.register(comp);
+    }
+}
+
+
 
         // ============================================================
         // 4) CHARGEMENT DES RÈGLES

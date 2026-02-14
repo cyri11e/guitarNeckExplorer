@@ -21,7 +21,7 @@ const UI_RULES = [
         guitar.theory.useFlats = (newState === 0);
 
         console.log(
-            "%c[METALSWITCH SYNC] flatMode=" + guitar.flatMode +
+            "%c[METALSWITCH SYNC] flatMode=" + guitar.theory.useFlats +
             " (state=" + newState + ")",
             "color:#00ff00; font-weight:bold;"
         );

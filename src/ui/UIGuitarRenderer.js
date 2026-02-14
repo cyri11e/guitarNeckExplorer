@@ -311,7 +311,6 @@ drawNote(x, y, opts = {}) {
     // altération
     if (alt) {
         textSize(r * 0.65);
-
         let ax = x;
         let ay = y - r * 0.15;
 

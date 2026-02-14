@@ -143,11 +143,6 @@ mouseWheel(event) {
     keyPressed(k, kc) {
         const lower = k.toLowerCase();
 
-        // Shortcuts directs
-        if (this.shortcuts[lower]) {
-            this.shortcuts[lower].onShortcut?.();
-            return true;
-        }
 
         // Guitar orientation toggle
         for (let c of this.components) {

@@ -108,7 +108,7 @@ onClick() {
 
         this.hoverDrag.hitZone = { x, y, w, h };
 
-        let inside = evt.mx >= x && evt.mx <= x + w && evt.y >= y && evt.y <= y + h;
+        let inside = evt.x >= x && evt.x <= x + w && evt.y >= y && evt.y <= y + h;
         this.hover = inside;
         this.hoverDrag.isHovered = inside;
     }
