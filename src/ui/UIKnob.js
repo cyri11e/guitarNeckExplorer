@@ -1,6 +1,7 @@
 class Knob extends UIComponent {
     constructor(cfg = {}) {
         super();
+        this.aspectRatio = cfg.aspectRatio ?? 0.90;
 
         // --- POSITION / RESPONSIVE ---
         const xp = cfg.xp ?? 0;
@@ -15,7 +16,6 @@ class Knob extends UIComponent {
         this._index = 0;
 
         this.hideBottom = cfg.hideBottom ?? false;
-        this.ratio = 0.90;
 
         this.shortcutKey  = cfg.shortcutKey  || null;
         this.shortcutCode = cfg.shortcutCode || null;
@@ -114,10 +114,22 @@ onClick() {
     }
 
 containsRect(mx, my) {
-    const { cx, cy } = this.getCenter();
-    const r = min(this.w, this.h) / 2;
+    // centre réel du knob (pas le centre du composant)
+    const topP = 0.25;
+    const circleP = 0.50;
+
+    const topH = this.h * topP;
+    const circleH = this.h * circleP;
+
+    const cx = this.x + this.w / 2;
+    const cy = this.y + topH + circleH / 2;
+
+    // rayon réel du knob
+    const r = min(this.w, circleH) / 2;
+
     return dist(mx, my, cx, cy) <= r * this.hitboxScale;
 }
+
 
 
     // -----------------------------

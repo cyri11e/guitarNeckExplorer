@@ -47,7 +47,7 @@ class App {
                 case "knob":
                     comp = new Knob(cfg); 
                     break;    
-                    
+
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;
@@ -163,12 +163,22 @@ class App {
     // RESPONSIVE
     // ============================================================
 
-    resize() {
-        for (const c of this.components) {
-            c.updateResponsive();
-        }
-        this.invalidate();
+resize() {
+    // 1) recalculer les panels
+    for (const c of this.components) {
+        c.updateResponsive();
     }
+
+    // 2) recalculer les enfants APRÈS que les panels soient stables
+    for (const c of this.components) {
+        if (c instanceof Panel) {
+            c.updateChildrenLayout();
+        }
+    }
+
+    this.invalidate();
+}
+
 
     invalidate() {
         this.needsRedraw = true;

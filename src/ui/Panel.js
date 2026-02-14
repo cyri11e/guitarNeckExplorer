@@ -37,7 +37,7 @@ class Panel extends UIComponent {
     // -------------------------------------------------------
     updateResponsive() {
         super.updateResponsive();     // calcule x,y,w,h du panel
-        this.updateChildrenLayout();  // layout interne
+        //this.updateChildrenLayout();  // layout interne
     }
 
 updateChildrenLayout() {

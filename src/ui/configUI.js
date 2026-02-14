@@ -4,7 +4,7 @@ const UI_CONFIG = {
         type: "panel",
         xp: 25,
         yp: 25,
-        sp: 50,
+        sp: 20,
         aspectRatio: 1.5,
         visible: true,
         debug: true,
@@ -12,7 +12,10 @@ const UI_CONFIG = {
         isZoomable: true,
         toggleOnClick: true,
         //toggleShortcut: "v",
-        children: ["metalSwitch1","knob1","knob2"]
+        children: ["knob1",
+            "metalSwitch1",
+            "knob2",
+            "metalSwitch2"]
     },
 
 
@@ -22,6 +25,13 @@ metalSwitch1: {
     topLabel: "♯",
     bottomLabel: "♭",
     toggleShortcut: "b"
+},
+metalSwitch2: {
+    type: "metalSwitch",
+    sp: 100,     // % de la hauteur du panel
+    topLabel: "♯T",
+    bottomLabel: "S",
+    toggleShortcut: "f"
 },
 
 

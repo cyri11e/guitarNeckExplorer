@@ -47,9 +47,19 @@ class MusicTheory {
 
     constructor() {
         this.useFlats = false;
+        this.root = null;
         this.NOTES = NOTES;
         this.INTERVALS = INTERVALS;
     }
+
+    hasRoot() {
+        return this.root !== null;
+    }
+
+    setRoot(i) {
+        this.root = ((i % 12) + 12) % 12;
+    }
+
 
     // -----------------------------
     // NOTES

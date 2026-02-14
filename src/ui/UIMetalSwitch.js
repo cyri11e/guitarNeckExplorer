@@ -39,7 +39,7 @@ set state(v) {
 
     this.invalidate();
 
-    // ⭐ indispensable pour déclencher les règles
+    //  indispensable pour déclencher les règles
     this.onChange?.(v);
 }
 

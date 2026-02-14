@@ -123,6 +123,16 @@ class Guitar extends UIComponent {
     // ------------------------------------------------------------
     // INTERACTIONS
     // ------------------------------------------------------------
+onNoteClicked(noteIndex) {
+    if (!this.theory.hasRoot()) {
+        this.theory.setRoot(noteIndex);
+        console.log("new tonic "+noteIndex)
+        this.invalidate();
+        return;
+    }
+
+    // sinon comportement normal (sélection, highlight, etc.)
+}
 
     togglePinnedNote(fret, string) {
         const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);

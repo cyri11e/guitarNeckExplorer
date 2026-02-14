@@ -2,10 +2,14 @@ let app;
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
+    noLoop();
+
     app = new App();
 }
 
 function draw() {
+    clear(); // ou background(0)
+
     if (app.needsRedraw) {
         app.update();
         app.display();
@@ -15,6 +19,7 @@ function draw() {
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
     app.resize();
+    redraw();
 }
 
 // ============================================================
