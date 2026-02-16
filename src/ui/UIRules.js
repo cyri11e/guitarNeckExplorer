@@ -25,7 +25,19 @@ const UI_RULES = [
             " (state=" + newState + ")",
             "color:#00ff00; font-weight:bold;"
         );
-    }
+    },
+    // KNOB2 → change displayMode
+(components, source, newState) => {
+    if (source.name !== "knob2") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    if (newState === 0) guitar.setDisplayMode("noteEN"); // N
+    if (newState === 1) guitar.setDisplayMode("degree"); // D
+    if (newState === 2) guitar.setDisplayMode("none");   // P
+}
+
 
     // Tu pourras ajouter d’autres règles ici…
 ];

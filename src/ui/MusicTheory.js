@@ -240,6 +240,14 @@ getLabelFromFull(full, mode) {
         };
     }
 
+    if (mode === "none") {
+        return {
+            base: "",
+            alt:  "",
+            type: "none"
+        };
+    }
+
     // fallback : EN
     return {
         base: full.baseEN,

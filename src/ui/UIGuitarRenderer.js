@@ -348,7 +348,10 @@ drawNote(x, y, opts = {}) {
     fill(fillColor);
     stroke(strokeColor);
     strokeWeight(strokeW);
-
+    if (base=="") {
+       fill(0); 
+    }
+        
     push();
     if (shapeType === "square") {
         rectMode(CENTER);
