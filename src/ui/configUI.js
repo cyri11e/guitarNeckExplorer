@@ -2,8 +2,8 @@ const UI_CONFIG = {
 
     aspectPanel: {
         type: "panel",
-        xp: 25,
-        yp: 25,
+        xp: 45,
+        yp: 55,
         sp: 20,
         aspectRatio: 1.5,
         visible: true,
@@ -31,7 +31,7 @@ metalSwitch1: {
     panel2: {
         type: "panel",
         xp: 60,
-        yp: 25,
+        yp: 55,
         sp: 40,
         aspectRatio: 1.2,
         visible: true,
@@ -44,9 +44,9 @@ metalSwitch1: {
 
 guitar1: {
     type: "guitar",
-    xp: 10,
-    yp: 10,
-    sp: 20,
+    xp: 5,
+    yp: 5,
+    sp: 40,
     aspectRatio: 8,
     debug: true,
     isDraggable: true,
@@ -55,7 +55,9 @@ guitar1: {
     inlayStyle: 'dot',
     woodColor: "maple",
     orientation: "horizontal",
-    toggleOrientationShortcut: "o"   // NEW
+    toggleOrientationShortcut: "o" ,  // NEW
+    displayMode: "degree"
+
 },
 
 

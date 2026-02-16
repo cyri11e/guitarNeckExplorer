@@ -68,6 +68,94 @@ class MusicTheory {
         return this.NOTES[((index % 12) + 12) % 12];
     }
 
+getFullNote(index) {
+    const n = this.getNote(index); // déjà existant dans MusicTheory
+    const root = this.root;
+
+    const full = {
+        index,
+
+        // NOTE
+        noteName: n.sharp,      // EN implicite
+        noteNameFR: n.french,
+        noteAccidental: "",     // sera rempli selon sharp/flat
+
+        // DEGRÉ
+        degree: "",
+        degreeAccidental: "",
+
+        // INTERVALLE
+        interval: "",
+        intervalNature: ""
+    };
+
+    // --- altération commune EN/FR ---
+    // sharp = "C#" → base "C", accidental "#"
+    // flat  = "Db" → base "D", accidental "b"
+    const match = n.sharp.match(/^([A-G])([#b]?)$/);
+    if (match) {
+        full.noteName = match[1];
+        full.noteAccidental = match[2] || "";
+    }
+
+    // --- intervalle + degré ---
+    if (root != null) {
+        const semitones = (index - root + 12) % 12;
+        const interval = this.INTERVALS.find(i => i.semitones === semitones);
+
+        if (interval) {
+            // interval
+            full.interval = interval.degree.toString();   // 1,2,3,4,5,6,7
+            full.intervalNature = interval.quality;       // m, M, P, A/d
+
+            // degré (chromatique)
+            full.degree = interval.degree.toString();
+
+            switch (interval.short) {
+                case "m2":
+                case "m3":
+                case "m6":
+                case "m7":
+                    full.degreeAccidental = "♭";
+                    break;
+
+                case "TT":
+                    full.degreeAccidental = "♯";
+                    break;
+
+                default:
+                    full.degreeAccidental = "";
+            }
+        }
+    }
+
+    return full;
+}
+getNoteLabel(full, mode) {
+    switch (mode) {
+
+        case "noteEN":
+            return full.noteName + full.noteAccidental;
+
+        case "noteFR":
+            return full.noteNameFR + full.noteAccidental;
+
+        case "degree":
+            return full.degreeAccidental + full.degree;
+
+        case "interval":
+            return full.intervalNature + full.interval;
+
+        default:
+            return "";
+    }
+}
+getLabelForNote(index) {
+    const full = this.theory.getFullNote(index);
+    return this.theory.getNoteLabel(full, this.guitar.displayMode);
+}
+
+
     getNoteName(index) {
         const n = this.getNote(index);
         return this.useFlats ? n.flat : n.sharp;

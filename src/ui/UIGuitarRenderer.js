@@ -60,64 +60,101 @@ detectPlatformAdjustments() {
         }
     }
 
-    drawStrings() {
-        const strings = this.g.strings;
+  drawStrings() {
+    const strings = this.g.strings;
 
-        for (let i = 0; i < strings.length; i++) {
-            const s = strings[i];
+    for (let i = 0; i < strings.length; i++) {
+        const s = strings[i];
 
-            fill(150);
-            rect(s.x, s.y, s.w, s.h);
+        // Base de la corde
+        fill(100);
+        rect(s.x, s.y, s.w, s.h);
 
-            fill(230);
-            rect(s.x, s.y, s.w, s.h * 0.4);
+        // Reflet
+        fill(230);
+        rect(s.x, s.y, s.w, s.h * 0.4);
+
+        push();
+        // -------------------------------------------------
+        // CORDES WOUND (les 3 graves)
+        // -------------------------------------------------
+        if (i < 3) {  // i=3,4,5 → cordes graves (E,A,D)
+            const step = s.h * 0.35;   // espacement des spires
+            const thickness = s.h * 0.15;
+
+            stroke(100);
+            strokeWeight(thickness);
+
+            for (let x = s.x; x < s.x + s.w; x += step) {
+                line(x, s.y, x, s.y + s.h);
+            }
         }
+        pop();
     }
+}
+
 
     // ------------------------------------------------------------
     // FRETTES
     // ------------------------------------------------------------
 
-    drawFrets() {
-        const frets = this.g.frets;
+drawFrets() {
+    const frets = this.g.frets;
 
-        for (const f of frets) {
+    // Paramètre unique : épaisseur de la frette
+    const fretThickness = 0.8;   // ← ajuste ici (1.0 = rendu actuel)
 
-            const x0 = f.x - f.w * 0.5;
+    for (const f of frets) {
 
-            if (f.index === 0) {
-                fill(240);
-                noStroke();
-                rect(x0, f.y, f.w, f.h);
+        const x0 = f.x - f.w * 0.5;
 
-                fill(0, 50);
-                rect(x0 - f.w * 0.2, f.y, f.w * 0.2, f.h);
+        // Largeurs dérivées du paramètre
+        const wMain   = f.w * fretThickness;        // largeur principale
+        const wShadow = wMain * 0.3;                // ombre latérale
+        const wBright = wMain * 0.8;                // highlight
+        const hBright = f.h * 0.25;                 // hauteur highlight
+        const rCorner = wMain * 0.3;                // arrondi
+        const rBright = f.h * 0.25;                 // arrondi highlight
 
-                fill(0, 35);
-                rect(x0 + f.w, f.y, f.w * 0.3, f.h);
+        if (f.index === 0) {
+            // Sillet (frette 0)
+            fill(240);
+            noStroke();
+            rect(x0, f.y, wMain, f.h);
 
-                continue;
-            }
+            fill(0, 50);
+            rect(x0 - wShadow, f.y, wShadow, f.h);
 
-            fill(0, 40);
-            rect(x0 - f.w * 0.3, f.y, f.w * 1.6, f.h);
+            fill(0, 35);
+            rect(x0 + wMain, f.y, wShadow, f.h);
 
-            fill(220);
-            rect(x0, f.y, f.w, f.h, f.w * 0.3);
-
-            fill(255);
-            rect(x0, f.y, f.w * 0.8, f.h * 0.25, f.h * 0.25, 0, 0);
-
-            fill(100);
-            rect(
-                x0 + f.w * 0.3,
-                f.y + f.w * 0.3,
-                f.w * 0.6,
-                f.h * 0.97,
-                f.w * 0.98
-            );
+            continue;
         }
+
+        // Ombre large derrière la frette
+        fill(0, 40);
+        rect(x0 - wShadow, f.y, wMain + wShadow * 2, f.h);
+
+        // Corps principal de la frette
+        fill(220);
+        rect(x0, f.y, wMain, f.h, rCorner);
+
+        // Highlight supérieur
+        fill(255);
+        rect(x0, f.y, wBright, hBright, rBright, 0, 0);
+
+        // Ombre interne
+        fill(100);
+        rect(
+            x0 + wMain * 0.3,
+            f.y + wMain * 0.3,
+            wMain * 0.6,
+            f.h * 0.97,
+            wMain * 0.98
+        );
     }
+}
+
 
     drawHead() {
         const frets = this.g.frets;
@@ -265,7 +302,7 @@ parseNoteLabel(label) {
 
 drawNote(x, y, opts = {}) {
     const {
-        fillColor = "white",
+        fillColor = color("#ffffff"),
         strokeColor = "black",
         strokeW = 1,
         shapeType = "circle",   // "circle" | "square"
@@ -278,41 +315,52 @@ drawNote(x, y, opts = {}) {
     const { base, alt, type } = parsed;
 
     const r = this.g.getThickness() * 0.18;
-
+    const offset = hasShadow ?  (r / 20) : 0 ;
     // --- ombre ---
     if (hasShadow) {
         noStroke();
         fill(0, 40);
-        ellipse(x + 3, y + 3, r * 1.1, r * 1.1);
+        
+        if (shapeType === "square") {
+            push();
+            rectMode(CENTER);
+            rect(x + offset, y + offset, r, r, r * 0.2);
+            pop();
+        } else {
+            ellipse(x + offset, y + offset, r * 1.1, r * 1.1);
+            
+        }                                                           
     }
 
     // --- forme ---
     fill(fillColor);
     stroke(strokeColor);
     strokeWeight(strokeW);
-    tint(255, opacity);
 
+
+    push();
     if (shapeType === "square") {
         rectMode(CENTER);
-        rect(x, y, r, r, r * 0.2);
+        rect(x - offset, y - offset, r, r, r * 0.2);
     } else {
-        circle(x, y, r);
+        circle(x - offset, y - offset, r);
     }
+    pop();
 
     // --- texte ---
     noStroke();
-    fill(0);
+    fill(strokeColor);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
     // base centrée
     textSize(r * 0.75);
-    text(base, x, y);
+    text(base, x - offset, y - offset);
 
     // altération
     if (alt) {
         textSize(r * 0.65);
-        let ax = x;
-        let ay = y - r * 0.15;
+        let ax = x - offset;
+        let ay = y - offset - r * 0.15;
 
         // ajustement OS
         ax += this.altAdjustX; 
@@ -341,12 +389,14 @@ drawHoverDot() {
     const label = this.g.theory.getNoteName(n.index);
 
     this.drawNote(pos.x, pos.y, {
-        fillColor: "yellow",
-        strokeColor: "black",
+        fillColor: "#5156127d",
+        strokeColor: "white",
+        opacity: 50,
         hasShadow: true,
         label
     });
 }
+
 
 drawPinnedNotes() {
     for (let p of this.g.pinnedNotes) {
@@ -362,6 +412,102 @@ drawPinnedNotes() {
         });
     }
 }
+drawSelectedNotes() {
+    const g = this.g;
+
+    for (let s of g.selectedNotes) {
+
+        const inFretRange   = s.fret   >= 0 && s.fret   <= g.fretCount;
+        const inStringRange = s.string >= 1 && s.string <= g.strings.length;
+
+        // 1) Note hors manche → afficher un "+"
+        if (!inFretRange || !inStringRange) {
+            this.drawOutOfBoundsMarker(s);
+            continue;
+        }
+
+        // 2) Note dans le manche → affichage normal
+        const pos = g.toScreen(s.fret, s.string);
+        const n = g.instrument.getNoteAt(s.string - 1, s.fret);
+        const label = g.theory.getNoteName(n.index);
+
+
+        this.drawNote(pos.x, pos.y, {
+            fillColor: "#fcb900",
+            strokeColor: "black",
+            shapeType: "square",
+            hasShadow: true,
+            label
+        });
+    }
+}
+
+getStringY(stringIndex) {
+    const g = this.g;
+
+    // clamp
+    const safe = Math.min(Math.max(stringIndex, 1), g.stringRatio.length);
+
+    // stringRatio[0] = corde 6 (haut)
+    // stringRatio[5] = corde 1 (bas)
+    const ratioIndex = g.stringRatio.length - safe;
+
+    return g.y + g.h * g.stringRatio[ratioIndex];
+}
+
+drawOutOfBoundsMarker(sel) {
+    const g = this.g;
+
+    const minString = 1;
+    const maxString = g.strings.length;
+    const minFret   = 0;
+    const maxFret   = g.fretCount;
+
+    let x, y;
+
+    // ---------------------------------------------------------
+    // 1) X (inchangé)
+    // ---------------------------------------------------------
+    if (sel.fret < minFret) {
+        x = g.x;
+    }
+    else if (sel.fret > maxFret) {
+        x = g.x + g.w;
+    }
+    else {
+        const safeString = Math.min(Math.max(sel.string, minString), maxString);
+        const pos = g.toScreen(sel.fret, safeString);
+        x = pos ? pos.x : (g.x + g.w * (sel.fret / maxFret));
+    }
+
+    // ---------------------------------------------------------
+    // 2) Y (corrigé pour les sorties par le côté)
+    // ---------------------------------------------------------
+    if (sel.string < minString) {
+        // sortie par le haut/bas → tu avais dit que ça, c'était OK
+        y = g.y;
+    }
+    else if (sel.string > maxString) {
+        y = g.y + g.h;
+    }
+    else {
+        // corde valide → on veut être EXACTEMENT sur la corde,
+        // même si la frette est hors manche
+        const safeFret = Math.min(Math.max(sel.fret, minFret), maxFret);
+        const pos = g.toScreen(safeFret, sel.string);
+        y = pos ? pos.y : (g.y + g.h * (sel.string / maxString));
+    }
+
+    // ---------------------------------------------------------
+    // 3) Dessin
+    // ---------------------------------------------------------
+    fill(255);
+    stroke(0);
+    textAlign(CENTER, CENTER);
+    textSize(20 * g.zoomFactor);
+    text("+", x, y);
+}
+
 
 
 drawOpenStringLabels() {
@@ -464,6 +610,8 @@ drawDebugInfo() {
         this.drawStrings();
         this.drawOpenStringLabels();
         this.drawPinnedNotes();
+        this.drawSelectedNotes();
+        
         this.drawHoverDot();
 
         if (g.debug) this.drawDebugInfo();

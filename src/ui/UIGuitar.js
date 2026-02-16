@@ -42,9 +42,12 @@ class Guitar extends UIComponent {
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
         this.pinnedNotes = []; // { fret, string }
+        this.selectedNotes = []; // { fret, string }
 
         // 🔥 Ajout : flag anti-clic-après-drag
         this.wasDragged = false;
+
+        this.displayMode = cfg.displayMode ?? "degree";
     }
 
     // ------------------------------------------------------------
@@ -133,6 +136,25 @@ onNoteClicked(noteIndex) {
 
     // sinon comportement normal (sélection, highlight, etc.)
 }
+isPinned(fret, string) {
+    return this.pinnedNotes.some(n => n.fret === fret && n.string === string);
+}
+
+isSelected(fret, string) {
+    return this.selectedNotes.some(n => n.fret === fret && n.string === string);
+}
+
+toggleSelected(fret, string) {
+    const idx = this.selectedNotes.findIndex(n => n.fret === fret && n.string === string);
+    if (idx >= 0) {
+        this.selectedNotes.splice(idx, 1);
+    } else {
+        this.selectedNotes.push({ fret, string });
+    }
+    this.invalidate();
+}
+
+
 
     togglePinnedNote(fret, string) {
         const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);
@@ -145,6 +167,61 @@ onNoteClicked(noteIndex) {
 
         this.invalidate();
     }
+
+
+moveSelectedFrets(delta) {
+    const maxFret = this.fretCount;
+
+    this.selectedNotes = this.selectedNotes.map(n => ({
+        fret: n.fret + delta,   // PAS de clamp ici !
+        string: n.string
+    }));
+
+    this.invalidate();
+}
+
+moveSelectedStrings(delta) {
+    const minString = 1;
+    const maxString = this.strings.length;
+    const tuning    = this.instrument.tuning; // E2, A2, D3, G3, B3, E4...
+
+    this.selectedNotes = this.selectedNotes.map(n => {
+        let string = n.string;
+        let fret   = n.fret;
+
+        const step = Math.sign(delta);
+        let remaining = Math.abs(delta);
+
+        while (remaining > 0) {
+            const oldString = string;
+            let newString = oldString + step;
+
+            // 1) WRAP VERTICAL
+            if (newString < minString) newString = maxString;
+            if (newString > maxString) newString = minString;
+
+            // 2) DÉTECTION SOL–SI PAR L’ACCORDAGE (intervalle de 4 demi‑tons)
+            const midiOld = tuning[oldString - 1].midi;
+            const midiNew = tuning[newString - 1].midi;
+            const diff    = Math.abs(midiNew - midiOld);
+
+            if (diff === 4) {
+                // paire SOL–SI, on applique ton décalage de frette
+                if (step > 0) fret += 1;   // vers "le bas" visuel → frette suivante
+                else if (step < 0) fret -= 1; // vers "le haut" visuel → frette précédente
+            }
+
+            string = newString;
+            remaining--;
+        }
+
+        return { fret, string };
+    });
+
+    this.invalidate();
+}
+
+
 
     // 🔥 Ajout : gestion propre du drag/click
 
@@ -162,19 +239,61 @@ onNoteClicked(noteIndex) {
         return super.mouseReleased(evt);
     }
 
-    mouseClicked(evt) {
-        // 🔥 Empêche le pin si un drag a eu lieu
-        if (this.wasDragged) {
-            this.wasDragged = false;
-            return false;
-        }
-
-        if (!this.containsRect(evt)) return false;
-
-        const hit = this.fromScreen(evt.x, evt.y);
-        if (!hit) return false;
-
-        this.togglePinnedNote(hit.fret, hit.string);
-        return true;
+mouseClicked(evt) {
+    if (this.wasDragged) {
+        this.wasDragged = false;
+        return false;
     }
+
+    if (!this.containsRect(evt)) return false;
+
+    const hit = this.fromScreen(evt.x, evt.y);
+    if (!hit) return false;
+
+    const { fret, string } = hit;
+
+    if (evt.shift) {
+       
+        //this.togglePinnedNote(fret, string);
+            this.toggleSelected(fret, string);
+        
+    } else {
+        // comportement existant : pin / unpin
+        this.togglePinnedNote(fret, string);
+
+        // si on unpin une note, on la retire aussi de la sélection
+        if (!this.isPinned(fret, string)) {
+            this.selectedNotes = this.selectedNotes.filter(
+                n => !(n.fret === fret && n.string === string)
+            );
+        }
+        this.invalidate();
+    }
+
+    return true;
+}
+keyPressed(k, kc) {
+    if (this.selectedNotes.length === 0) return false;
+
+    switch (kc) {
+        case LEFT_ARROW:
+            this.moveSelectedFrets(-1);
+            return true;
+
+        case RIGHT_ARROW:
+            this.moveSelectedFrets(+1);
+            return true;
+
+        case UP_ARROW:
+            this.moveSelectedStrings(+1);
+            return true;
+
+        case DOWN_ARROW:
+            this.moveSelectedStrings(-1);
+            return true;
+    }
+
+    return false;
+}
+
 }
