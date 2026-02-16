@@ -7,19 +7,20 @@
 // ------------------------------------------------------------
 
 const NOTES = [
-    { index: 0,  sharp: "C",  flat: "C",  french: "do",  midi: 60 },
-    { index: 1,  sharp: "C#", flat: "Db", french: "ré♭", midi: 61 },
-    { index: 2,  sharp: "D",  flat: "D",  french: "ré",  midi: 62 },
-    { index: 3,  sharp: "D#", flat: "Eb", french: "mi♭", midi: 63 },
-    { index: 4,  sharp: "E",  flat: "E",  french: "mi",  midi: 64 },
-    { index: 5,  sharp: "F",  flat: "F",  french: "fa",  midi: 65 },
-    { index: 6,  sharp: "F#", flat: "Gb", french: "sol♭", midi: 66 },
-    { index: 7,  sharp: "G",  flat: "G",  french: "sol", midi: 67 },
-    { index: 8,  sharp: "G#", flat: "Ab", french: "la♭", midi: 68 },
-    { index: 9,  sharp: "A",  flat: "A",  french: "la",  midi: 69 },
-    { index: 10, sharp: "A#", flat: "Bb", french: "si♭", midi: 70 },
-    { index: 11, sharp: "B",  flat: "B",  french: "si",  midi: 71 }
+    { index: 0,  sharp: "C",  flat: "C",  midi: 60 },
+    { index: 1,  sharp: "C#", flat: "Db", midi: 61 },
+    { index: 2,  sharp: "D",  flat: "D",  midi: 62 },
+    { index: 3,  sharp: "D#", flat: "Eb", midi: 63 },
+    { index: 4,  sharp: "E",  flat: "E",  midi: 64 },
+    { index: 5,  sharp: "F",  flat: "F",  midi: 65 },
+    { index: 6,  sharp: "F#", flat: "Gb", midi: 66 },
+    { index: 7,  sharp: "G",  flat: "G",  midi: 67 },
+    { index: 8,  sharp: "G#", flat: "Ab", midi: 68 },
+    { index: 9,  sharp: "A",  flat: "A",  midi: 69 },
+    { index: 10, sharp: "A#", flat: "Bb", midi: 70 },
+    { index: 11, sharp: "B",  flat: "B",  midi: 71 }
 ];
+
 
 // ------------------------------------------------------------
 // BASE DE DONNÉES DES INTERVALLES
@@ -68,92 +69,186 @@ class MusicTheory {
         return this.NOTES[((index % 12) + 12) % 12];
     }
 
-getFullNote(index) {
-    const n = this.getNote(index); // déjà existant dans MusicTheory
-    const root = this.root;
+translateENtoFR(nameEN) {
+    // 1) séparer lettre + altération
+    const m = nameEN.match(/^([A-G])([#b]?)$/);
+    if (!m) return nameEN;
 
-    const full = {
-        index,
+    const letter = m[1];
+    const alt    = m[2]; // "#" ou "b" ou ""
 
-        // NOTE
-        noteName: n.sharp,      // EN implicite
-        noteNameFR: n.french,
-        noteAccidental: "",     // sera rempli selon sharp/flat
-
-        // DEGRÉ
-        degree: "",
-        degreeAccidental: "",
-
-        // INTERVALLE
-        interval: "",
-        intervalNature: ""
+    // 2) correspondance lettre EN → FR
+    const map = {
+        "C": "do",
+        "D": "ré",
+        "E": "mi",
+        "F": "fa",
+        "G": "sol",
+        "A": "la",
+        "B": "si"
     };
 
-    // --- altération commune EN/FR ---
-    // sharp = "C#" → base "C", accidental "#"
-    // flat  = "Db" → base "D", accidental "b"
-    const match = n.sharp.match(/^([A-G])([#b]?)$/);
-    if (match) {
-        full.noteName = match[1];
-        full.noteAccidental = match[2] || "";
+    const baseFR = map[letter] || letter;
+
+    // 3) altération ASCII → UTF
+    const altFR =
+        alt === "#" ? "♯" :
+        alt === "b" ? "♭" :
+        "";
+
+    return baseFR + altFR;
+}
+
+getFullNote(index) {
+    index = (index + 12) % 12;
+
+    const n = this.NOTES[index];
+
+    // EN : sharp ou flat selon useFlats
+    const nameEN = this.useFlats ? n.flat : n.sharp;
+
+    // FR : via la méthode interne
+    const nameFR = this.translateENtoFR(nameEN);
+
+    // extraction EN
+    const mEN = nameEN.match(/^([A-G])([#b]?)$/);
+    const baseEN = mEN[1];
+    const altEN  = mEN[2] || "";
+
+    // extraction FR
+    const mFR = nameFR.match(/^(.+?)([♯♭]?)$/);
+    const baseFR = mFR[1];
+    const altFR  = mFR[2] || "";
+
+    // -----------------------------
+    // CHROMA (ton ancien système)
+    // -----------------------------
+    const chroma = index;
+
+    // -----------------------------
+    // INTERVAL (ton ancien système)
+    // -----------------------------
+    const interval = this.INTERVALS.find(i => i.semitones === chroma);
+    const intervalShort = interval ? interval.short : null;
+
+    // -----------------------------
+    // DEGRÉ (ton ancien système)
+    // -----------------------------
+    let degreeBase = null;
+    let degreeAlt  = null;
+
+    if (this.root !== null) {
+        const diff = (index - this.root + 12) % 12;
+
+        const DEG = [
+            { base: "1", alt: ""  }, // 0
+            { base: "2", alt: "♭" }, // 1
+            { base: "2", alt: ""  }, // 2
+            { base: "3", alt: "♭" }, // 3
+            { base: "3", alt: ""  }, // 4
+            { base: "4", alt: ""  }, // 5
+            { base: "4", alt: "♯" }, // 6
+            { base: "5", alt: ""  }, // 7
+            { base: "6", alt: "♭" }, // 8
+            { base: "6", alt: ""  }, // 9
+            { base: "7", alt: "♭" }, // 10
+            { base: "7", alt: ""  }  // 11
+        ];
+
+        degreeBase = DEG[diff].base;
+        degreeAlt  = DEG[diff].alt;
     }
 
-    // --- intervalle + degré ---
-    if (root != null) {
-        const semitones = (index - root + 12) % 12;
-        const interval = this.INTERVALS.find(i => i.semitones === semitones);
+    return {
+        index,
+        nameEN,
+        nameFR,
+        baseEN,
+        altEN,
+        baseFR,
+        altFR,
+        chroma,
+        intervalShort,
+        degreeBase,
+        degreeAlt
+    };
+}
 
-        if (interval) {
-            // interval
-            full.interval = interval.degree.toString();   // 1,2,3,4,5,6,7
-            full.intervalNature = interval.quality;       // m, M, P, A/d
 
-            // degré (chromatique)
-            full.degree = interval.degree.toString();
+getNoteLabel(index, mode) {
+    const n = this.NOTES[index];
 
-            switch (interval.short) {
-                case "m2":
-                case "m3":
-                case "m6":
-                case "m7":
-                    full.degreeAccidental = "♭";
-                    break;
+    // EN : sharp ou flat selon useFlats
+    const nameEN = this.useFlats ? n.flat : n.sharp;
 
-                case "TT":
-                    full.degreeAccidental = "♯";
-                    break;
+    if (mode === "noteEN") {
+        const m = nameEN.match(/^([A-G])([#b]?)$/);
+        return {
+            base: m[1],
+            alt:  m[2] === "#" ? "♯" :
+                  m[2] === "b" ? "♭" : "",
+            type: mode
+        };
+    }
 
-                default:
-                    full.degreeAccidental = "";
-            }
+    if (mode === "noteFR") {
+        const nameFR = this.translateENtoFR(nameEN);
+        const m = nameFR.match(/^(.+?)([♯♭]?)$/);
+        return {
+            base: m[1],
+            alt:  m[2] || "",
+            type: mode
+        };
+    }
+
+    // degree / interval → ton système existant
+    const full = this.getFullNote(index);
+    return this.getLabelFromFull(full, mode);
+}
+
+
+getLabelFromFull(full, mode) {
+
+    if (mode === "degree") {
+        if (!full.degreeBase) {
+            // pas de fondamentale définie → rien à afficher
+            return {
+                base: "",
+                alt: "",
+                type: "degree"
+            };
         }
+        return {
+            base: full.degreeBase,
+            alt:  full.degreeAlt || "",
+            type: "degree"
+        };
     }
 
-    return full;
-}
-getNoteLabel(full, mode) {
-    switch (mode) {
-
-        case "noteEN":
-            return full.noteName + full.noteAccidental;
-
-        case "noteFR":
-            return full.noteNameFR + full.noteAccidental;
-
-        case "degree":
-            return full.degreeAccidental + full.degree;
-
-        case "interval":
-            return full.intervalNature + full.interval;
-
-        default:
-            return "";
+    if (mode === "interval") {
+        if (!full.intervalShort) {
+            return {
+                base: "",
+                alt: "",
+                type: "interval"
+            };
+        }
+        return {
+            base: full.intervalShort,
+            alt:  "",
+            type: "interval"
+        };
     }
+
+    // fallback : EN
+    return {
+        base: full.baseEN,
+        alt:  full.altEN,
+        type: "noteEN"
+    };
 }
-getLabelForNote(index) {
-    const full = this.theory.getFullNote(index);
-    return this.theory.getNoteLabel(full, this.guitar.displayMode);
-}
+
+
 
 
     getNoteName(index) {

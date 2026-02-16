@@ -265,62 +265,75 @@ drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
 }
 
 
-parseNoteLabel(label) {
-    label = label.trim();
+// parseNoteLabel(label) {
+//     label = label.trim();
 
-    // Normalisation des altérations
-    const flat  = ["b", "♭"];
-    const sharp = ["#", "♯"];
+//     // Normalisation des altérations
+//     const flat  = ["b", "♭"];
+//     const sharp = ["#", "♯"];
 
-    // Remplacement automatique
-    label = label
-        .replace(/^b(?=\d)/, "♭")   // b3 → ♭3
-        .replace(/b$/, "♭")         // Eb → E♭
-        .replace(/#/, "♯");         // C# → C♯
+//     // Remplacement automatique
+//     label = label
+//         .replace(/^b(?=\d)/, "♭")   // b3 → ♭3
+//         .replace(/b$/, "♭")         // Eb → E♭
+//         .replace(/#/, "♯");         // C# → C♯
 
-    // Degré : ♭3, ♯5…
-    if (/^[♭♯]\d+$/.test(label)) {
-        return {
-            base: label.slice(1),
-            alt: label[0],
-            type: "degree"
-        };
-    }
+//     // Degré : ♭3, ♯5…
+//     if (/^[♭♯]\d+$/.test(label)) {
+//         return {
+//             base: label.slice(1),
+//             alt: label[0],
+//             type: "degree"
+//         };
+//     }
 
-    // Note : C♯, E♭…
-    if (/^[A-G][♭♯]?$/.test(label)) {
-        return {
-            base: label[0],
-            alt: label.slice(1),
-            type: "note"
-        };
-    }
+//     // Note : C♯, E♭…
+//     if (/^[A-G][♭♯]?$/.test(label)) {
+//         return {
+//             base: label[0],
+//             alt: label.slice(1),
+//             type: "note"
+//         };
+//     }
 
-    // Fallback
-    return { base: label, alt: "", type: "raw" };
-}
+//     // Fallback
+//     return { base: label, alt: "", type: "raw" };
+// }
 
 drawNote(x, y, opts = {}) {
-    const {
+
+    // --- extraction des options ---
+    let {
         fillColor = color("#ffffff"),
         strokeColor = "black",
         strokeW = 1,
         shapeType = "circle",   // "circle" | "square"
         opacity = 255,
         hasShadow = false,
-        label = ""
+        label = null // { base, alt, type, chroma }
     } = opts;
 
-    const parsed = this.parseNoteLabel(label);
-    const { base, alt, type } = parsed;
+    // --- sécurité : label doit exister ---
+    if (!label) return;
 
+    const { base, alt, type, chroma } = label;
+
+    // --- priorité couleur chromatique ---
+    // si chroma existe ET style fournit une couleur → priorité
+    if (chroma != null && this.style && this.style.getChromaColor) {
+        const chromaCol = this.style.getChromaColor(chroma);
+        if (chromaCol) fillColor = chromaCol;
+    }
+
+    // --- rayon et offset ---
     const r = this.g.getThickness() * 0.18;
-    const offset = hasShadow ?  (r / 20) : 0 ;
+    const offset = hasShadow ? (r / 20) : 0;
+
     // --- ombre ---
     if (hasShadow) {
         noStroke();
         fill(0, 40);
-        
+
         if (shapeType === "square") {
             push();
             rectMode(CENTER);
@@ -328,15 +341,13 @@ drawNote(x, y, opts = {}) {
             pop();
         } else {
             ellipse(x + offset, y + offset, r * 1.1, r * 1.1);
-            
-        }                                                           
+        }
     }
 
-    // --- forme ---
+    // --- forme principale ---
     fill(fillColor);
     stroke(strokeColor);
     strokeWeight(strokeW);
-
 
     push();
     if (shapeType === "square") {
@@ -352,20 +363,23 @@ drawNote(x, y, opts = {}) {
     fill(strokeColor);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
+
     // base centrée
     textSize(r * 0.75);
     text(base, x - offset, y - offset);
 
-    // altération
+    // --- altération ---
     if (alt) {
         textSize(r * 0.65);
+
         let ax = x - offset;
         let ay = y - offset - r * 0.15;
 
         // ajustement OS
-        ax += this.altAdjustX; 
+        ax += this.altAdjustX;
         ay += this.altAdjustY;
 
+        // placement selon type
         if (type === "degree") {
             ax -= r * 0.35; // à gauche
         } else {
@@ -374,8 +388,10 @@ drawNote(x, y, opts = {}) {
 
         text(alt, ax, ay);
     }
+
     textStyle(NORMAL);
 }
+
 
 
 drawHoverDot() {
@@ -385,8 +401,12 @@ drawHoverDot() {
     if (!h) return;
 
     const pos = this.g.toScreen(h.fret, h.string);
-    const n = this.g.instrument.getNoteAt(h.string - 1, h.fret);
-    const label = this.g.theory.getNoteName(n.index);
+    const raw = this.g.instrument.getNoteAt(h.string - 1, h.fret);
+
+    const label = this.g.theory.getNoteLabel(
+        raw.index,
+        this.g.displayMode
+    );
 
     this.drawNote(pos.x, pos.y, {
         fillColor: "#5156127d",
@@ -398,11 +418,21 @@ drawHoverDot() {
 }
 
 
+
 drawPinnedNotes() {
-    for (let p of this.g.pinnedNotes) {
-        const pos = this.g.toScreen(p.fret, p.string);
-        const n = this.g.instrument.getNoteAt(p.string - 1, p.fret);
-        const label = this.g.theory.getNoteName(n.index);
+    const g = this.g;
+    const app = g.app;
+
+    for (const pin of g.pinnedNotes) {
+        const pos = g.toScreen(pin.fret, pin.string);
+        if (!pos) continue;
+
+        const raw = app.instrument.getNoteAt(pin.string - 1, pin.fret);
+
+        const label = app.theory.getNoteLabel(
+            raw.index,
+            g.displayMode
+        );
 
         this.drawNote(pos.x, pos.y, {
             fillColor: "red",
@@ -412,25 +442,28 @@ drawPinnedNotes() {
         });
     }
 }
+
 drawSelectedNotes() {
     const g = this.g;
+    const app = g.app;
 
     for (let s of g.selectedNotes) {
 
         const inFretRange   = s.fret   >= 0 && s.fret   <= g.fretCount;
         const inStringRange = s.string >= 1 && s.string <= g.strings.length;
 
-        // 1) Note hors manche → afficher un "+"
         if (!inFretRange || !inStringRange) {
             this.drawOutOfBoundsMarker(s);
             continue;
         }
 
-        // 2) Note dans le manche → affichage normal
         const pos = g.toScreen(s.fret, s.string);
-        const n = g.instrument.getNoteAt(s.string - 1, s.fret);
-        const label = g.theory.getNoteName(n.index);
+        const raw = app.instrument.getNoteAt(s.string - 1, s.fret);
 
+        const label = app.theory.getNoteLabel(
+            raw.index,
+            g.displayMode
+        );
 
         this.drawNote(pos.x, pos.y, {
             fillColor: "#fcb900",

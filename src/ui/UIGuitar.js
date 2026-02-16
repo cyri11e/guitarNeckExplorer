@@ -41,8 +41,15 @@ class Guitar extends UIComponent {
         this.geometry.projectGeometry();
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
-        this.pinnedNotes = []; // { fret, string }
-        this.selectedNotes = []; // { fret, string }
+        this.pinnedNotes = [ { fret: 1, string: 6 }, { fret: 1, string: 5 }, { fret: 1, string: 1 }, { fret: 3, string: 2 }, { fret: 3, string: 3 }, { fret: 2, string: 4 } ]; // { fret, string }
+        this.selectedNotes = [
+  { fret: 3, string: 3 },
+  { fret: 5, string: 3 },
+  { fret: 7, string: 3 },
+  { fret: 7, string: 4 },
+  { fret: 5, string: 4 }
+]
+; // { fret, string }
 
         // 🔥 Ajout : flag anti-clic-après-drag
         this.wasDragged = false;
