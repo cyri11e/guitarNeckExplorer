@@ -47,7 +47,11 @@ class App {
                 case "knob":
                     comp = new Knob(cfg); 
                     break;    
-
+                    
+                case "cof":
+                    comp = new COF(cfg); 
+                    comp.theory = this.theory;
+                    break;  
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;

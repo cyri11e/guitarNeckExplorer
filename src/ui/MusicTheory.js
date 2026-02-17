@@ -99,6 +99,38 @@ translateENtoFR(nameEN) {
     return baseFR + altFR;
 }
 
+
+getDegreeLabel(interval) {
+
+    const useFlats = this.useFlats;
+
+    // tableau DEG d’origine
+    const DEG = [
+        { base: "1", alt: ""  }, // 0
+        { base: "2", alt: "♭" }, // 1
+        { base: "2", alt: ""  }, // 2
+        { base: "3", alt: "♭" }, // 3
+        { base: "3", alt: ""  }, // 4
+        { base: "4", alt: ""  }, // 5
+        { base: "4", alt: "♯" }, // 6
+        { base: "5", alt: ""  }, // 7
+        { base: "6", alt: "♭" }, // 8
+        { base: "6", alt: ""  }, // 9
+        { base: "7", alt: "♭" }, // 10
+        { base: "7", alt: ""  }  // 11
+    ];
+
+    const d = DEG[interval];
+
+    // cas spécial : #4 → b5 en mode flats
+    if (interval === 6 && useFlats) {
+        return { base: "5", alt: "♭" };
+    }
+
+    return d;
+}
+
+
 getFullNote(index) {
     index = (index + 12) % 12;
 
@@ -121,42 +153,32 @@ getFullNote(index) {
     const altFR  = mFR[2] || "";
 
     // -----------------------------
-    // CHROMA (ton ancien système)
+    // CHROMA RELATIF
     // -----------------------------
-    const chroma = index;
+    let chroma = null;
+    if (this.root !== null) {
+        chroma = (index - this.root + 12) % 12;
+    }
 
     // -----------------------------
-    // INTERVAL (ton ancien système)
+    // INTERVAL
     // -----------------------------
-    const interval = this.INTERVALS.find(i => i.semitones === chroma);
-    const intervalShort = interval ? interval.short : null;
+    let intervalShort = null;
+    if (chroma !== null) {
+        const interval = this.INTERVALS.find(i => i.semitones === chroma);
+        intervalShort = interval ? interval.short : null;
+    }
 
     // -----------------------------
-    // DEGRÉ (ton ancien système)
+    // DEGRÉ
     // -----------------------------
     let degreeBase = null;
     let degreeAlt  = null;
 
-    if (this.root !== null) {
-        const diff = (index - this.root + 12) % 12;
-
-        const DEG = [
-            { base: "1", alt: ""  }, // 0
-            { base: "2", alt: "♭" }, // 1
-            { base: "2", alt: ""  }, // 2
-            { base: "3", alt: "♭" }, // 3
-            { base: "3", alt: ""  }, // 4
-            { base: "4", alt: ""  }, // 5
-            { base: "4", alt: "♯" }, // 6
-            { base: "5", alt: ""  }, // 7
-            { base: "6", alt: "♭" }, // 8
-            { base: "6", alt: ""  }, // 9
-            { base: "7", alt: "♭" }, // 10
-            { base: "7", alt: ""  }  // 11
-        ];
-
-        degreeBase = DEG[diff].base;
-        degreeAlt  = DEG[diff].alt;
+    if (chroma !== null) {
+        const d = this.getDegreeLabel(chroma);
+        degreeBase = d.base;
+        degreeAlt  = d.alt;
     }
 
     return {
@@ -265,8 +287,11 @@ getLabelFromFull(full, mode) {
     }
 
     getFrenchName(index) {
-        return this.getNote(index).french;
+        const n = this.getNote(index);
+        const nameEN = this.useFlats ? n.flat : n.sharp;
+        return this.translateENtoFR(nameEN);
     }
+
 
     toggleAccidentals() {
         this.useFlats = !this.useFlats;

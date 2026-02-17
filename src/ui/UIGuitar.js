@@ -54,17 +54,26 @@ class Guitar extends UIComponent {
         // 🔥 Ajout : flag anti-clic-après-drag
         this.wasDragged = false;
 
-        this.displayMode = cfg.displayMode ?? "degree";
+        this.displayMode = cfg.displayMode ?? "note";     // note | degree | none
+        this.labelType   = cfg.labelType   ?? "noteEN";   // noteEN | noteFR
+
     }
 
 
-    setDisplayMode(mode) {
-        const allowed = ["noteEN","noteFR","degree", "none"];
-        if (!allowed.includes(mode)) return;
+setDisplayMode(mode) {
+    const allowed = ["note", "degree", "none"];
+    if (!allowed.includes(mode)) return;
+    this.displayMode = mode;
+    this.invalidate();
+}
 
-        this.displayMode = mode;
-        this.invalidate();
-    }
+setLabelType(type) {
+    const allowed = ["noteEN", "noteFR"];
+    if (!allowed.includes(type)) return;
+    this.labelType = type;
+    this.invalidate();
+}
+
 
     // ------------------------------------------------------------
     // GETTERS

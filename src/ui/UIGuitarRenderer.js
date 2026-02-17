@@ -301,6 +301,21 @@ drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
 // }
 
 drawNote(x, y, opts = {}) {
+function drawTightText(txt, x, y, size, tighten = 0.85) {
+    textSize(size);
+
+    let cx = x;
+    for (let i = 0; i < txt.length; i++) {
+        const ch = txt[i];
+        const w  = textWidth(ch);
+
+        // dessine le caractère
+        text(ch, cx, y);
+
+        // avance moins que la largeur → resserrement
+        cx += w * tighten;
+    }
+}
 
     // --- extraction des options ---
     let {
@@ -369,11 +384,12 @@ drawNote(x, y, opts = {}) {
 
     // base centrée
     textSize(r * 0.75);
+    if (base.length === 3)  textSize(r * 0.50); 
     text(base, x - offset, y - offset);
 
     // --- altération ---
     if (alt) {
-        textSize(r * 0.65);
+        textSize(r * 0.90);
 
         let ax = x - offset;
         let ay = y - offset - r * 0.15;
@@ -384,9 +400,9 @@ drawNote(x, y, opts = {}) {
 
         // placement selon type
         if (type === "degree") {
-            ax -= r * 0.35; // à gauche
+            ax -= r * 0.30; // à gauche
         } else {
-            ax += r * 0.35; // à droite
+            ax += r * 0.45; // à droite
         }
 
         text(alt, ax, ay);
@@ -407,9 +423,12 @@ drawHoverDot() {
     const raw = this.g.instrument.getNoteAt(h.string - 1, h.fret);
 
     const label = this.g.theory.getNoteLabel(
-        raw.index,
-        this.g.displayMode
-    );
+    raw.index,
+    this.g.displayMode === "note"
+        ? this.g.labelType     // noteEN / noteFR
+        : this.g.displayMode   // degree / none
+)
+
 
     this.drawNote(pos.x, pos.y, {
         fillColor: "#5156127d",
@@ -433,9 +452,12 @@ drawPinnedNotes() {
         const raw = app.instrument.getNoteAt(pin.string - 1, pin.fret);
 
         const label = app.theory.getNoteLabel(
-            raw.index,
-            g.displayMode
-        );
+    raw.index,
+    g.displayMode === "note"
+        ? g.labelType
+        : g.displayMode
+);
+
 
         this.drawNote(pos.x, pos.y, {
             fillColor: "red",
@@ -463,10 +485,13 @@ drawSelectedNotes() {
         const pos = g.toScreen(s.fret, s.string);
         const raw = app.instrument.getNoteAt(s.string - 1, s.fret);
 
-        const label = app.theory.getNoteLabel(
-            raw.index,
-            g.displayMode
-        );
+ const label = app.theory.getNoteLabel(
+    raw.index,
+    g.displayMode === "note"
+        ? g.labelType
+        : g.displayMode
+);
+
 
         this.drawNote(pos.x, pos.y, {
             fillColor: "#fcb900",

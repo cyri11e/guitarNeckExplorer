@@ -2,7 +2,7 @@ const UI_CONFIG = {
 
     aspectPanel: {
         type: "panel",
-        xp: 45,
+        xp: 15,
         yp: 55,
         sp: 20,
         aspectRatio: 1.5,
@@ -13,8 +13,10 @@ const UI_CONFIG = {
         toggleOnClick: true,
         //toggleShortcut: "v",
         children: ["knob1",
+            "knob2",
             "metalSwitch1",
-            "knob2"]
+            "metalSwitchENFR"
+        ]
     },
 
 
@@ -26,7 +28,13 @@ metalSwitch1: {
     shortcutKey: "b"
 },
 
-
+metalSwitchENFR: {
+    type: "metalSwitch",
+    sp: 100,     // % de la hauteur du panel
+    topLabel: "FR",
+    bottomLabel: "EN",
+    shortcutKey: "f"
+},
 
     panel2: {
         type: "panel",
@@ -39,7 +47,8 @@ metalSwitch1: {
         isDraggable: true,
         isZoomable: true,
         toggleOnClick: true,
-        toggleShortcut: "w"
+        toggleShortcut: "w",
+        children: ["cof1"]
     },
 
 guitar1: {
@@ -56,7 +65,7 @@ guitar1: {
     woodColor: "maple",
     orientation: "horizontal",
     toggleOrientationShortcut: "o" ,  // NEW
-    displayMode: "degree"
+    displayMode: "note"
 
 },
 
@@ -93,9 +102,15 @@ knob2: {
         { symbol: "P", label: "Pastille" },
     ],
     shortcutKey: 'd'
+},
+
+
+cof1 : { 
+    type: "cof",
+    xp: 50,
+    yp: 50,
+    sp: 100
 }
-
-
 
 
     // // Exemple futur : un knob

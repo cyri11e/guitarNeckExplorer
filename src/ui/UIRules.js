@@ -20,24 +20,79 @@ const UI_RULES = [
         // Application de la règle
         guitar.theory.useFlats = (newState === 0);
 
-        console.log(
-            "%c[METALSWITCH SYNC] flatMode=" + guitar.theory.useFlats +
-            " (state=" + newState + ")",
-            "color:#00ff00; font-weight:bold;"
-        );
     },
+
     // KNOB2 → change displayMode
+    (components, source, newState) => {
+        if (source.name !== "knob2") return;
+
+        const guitar = components.find(c => c.name === "guitar1");
+        if (!guitar) return;
+
+        if (newState === 0) guitar.setDisplayMode("note"); // N
+        if (newState === 1) guitar.setDisplayMode("degree"); // D
+        if (newState === 2) guitar.setDisplayMode("none");   // P
+    },
+
+
+// ============================================================
+// METALSWITCH EN/FR → displayMode
+// ============================================================
+// METALSWITCH EN/FR → langue
 (components, source, newState) => {
-    if (source.name !== "knob2") return;
+
+    const sw = components.find(c => c.name === "metalSwitchENFR");
+    if (source !== sw) return;
 
     const guitar = components.find(c => c.name === "guitar1");
-    if (!guitar) return;
+    const cof    = components.find(c => c.name === "cof1");
+    if (!guitar || !cof) return;
 
-    if (newState === 0) guitar.setDisplayMode("noteEN"); // N
-    if (newState === 1) guitar.setDisplayMode("degree"); // D
-    if (newState === 2) guitar.setDisplayMode("none");   // P
+    const mode = (newState === 0) ? "noteEN" : "noteFR";
+
+    // 🎸 guitare : on change la langue, PAS displayMode
+    guitar.labelType = mode;
+    guitar.invalidate();
+
+    // 🧿 COF : lui continue d’utiliser displayMode comme langue
+    cof.setDisplayMode(mode);
+    cof.invalidate();
+},
+
+
+// ============================================================
+// COF → GUITAR : priorité au hover, click = root persistante
+// ============================================================
+(components, source, newState) => {
+
+    const cof    = components.find(c => c.name === "cof1");
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!cof || !guitar) return;
+
+    // On ne réagit qu’aux changements venant du COF
+    if (source !== cof) return;
+
+    const hover = cof.hoverIndex;   // priorité
+    const root  = cof.rootIndex;    // fallback
+
+    let activeIndex = null;
+
+    if (hover !== -1 && hover !== null) {
+        activeIndex = hover;        // priorité absolue
+    } else if (root !== null) {
+        activeIndex = root;         // fallback
+    }
+
+    if (activeIndex === null) {
+        guitar.theory.root = null;
+        guitar.invalidate();
+        return;
+    }
+
+    const noteIndex = cof.chroma[activeIndex];
+    guitar.theory.root = noteIndex;
+    guitar.invalidate();
 }
 
 
-    // Tu pourras ajouter d’autres règles ici…
 ];
