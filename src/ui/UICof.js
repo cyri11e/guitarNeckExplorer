@@ -93,13 +93,16 @@ mouseMoved(evt) {
 
         let angle = Math.atan2(dy, dx);
 
-        const offset = -PI / 12;
+const segAngle = TWO_PI / 12;
+const root = this.rootIndex ?? 0;
+const offset = -PI / 12 - root * segAngle;
+
+
         angle -= offset;
 
         angle += HALF_PI;
         if (angle < 0) angle += TWO_PI;
 
-        const segAngle = TWO_PI / 12;
         return Math.floor(angle / segAngle);
     }
 
@@ -123,7 +126,9 @@ class COFRenderer {
         const rInner = c.w/2 * 0.45;
 
         const segAngle = TWO_PI / 12;
-        const offset   = -PI / 12;
+        const root = c.rootIndex ?? 0;
+        const offset = -PI / 12 - root * segAngle;
+
         const epsilon  = 0.05;
 
         for (let i = 0; i < 12; i++) {
