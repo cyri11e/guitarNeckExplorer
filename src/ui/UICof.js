@@ -24,11 +24,13 @@ class COF extends UIComponent {
 
     }
 
-    setDisplayMode(mode) {
-        if (mode !== "noteEN" && mode !== "noteFR") return;
-        this.displayMode = mode;
-        this.invalidate();
-    }
+setDisplayMode(mode) {
+    const allowed = ["note", "degree", "none"];
+    if (!allowed.includes(mode)) return;
+    this.displayMode = mode;
+    this.invalidate();
+}
+
 
     setLabelType(type) {
         const allowed = ["noteEN", "noteFR"];
@@ -150,7 +152,12 @@ class COFRenderer {
 
             // --- LABEL ---
             const noteIndex = c.chroma[i];
-            const labelObj  = c.theory.getNoteLabel(noteIndex, c.displayMode);
+            const mode = (c.displayMode === "note")
+    ? c.labelType
+    : c.displayMode;
+
+const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+
             const txt = labelObj.base + (labelObj.alt ?? "");
 
             const mid = (a0 + a1) * 0.5;

@@ -48,14 +48,13 @@ const UI_RULES = [
     const cof    = components.find(c => c.name === "cof1");
     if (!guitar || !cof) return;
 
-    const mode = (newState === 0) ? "noteEN" : "noteFR";
+    const labelType = (newState === 0) ? "noteEN" : "noteFR";
 
     // 🎸 guitare : on change la langue, PAS displayMode
-    guitar.labelType = mode;
+    guitar.setLabelType(labelType);
     guitar.invalidate();
 
-    // 🧿 COF : lui continue d’utiliser displayMode comme langue
-    cof.setDisplayMode(mode);
+    cof.setLabelType(labelType);
     cof.invalidate();
 },
 
