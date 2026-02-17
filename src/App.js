@@ -47,7 +47,7 @@ class App {
                 case "knob":
                     comp = new Knob(cfg); 
                     break;    
-                    
+
                 case "cof":
                     comp = new COF(cfg); 
                     comp.theory = this.theory;
@@ -118,7 +118,7 @@ for (const comp of this.components) {
         // ============================================================
 
         this.needsRedraw = true;
-        this.debug = true;
+        this.debug = false;
         this.redrawCount = 0;
         this.lastFPS = 0;
         this._lastTime = millis();

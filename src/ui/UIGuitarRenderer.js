@@ -7,6 +7,9 @@ class GuitarRenderer {
         this.g = guitar;
         this.style = style;
         this.detectPlatformAdjustments();
+
+        this.noteColors = [ color(255, 20, 20), color(255, 82, 90), color(255, 165, 10), color(255, 210, 10), color(200, 200, 10), color(144, 238, 144), color(72, 169, 127), color(20, 40, 255), color(68, 103, 192), color(75, 10, 130), color(111, 21, 168), color(148, 10, 211) ];
+        
     }
 detectPlatformAdjustments() {
     const ua = navigator.userAgent;
@@ -301,21 +304,6 @@ drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
 // }
 
 drawNote(x, y, opts = {}) {
-function drawTightText(txt, x, y, size, tighten = 0.85) {
-    textSize(size);
-
-    let cx = x;
-    for (let i = 0; i < txt.length; i++) {
-        const ch = txt[i];
-        const w  = textWidth(ch);
-
-        // dessine le caractère
-        text(ch, cx, y);
-
-        // avance moins que la largeur → resserrement
-        cx += w * tighten;
-    }
-}
 
     // --- extraction des options ---
     let {
@@ -325,6 +313,7 @@ function drawTightText(txt, x, y, size, tighten = 0.85) {
         shapeType = "circle",   // "circle" | "square"
         opacity = 255,
         hasShadow = false,
+
         label = null // { base, alt, type, chroma }
     } = opts;
 
@@ -452,17 +441,26 @@ drawPinnedNotes() {
         const raw = app.instrument.getNoteAt(pin.string - 1, pin.fret);
 
         const label = app.theory.getNoteLabel(
-    raw.index,
-    g.displayMode === "note"
-        ? g.labelType
-        : g.displayMode
-);
+            raw.index,
+            g.displayMode === "note"
+                ? g.labelType
+                : g.displayMode
+        );
 
+        // 🎯 RÉCUPÉRER LE DEGRÉ
+        const degObj = app.theory.getNoteLabel(raw.index, "degree");
+        const isTonic = (degObj.base === "1"); // degré 1
 
+        // 🎯 AJOUT : récupérer le chroma (si root existe)
+        const full = app.theory.getFullNote(raw.index);
+        label.chroma = full.chroma;   // ← EXACTEMENT ce que tu veux
+
+        // 🎯 ENVOYER À drawNote
         this.drawNote(pos.x, pos.y, {
             fillColor: "#3494f3",
             strokeColor: "black",
             hasShadow: false,
+            isTonic: isTonic,
             label
         });
     }
