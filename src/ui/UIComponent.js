@@ -33,7 +33,7 @@ class UIComponent {
 
         // Rendering / debug
         this.needsRedraw = true;
-        this.debug = true;
+        this.debug = false;
         this.wheelActive = false;
 
         // ⭐ AJOUT : référence vers App

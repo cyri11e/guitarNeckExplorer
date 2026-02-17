@@ -137,7 +137,7 @@ class COFRenderer {
             const a1 = (i+1) * segAngle + offset - HALF_PI + epsilon;
 
             // couleur segment
-            if (i === c.rootIndex) fill(255, 180, 80);
+            if (i === c.rootIndex) fill(255, 20, 20);
             else if (i === c.hoverIndex) fill(200);
             else fill(150);
 

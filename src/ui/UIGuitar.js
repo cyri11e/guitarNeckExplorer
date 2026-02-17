@@ -56,6 +56,7 @@ class Guitar extends UIComponent {
 
         this.displayMode = cfg.displayMode ?? "note";     // note | degree | none
         this.labelType   = cfg.labelType   ?? "noteEN";   // noteEN | noteFR
+        this.hoverMode = "cursor"; // "cursor" | "note" | "octave"
 
     }
 
@@ -263,6 +264,19 @@ moveSelectedStrings(delta) {
     mouseReleased(evt) {
         return super.mouseReleased(evt);
     }
+
+
+    mouseMoved(evt) {
+    const inside = this.containsRect(evt);
+    this.isHovered = inside;
+
+    if (inside) {
+        this.fromScreen(evt.x, evt.y);
+    }
+
+    this.invalidate();
+    return inside;
+}
 
 mouseClicked(evt) {
     if (this.wasDragged) {

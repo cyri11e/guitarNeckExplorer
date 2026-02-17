@@ -11,20 +11,31 @@ class GuitarGeometry {
     // RATIOS
     // ------------------------------------------------------------
 
-    computeFretRatios() {
-        const g = this.g;
-        const arr = [];
-        const max = g.fretCount + 1;
+computeFretRatios() {
+    const g = this.g;
+    const arr = [];
+    const max = g.fretCount + 1;
 
-        for (let i = 0; i <= max; i++) {
-            arr[i] = 1 - 1 / Math.pow(2, i / 12);
-        }
-
-        const scale = arr[max];
-        for (let i = 0; i <= max; i++) arr[i] /= scale;
-
-        return arr;
+    // 1) courbe originale
+    for (let i = 0; i <= max; i++) {
+        arr[i] = 1 - 1 / Math.pow(2, i / 12);
     }
+
+    // 2) adoucissement de la pente
+    const p = 1.1;   // ← ajuste ici (0.7 = 30% plus petit environ)
+    for (let i = 0; i <= max; i++) {
+        arr[i] = Math.pow(arr[i], p);
+    }
+
+    // 3) renormalisation (la dernière frette reste correcte)
+    const scale = arr[max];
+    for (let i = 0; i <= max; i++) {
+        arr[i] /= scale;
+    }
+
+    return arr;
+}
+
 
 computeStringRatios() {
     const arr = [];

@@ -7,9 +7,6 @@ class GuitarRenderer {
         this.g = guitar;
         this.style = style;
         this.detectPlatformAdjustments();
-
-        this.noteColors = [ color(255, 20, 20), color(255, 82, 90), color(255, 165, 10), color(255, 210, 10), color(200, 200, 10), color(144, 238, 144), color(72, 169, 127), color(20, 40, 255), color(68, 103, 192), color(75, 10, 130), color(111, 21, 168), color(148, 10, 211) ];
-        
     }
 detectPlatformAdjustments() {
     const ua = navigator.userAgent;
@@ -70,11 +67,11 @@ detectPlatformAdjustments() {
         const s = strings[i];
 
         // Base de la corde
-        fill(100);
+        fill(100,100);
         rect(s.x, s.y, s.w, s.h);
 
         // Reflet
-        fill(230);
+        fill(230,100);
         rect(s.x, s.y, s.w, s.h * 0.4);
 
         push();
@@ -330,13 +327,13 @@ drawNote(x, y, opts = {}) {
     }
 
     // --- rayon et offset ---
-    const r = this.g.getThickness() * 0.18;
-    const offset = hasShadow ? (r / 20) : 0;
+    const r = this.g.getThickness() * 0.15;
+    const offset = hasShadow ? (r / 18) : 0;
 
     // --- ombre ---
     if (hasShadow) {
         noStroke();
-        fill(0, 40);
+        fill(0, 80);
 
         if (shapeType === "square") {
             push();
@@ -344,14 +341,14 @@ drawNote(x, y, opts = {}) {
             rect(x + offset, y + offset, r, r, r * 0.2);
             pop();
         } else {
-            ellipse(x + offset, y + offset, r * 1.1, r * 1.1);
+            ellipse(x + offset, y + offset, r , r );
         }
     }
 
     // --- forme principale ---
     fill(fillColor);
     stroke(strokeColor);
-    strokeWeight(strokeW);
+    strokeWeight((shapeType === "square") ? strokeW *3 : strokeW);
     if (base=="") {
        fill(0); 
     }
@@ -403,31 +400,90 @@ drawNote(x, y, opts = {}) {
 
 
 drawHoverDot() {
-    if (!this.g.isHovered) return;
+    const g = this.g;
+    const app = g.app;
 
-    const h = this.g.hoveredNote;
+    if (!g.isHovered) return;
+    const h = g.hoveredNote;
     if (!h) return;
 
-    const pos = this.g.toScreen(h.fret, h.string);
-    const raw = this.g.instrument.getNoteAt(h.string - 1, h.fret);
+    const baseRaw = app.instrument.getNoteAt(h.string - 1, h.fret);
+    const baseIndex = baseRaw.index;
+    const baseMidi  = baseRaw.midi;
 
-    const label = this.g.theory.getNoteLabel(
-    raw.index,
-    this.g.displayMode === "note"
-        ? this.g.labelType     // noteEN / noteFR
-        : this.g.displayMode   // degree / none
-)
+    // --- MODE CURSEUR : comportement actuel ---
+    if (g.hoverMode === "cursor") {
+        const pos = g.toScreen(h.fret, h.string);
+        const label = app.theory.getNoteLabel(
+            baseIndex,
+            g.displayMode === "note" ? g.labelType : g.displayMode
+        );
+        this.drawNote(pos.x, pos.y, {
+            fillColor: "#5156127d",
+            strokeColor: "white",
+            hasShadow: true,
+            label
+        });
+        return;
+    }
 
+    // --- MODE NOTE : toutes les occurrences du même index ---
+// --- MODE NOTE : même MIDI EXACT ---
+if (g.hoverMode === "note") {
 
-    this.drawNote(pos.x, pos.y, {
-        fillColor: "#5156127d",
-        strokeColor: "white",
-        opacity: 50,
-        hasShadow: true,
-        label
-    });
+    for (let s = 1; s <= g.strings.length; s++) {
+        for (let f = 0; f <= g.fretCount; f++) {
+
+            const raw = app.instrument.getNoteAt(s - 1, f);
+
+            // 🔥 comparaison stricte MIDI
+            if (raw.midi !== baseMidi) continue;
+
+            const pos = g.toScreen(f, s);
+            const label = app.theory.getNoteLabel(
+                raw.index,
+                g.displayMode === "note" ? g.labelType : g.displayMode
+            );
+
+            this.drawNote(pos.x, pos.y, {
+                fillColor: "#5156127d",
+                strokeColor: "white",
+                hasShadow: true,
+                label
+            });
+        }
+    }
+
+    return;
 }
 
+
+    // --- MODE OCTAVE : même note + toutes les octaves ---
+    if (g.hoverMode === "octave") {
+        for (let s = 1; s <= g.strings.length; s++) {
+            for (let f = 0; f <= g.fretCount; f++) {
+                const raw = app.instrument.getNoteAt(s - 1, f);
+
+                // même note (index) → OK
+                if (raw.index !== baseIndex) continue;
+
+                // octave différente → OK aussi
+                const pos = g.toScreen(f, s);
+                const label = app.theory.getNoteLabel(
+                    raw.index,
+                    g.displayMode === "note" ? g.labelType : g.displayMode
+                );
+
+                this.drawNote(pos.x, pos.y, {
+                    fillColor: "#5156127d",
+                    strokeColor: "white",
+                    hasShadow: true,
+                    label
+                });
+            }
+        }
+    }
+}
 
 
 drawPinnedNotes() {
@@ -483,16 +539,20 @@ drawSelectedNotes() {
         const pos = g.toScreen(s.fret, s.string);
         const raw = app.instrument.getNoteAt(s.string - 1, s.fret);
 
- const label = app.theory.getNoteLabel(
-    raw.index,
-    g.displayMode === "note"
-        ? g.labelType
-        : g.displayMode
-);
+        const label = app.theory.getNoteLabel(
+            raw.index,
+            g.displayMode === "note"
+                ? g.labelType
+                : g.displayMode
+        );
 
+        // AJOUT : chroma (exactement comme pinned)
+        const full = app.theory.getFullNote(raw.index);
+        label.chroma = full.chroma;
 
+        // ET ON GARDE L’ASPECT D’ORIGINE
         this.drawNote(pos.x, pos.y, {
-            fillColor: "#fcb900",
+            fillColor: "#fcb900",      // couleur d’origine
             strokeColor: "black",
             shapeType: "square",
             hasShadow: true,
@@ -500,6 +560,7 @@ drawSelectedNotes() {
         });
     }
 }
+
 
 getStringY(stringIndex) {
     const g = this.g;
@@ -621,29 +682,29 @@ drawDebugInfo() {
     const caseStr   = hit ? hit.fret : "-";   // même index pour l’instant
 
     push();
-    fill("green");
-    textSize(12);
-    textAlign(LEFT, TOP);
+    // fill("green");
+    // textSize(12);
+    // textAlign(LEFT, TOP);
 
-    text(
-        `x: ${x.toFixed(1)}\n` +
-        `y: ${y.toFixed(1)}\n` +
-        `w: ${w.toFixed(1)}\n` +
-        `h: ${h.toFixed(1)}\n` +
-        `ratio: ${ratio}\n` +
-        `frets: ${g.fretCount}\n` +
-        `cases: ${g.cases.length}\n\n` +
+    // text(
+    //     `x: ${x.toFixed(1)}\n` +
+    //     `y: ${y.toFixed(1)}\n` +
+    //     `w: ${w.toFixed(1)}\n` +
+    //     `h: ${h.toFixed(1)}\n` +
+    //     `ratio: ${ratio}\n` +
+    //     `frets: ${g.fretCount}\n` +
+    //     `cases: ${g.cases.length}\n\n` +
 
-        `hover: ${isHovered}\n` +
-        `pressed: ${pressed}\n` +
-        `dragging: ${dragging}\n` +
-        `mouse: ${mx}, ${my}\n` +
-        `case: ${caseStr}\n` +
-        `fret: ${fretStr}\n` +
-        `string: ${stringStr}`,
-        x + 18,
-        y + 36
-    );
+    //     `hover: ${isHovered}\n` +
+    //     `pressed: ${pressed}\n` +
+    //     `dragging: ${dragging}\n` +
+    //     `mouse: ${mx}, ${my}\n` +
+    //     `case: ${caseStr}\n` +
+    //     `fret: ${fretStr}\n` +
+    //     `string: ${stringStr}`,
+    //     x + 18,
+    //     y + 36
+    // );
 
     pop();
 }
@@ -666,9 +727,10 @@ drawDebugInfo() {
         this.drawHead();
         this.drawStringShadows();
         this.drawFrets();
+        this.drawPinnedNotes();
+
         this.drawStrings();
         this.drawOpenStringLabels();
-        this.drawPinnedNotes();
         this.drawSelectedNotes();
         
         this.drawHoverDot();

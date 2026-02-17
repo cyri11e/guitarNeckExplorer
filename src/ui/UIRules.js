@@ -91,7 +91,21 @@ const UI_RULES = [
     const noteIndex = cof.chroma[activeIndex];
     guitar.theory.root = noteIndex;
     guitar.invalidate();
-}
+},
+// KNOB1 → hoverMode
+(components, source, newState) => {
+    if (source.name !== "knob1") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    if (newState === 0) guitar.hoverMode = "cursor"; // C
+    if (newState === 1) guitar.hoverMode = "note";   // N
+    if (newState === 2) guitar.hoverMode = "octave"; // T
+
+    guitar.invalidate();
+},
+
 
 
 ];
