@@ -129,7 +129,7 @@ class COFRenderer {
         const root = c.rootIndex ?? 0;
         const offset = -PI / 12 - root * segAngle;
 
-        const epsilon  = 0.05;
+        const epsilon  = 0.01;
 
         for (let i = 0; i < 12; i++) {
 
@@ -163,10 +163,10 @@ class COFRenderer {
 
             const labelObj = c.theory.getNoteLabel(noteIndex, mode);
 
-            const txt = labelObj.base + (labelObj.alt ?? "");
+            const noteTxt = labelObj.base + (labelObj.alt ?? "");
 
             const mid = (a0 + a1) * 0.5;
-            const lr  = (rInner + rOuter) * 0.5;
+            const lr  = (rInner + rOuter) * 0.55; // plus au bord
             const lx  = cx + Math.cos(mid) * lr;
             const ly  = cy + Math.sin(mid) * lr;
 
@@ -174,8 +174,30 @@ class COFRenderer {
             noStroke();
             textAlign(CENTER, CENTER);
             textSize(c.w * 0.10);
-            text(txt, lx, ly);
+            text(noteTxt, lx, ly);
+
+            // --- DEGRÉ (si root définie) ---
+            if (c.rootIndex !== null) {
+
+                // On récupère le degré pour CE noteIndex
+                const degObj = c.theory.getNoteLabel(noteIndex, "degree");
+                const degreeTxt =(degObj.alt ?? "") + degObj.base ;
+
+                const lr2 = (rInner + rOuter) * 0.38; // plus à l’intérieur
+                const lx2 = cx + Math.cos(mid) * lr2;
+                const ly2 = cy + Math.sin(mid) * lr2;
+
+                fill(0);
+                noStroke();
+                textAlign(CENTER, CENTER);
+                textSize(c.w * 0.08);
+                text(degreeTxt, lx2, ly2);
+            }
+
+
         }
+
+
 
         // --- ROOT CENTRALE ---
         if (c.rootIndex !== null) {
