@@ -460,7 +460,7 @@ drawPinnedNotes() {
 
 
         this.drawNote(pos.x, pos.y, {
-            fillColor: "red",
+            fillColor: "#3494f3",
             strokeColor: "black",
             hasShadow: false,
             label
