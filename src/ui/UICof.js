@@ -158,10 +158,10 @@ class COFRenderer {
             // --- LABEL ---
             const noteIndex = c.chroma[i];
             const mode = (c.displayMode === "note")
-    ? c.labelType
-    : c.displayMode;
+                ? c.labelType
+                : c.displayMode;
 
-const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+            const labelObj = c.theory.getNoteLabel(noteIndex, mode);
 
             const txt = labelObj.base + (labelObj.alt ?? "");
 
@@ -180,7 +180,12 @@ const labelObj = c.theory.getNoteLabel(noteIndex, mode);
         // --- ROOT CENTRALE ---
         if (c.rootIndex !== null) {
             const noteIndex = c.chroma[c.rootIndex];
-            const labelObj  = c.theory.getNoteLabel(noteIndex, c.displayMode);
+            const mode = (c.displayMode === "note")
+                ? c.labelType
+                : c.displayMode;
+
+            const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+
             const txt = labelObj.base + (labelObj.alt ?? "");
 
             fill(255);
