@@ -76,40 +76,43 @@ mouseMoved(evt) {
         return true;
     }
 
-    _hitTest(px, py) {
-        const cx = this.x + this.w/2;
-        const cy = this.y + this.h/2;
+_hitTest(px, py) {
+    const cx = this.x + this.w/2;
+    const cy = this.y + this.h/2;
 
-        const dx = px - cx;
-        const dy = py - cy;
+    const dx = px - cx;
+    const dy = py - cy;
 
-        const dist = Math.sqrt(dx*dx + dy*dy);
+    const dist = Math.sqrt(dx*dx + dy*dy);
 
-        const rOuter = this.w/2;
-        const rInner = this.w/2 * 0.45;
+    const rOuter = this.w/2;
+    const rInner = this.w/2 * 0.45;
 
-        if (dist > rOuter) return -1;
-        if (dist < rInner) return -1;
+    if (dist > rOuter) return -1;
+    if (dist < rInner) return -1;
 
-        let angle = Math.atan2(dy, dx);
+    let angle = Math.atan2(dy, dx);
 
-const segAngle = TWO_PI / 12;
-const root = this.rootIndex ?? 0;
-const offset = -PI / 12 - root * segAngle;
+    const segAngle = TWO_PI / 12;
+    const root = this.rootIndex ?? 0;
+    const offset = -PI / 12 - root * segAngle;
 
+    // 🔥 EXACTEMENT l’inverse de draw()
+    angle = angle + HALF_PI - offset;
 
-        angle -= offset;
+    if (angle < 0) angle += TWO_PI;
+    if (angle >= TWO_PI) angle -= TWO_PI;
 
-        angle += HALF_PI;
-        if (angle < 0) angle += TWO_PI;
+    return Math.floor(angle / segAngle);
+}
 
-        return Math.floor(angle / segAngle);
-    }
 
     draw() {
         this.renderer.draw();
     }
 }
+
+
 class COFRenderer {
 
     constructor(cof) {
@@ -143,30 +146,31 @@ class COFRenderer {
 
             beginShape();
 
-            // arc extérieur
             for (let a = a0; a <= a1; a += 0.02) {
                 vertex(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
             }
 
-            // arc intérieur
             for (let a = a1; a >= a0; a -= 0.02) {
                 vertex(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
             }
 
             endShape(CLOSE);
 
-            // --- LABEL ---
+            // --- LABEL NOTE ---
             const noteIndex = c.chroma[i];
+            if (noteIndex == null) continue;
+
             const mode = (c.displayMode === "note")
                 ? c.labelType
                 : c.displayMode;
 
             const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+            if (!labelObj || !labelObj.base) continue;
 
             const noteTxt = labelObj.base + (labelObj.alt ?? "");
 
             const mid = (a0 + a1) * 0.5;
-            const lr  = (rInner + rOuter) * 0.55; // plus au bord
+            const lr  = (rInner + rOuter) * 0.55;
             const lx  = cx + Math.cos(mid) * lr;
             const ly  = cy + Math.sin(mid) * lr;
 
@@ -176,14 +180,15 @@ class COFRenderer {
             textSize(c.w * 0.10);
             text(noteTxt, lx, ly);
 
-            // --- DEGRÉ (si root définie) ---
+            // --- DEGRÉ ---
             if (c.rootIndex !== null) {
 
-                // On récupère le degré pour CE noteIndex
                 const degObj = c.theory.getNoteLabel(noteIndex, "degree");
-                const degreeTxt =(degObj.alt ?? "") + degObj.base ;
+                if (!degObj || !degObj.base) continue;
 
-                const lr2 = (rInner + rOuter) * 0.38; // plus à l’intérieur
+                const degreeTxt = (degObj.alt ?? "") + degObj.base;
+
+                const lr2 = (rInner + rOuter) * 0.38;
                 const lx2 = cx + Math.cos(mid) * lr2;
                 const ly2 = cy + Math.sin(mid) * lr2;
 
@@ -193,11 +198,7 @@ class COFRenderer {
                 textSize(c.w * 0.08);
                 text(degreeTxt, lx2, ly2);
             }
-
-
         }
-
-
 
         // --- ROOT CENTRALE ---
         if (c.rootIndex !== null) {
@@ -207,6 +208,7 @@ class COFRenderer {
                 : c.displayMode;
 
             const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+            if (!labelObj || !labelObj.base) return;
 
             const txt = labelObj.base + (labelObj.alt ?? "");
 
@@ -218,3 +220,4 @@ class COFRenderer {
         }
     }
 }
+

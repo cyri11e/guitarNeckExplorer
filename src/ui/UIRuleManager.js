@@ -35,8 +35,8 @@ class RuleManager {
     }
 
 applyRules(source, newState) {
-    console.log("[RULEMANAGER] applyRules from", source.name, "state =", newState);
-    console.log("[RULEMANAGER] components =", this._components.map(c => c.name));
+ //   console.log("[RULEMANAGER] applyRules from", source.name, "state =", newState);
+  //  console.log("[RULEMANAGER] components =", this._components.map(c => c.name));
 
     for (let rule of this.rules) {
         rule(this._components, source, newState);
