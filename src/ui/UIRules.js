@@ -105,6 +105,31 @@ const UI_RULES = [
 
     guitar.invalidate();
 },
+// ============================================================
+// COF → GUITAR : animation highlight des roots sur le manche
+// ============================================================
+// ============================================================
+// COF (clic root) → GUITAR : animation highlight des roots
+// ============================================================
+(components, source, newState) => {
+
+    const cof    = components.find(c => c.name === "cof1");
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!cof || !guitar) return;
+
+    // On ne réagit qu’aux changements venant du COF
+    if (source !== cof) return;
+
+    //  On ignore totalement le hover
+    if (cof.rootIndex === null) return;
+
+    // rootIndex → noteIndex
+    const noteIndex = cof.chroma[cof.rootIndex];
+
+    //  déclenche l’animation du manche
+    guitar.highlightNote(noteIndex);
+    console.log('hilite')
+},
 
 
 

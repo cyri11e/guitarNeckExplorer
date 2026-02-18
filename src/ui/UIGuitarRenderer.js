@@ -67,11 +67,11 @@ detectPlatformAdjustments() {
         const s = strings[i];
 
         // Base de la corde
-        fill(100,100);
+        fill(100);
         rect(s.x, s.y, s.w, s.h);
 
         // Reflet
-        fill(230,100);
+        fill(230);
         rect(s.x, s.y, s.w, s.h * 0.4);
 
         push();
@@ -92,6 +92,29 @@ detectPlatformAdjustments() {
         pop();
     }
 }
+
+
+    // --------------------------------------------------------
+    //  MÉTHODE DÉDIÉE À L’ANIMATION DES ROOTS
+    // --------------------------------------------------------
+    drawHighlights() {
+        const g = this.g;
+
+        if (!g.highlighted || g.highlighted.length === 0)
+            return;
+
+        for (let h of g.highlighted) {
+
+            const alpha = 255 * (1 - h.t);      // fade-out
+            const scale = 1 + 0.3 * (1 - h.t);  // pulse
+
+            const pos = this.getFretPosition(h.s, h.f);
+
+            fill(255, 0, 0, alpha);
+            noStroke();
+            ellipse(pos.x, pos.y, this.fretMarkerSize * scale);
+        }
+    }
 
 
     // ------------------------------------------------------------
@@ -727,13 +750,15 @@ drawDebugInfo() {
         this.drawHead();
         this.drawStringShadows();
         this.drawFrets();
+        
+        this.drawStrings();
         this.drawPinnedNotes();
 
-        this.drawStrings();
         this.drawOpenStringLabels();
         this.drawSelectedNotes();
         
         this.drawHoverDot();
+        this.drawHighlights();
 
         if (g.debug) this.drawDebugInfo();
     }

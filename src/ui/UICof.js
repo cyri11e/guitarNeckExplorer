@@ -8,104 +8,121 @@ class COF extends UIComponent {
         this.aspectRatio = 1;
         this.setResponsive(cfg.xp ?? 0, cfg.yp ?? 0, cfg.sp ?? 20);
 
-        // cycle des quintes → indices chromatiques
         this.chroma = [0,7,2,9,4,11,6,1,8,3,10,5];
 
         this.hoverIndex = -1;
         this.rootIndex  = null;
 
-        // langue par défaut
-        this.displayMode = "note";      // toujours note pour l’instant
-        this.labelType   = "noteEN";    // langue
+        this.displayMode = "note";
+        this.labelType   = "noteEN";
 
-
-        this.renderer = new COFRenderer(this);
         this.theory = cfg.theory ?? null;
+        this.renderer = new COFRenderer(this);
 
+        // Animation
+        this.animAngle = 0;
+        this.targetAngle = 0;
+        this.animSpeed = 0.15;
+
+        this._animTimer = null; // 🔥 timer interne
     }
 
-setDisplayMode(mode) {
-    const allowed = ["note", "degree", "none"];
-    if (!allowed.includes(mode)) return;
-    this.displayMode = mode;
-    this.invalidate();
-}
+    _startAnimationLoop() {
+        if (this._animTimer) return; // déjà en cours
 
+        this._animTimer = setInterval(() => {
+            // si l’animation est finie → stop
+            if (Math.abs(this.animAngle - this.targetAngle) < 0.0001) {
+                clearInterval(this._animTimer);
+                this._animTimer = null;
+                return;
+            }
 
-    setLabelType(type) {
-        const allowed = ["noteEN", "noteFR"];
-        if (!allowed.includes(type)) return;
-        this.labelType = type;
+            // sinon → redraw
+            this.invalidate();
+
+        }, 16); // ~60 FPS
+    }
+
+    mouseMoved(evt) {
+        const idx = this._hitTest(evt.x, evt.y);
+
+        const oldHover = this.hoverIndex;
+        this.hoverIndex = idx;
+
+        if (idx !== oldHover) {
+            this.onChange?.(idx);
+        }
+
         this.invalidate();
+        return (idx >= 0);
     }
-
-mouseMoved(evt) {
-    const idx = this._hitTest(evt.x, evt.y);
-
-    const oldHover = this.hoverIndex;
-    this.hoverIndex = idx;
-
-    // ne spamme pas si rien ne change
-    if (idx !== oldHover) {
-        this.onChange?.(idx);
-    }
-
-    this.invalidate();
-    return (idx >= 0);
-}
-
 
     mousePressed(evt) {
         const idx = this._hitTest(evt.x, evt.y);
         return (idx >= 0);
     }
 
-    mouseClicked(evt) {
-        const idx = this._hitTest(evt.x, evt.y);
-        if (idx < 0) return false;
+mouseClicked(evt) {
+    const idx = this._hitTest(evt.x, evt.y);
+    if (idx < 0) return false;
 
-        if (this.rootIndex === idx) {
-            this.rootIndex = null;
-            this.onChange?.(null);
-        } else {
-            this.rootIndex = idx;
-            this.onChange?.(idx);
-        }
+    if (this.rootIndex === idx) {
+        this.rootIndex = null;
+        this.targetAngle = 0;
+        this.onChange?.(null);
+    } else {
+        this.rootIndex = idx;
 
-        this.invalidate();
-        return true;
+        const seg = TWO_PI / 12;
+        let newAngle = -idx * seg;
+
+        // différence brute
+        let delta = newAngle - this.animAngle;
+
+        // normalisation dans [-π, +π]
+        delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
+
+        // angle cible = angle actuel + delta minimal
+        this.targetAngle = this.animAngle + delta;
+
+        this.onChange?.(idx);
     }
 
-_hitTest(px, py) {
-    const cx = this.x + this.w/2;
-    const cy = this.y + this.h/2;
-
-    const dx = px - cx;
-    const dy = py - cy;
-
-    const dist = Math.sqrt(dx*dx + dy*dy);
-
-    const rOuter = this.w/2;
-    const rInner = this.w/2 * 0.45;
-
-    if (dist > rOuter) return -1;
-    if (dist < rInner) return -1;
-
-    let angle = Math.atan2(dy, dx);
-
-    const segAngle = TWO_PI / 12;
-    const root = this.rootIndex ?? 0;
-    const offset = -PI / 12 - root * segAngle;
-
-    // 🔥 EXACTEMENT l’inverse de draw()
-    angle = angle + HALF_PI - offset;
-
-    if (angle < 0) angle += TWO_PI;
-    if (angle >= TWO_PI) angle -= TWO_PI;
-
-    return Math.floor(angle / segAngle);
+    this._startAnimationLoop();
+    this.invalidate();
+    return true;
 }
 
+
+    _hitTest(px, py) {
+        const cx = this.x + this.w/2;
+        const cy = this.y + this.h/2;
+
+        const dx = px - cx;
+        const dy = py - cy;
+
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        const rOuter = this.w/2;
+        const rInner = this.w/2 * 0.45;
+
+        if (dist > rOuter) return -1;
+        if (dist < rInner) return -1;
+
+        let angle = Math.atan2(dy, dx);
+
+        const segAngle = TWO_PI / 12;
+        const root = this.rootIndex ?? 0;
+        const offset = -PI / 12 - root * segAngle;
+
+        angle = angle + HALF_PI - offset;
+
+        if (angle < 0) angle += TWO_PI;
+        if (angle >= TWO_PI) angle -= TWO_PI;
+
+        return Math.floor(angle / segAngle);
+    }
 
     draw() {
         this.renderer.draw();
@@ -129,8 +146,11 @@ class COFRenderer {
         const rInner = c.w/2 * 0.45;
 
         const segAngle = TWO_PI / 12;
-        const root = c.rootIndex ?? 0;
-        const offset = -PI / 12 - root * segAngle;
+
+        // interpolation
+        c.animAngle += (c.targetAngle - c.animAngle) * c.animSpeed;
+
+        const offset = -PI / 12 + c.animAngle;
 
         const epsilon  = 0.01;
 
@@ -139,24 +159,19 @@ class COFRenderer {
             const a0 = i * segAngle + offset - HALF_PI - epsilon;
             const a1 = (i+1) * segAngle + offset - HALF_PI + epsilon;
 
-            // couleur segment
             if (i === c.rootIndex) fill(255, 20, 20);
             else if (i === c.hoverIndex) fill(200);
             else fill(150);
 
             beginShape();
-
             for (let a = a0; a <= a1; a += 0.02) {
                 vertex(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
             }
-
             for (let a = a1; a >= a0; a -= 0.02) {
                 vertex(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
             }
-
             endShape(CLOSE);
 
-            // --- LABEL NOTE ---
             const noteIndex = c.chroma[i];
             if (noteIndex == null) continue;
 
@@ -180,9 +195,7 @@ class COFRenderer {
             textSize(c.w * 0.10);
             text(noteTxt, lx, ly);
 
-            // --- DEGRÉ ---
             if (c.rootIndex !== null) {
-
                 const degObj = c.theory.getNoteLabel(noteIndex, "degree");
                 if (!degObj || !degObj.base) continue;
 
@@ -200,7 +213,6 @@ class COFRenderer {
             }
         }
 
-        // --- ROOT CENTRALE ---
         if (c.rootIndex !== null) {
             const noteIndex = c.chroma[c.rootIndex];
             const mode = (c.displayMode === "note")

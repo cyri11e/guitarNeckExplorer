@@ -41,13 +41,18 @@ class Guitar extends UIComponent {
         this.geometry.projectGeometry();
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
-        this.pinnedNotes = [ { fret: 1, string: 6 }, { fret: 1, string: 5 }, { fret: 1, string: 1 }, { fret: 3, string: 2 }, { fret: 3, string: 3 }, { fret: 2, string: 4 } ]; // { fret, string }
+        this.pinnedNotes = [ { fret: 1, string: 6 }, 
+            // { fret: 1, string: 5 }, 
+            // { fret: 1, string: 1 }, 
+            // { fret: 3, string: 2 }, 
+            // { fret: 3, string: 3 },
+             { fret: 2, string: 4 } ]; // { fret, string }
         this.selectedNotes = [
                                 { fret: 3, string: 3 },
-                                { fret: 5, string: 3 },
-                                { fret: 7, string: 3 },
-                                { fret: 7, string: 4 },
-                                { fret: 5, string: 4 }
+                                // { fret: 5, string: 3 },
+                                // { fret: 7, string: 3 },
+                                // { fret: 7, string: 4 },
+                                // { fret: 5, string: 4 }
                                 ]
                                 ; // { fret, string }
 
@@ -193,6 +198,43 @@ toggleSelected(fret, string) {
 
         this.invalidate();
     }
+
+highlightNote(noteIndex) {
+    this.highlighted = [];
+
+    for (let s = 0; s < this.strings.length; s++) {
+        for (let f = 0; f < this.frets; f++) {
+            if (this.getNoteAt(s, f) === noteIndex) {
+                this.highlighted.push({ s, f, t: 0 });
+            }
+        }
+    }
+
+    this._startHighlightTimer();
+    this.invalidate();
+}
+
+_startHighlightTimer() {
+    if (this._highlightTimer) return;
+
+    this._highlightTimer = setInterval(() => {
+
+        let done = true;
+
+        for (let h of this.highlighted) {
+            h.t += 0.05; // vitesse animation
+            if (h.t < 1) done = false;
+        }
+
+        this.invalidate();
+
+        if (done) {
+            clearInterval(this._highlightTimer);
+            this._highlightTimer = null;
+        }
+
+    }, 16); // ~60 FPS
+}
 
 
 moveSelectedFrets(delta) {
