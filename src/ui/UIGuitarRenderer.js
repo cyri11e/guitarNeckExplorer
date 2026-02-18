@@ -334,7 +334,7 @@ drawNote(x, y, opts = {}) {
 
     // --- rayon et offset ---
     const r = this.g.getThickness() * 0.15;
-    const offset = hasShadow ? (r / 18) : 0;
+    const offset = hasShadow ? (r / 8) : 0;
 
     // --- ombre ---
     if (hasShadow) {
@@ -354,7 +354,7 @@ drawNote(x, y, opts = {}) {
     // --- forme principale ---
     fill(fillColor);
     stroke(strokeColor);
-    strokeWeight((shapeType === "square") ? strokeW *3 : strokeW);
+    strokeWeight((shapeType === "square") ? strokeW *2 : strokeW);
     if (base=="") {
        fill(0); 
     }
@@ -362,7 +362,8 @@ drawNote(x, y, opts = {}) {
     push();
     if (shapeType === "square") {
         rectMode(CENTER);
-        rect(x - offset, y - offset, r, r, r * 0.2);
+        stroke(255);
+        rect(x - offset, y - offset, r * 1.1, r *1.1, r * 0.2);
     } else {
         circle(x - offset, y - offset, r);
     }
@@ -370,7 +371,7 @@ drawNote(x, y, opts = {}) {
 
     // --- texte ---
     noStroke();
-    fill(strokeColor);
+    fill((shapeType === "square") ? 255 : strokeColor);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
 
@@ -534,6 +535,11 @@ drawHighlights() {
     if (!g.highlighted || g.highlighted.length === 0)
         return;
 
+    const pts = []; // points finalisés uniquement
+
+    // ---------------------------------------------------------
+    // 1) DESSIN DES CIBLES (t < 1) ET DES POINTS FINAUX (t >= 1)
+    // ---------------------------------------------------------
     for (let h of g.highlighted) {
 
         const pos = g.toScreen(h.fret, h.string);
@@ -549,43 +555,98 @@ drawHighlights() {
         translate(pos.x, pos.y);
         noStroke();
 
-        // --- CERCLES CONCENTRIQUES ROUGE / BLANC ---
-        const rings = [
-            { r: baseR * 1.00, col: [255, 0, 0] },   // rouge
-            { r: baseR * 0.70, col: [255, 255, 255] }, // blanc
-            { r: baseR * 0.40, col: [255, 0, 0] },   // rouge
-            { r: baseR * 0.15, col: [255, 255, 255] }  // blanc (centre)
-        ];
+        // Phase 1 : cibles (t < 1)
+        if (t < 1) {
 
-        for (const ring of rings) {
-            fill(ring.col[0], ring.col[1], ring.col[2], alpha);
-            circle(0, 0, ring.r);
-        }   
+            const rings = [
+                { r: baseR * 1.00, col: [255, 0, 0] },
+                { r: baseR * 0.70, col: [255, 255, 255] },
+                { r: baseR * 0.40, col: [255, 0, 0] },
+                { r: baseR * 0.15, col: [255, 255, 255] }
+            ];
 
-
-        
-        // --- Pastille rouge finale avec fade-out long ---
-        if (h.t >= 1) {
-
-            // fade = 1 → 0 entre t=1 et t=6
-            const fade = 1 - Math.min((h.t - 1) / 5, 1);
-            const alpha2 = 255 * fade;
-
-            noStroke();
-            fill(255, 0, 0, alpha2);
-
-            // Taille FIXE, ne change jamais
-            const finalR = g.getThickness() * 0.12;
-            circle(0, 0, finalR);
+            for (const ring of rings) {
+                fill(ring.col[0], ring.col[1], ring.col[2], alpha);
+                circle(0, 0, ring.r);
+            }
         }
 
+        // Phase 2 : point final (t >= 1)
+        else {
 
+            const fade = 1 - Math.min((t - 1) / 5, 1);
+            const alpha2 = 255 * fade;
 
+            fill(255, 0, 0, alpha2);
+            const finalR = g.getThickness() * 0.12;
+            circle(0, 0, finalR);
 
+            // On stocke uniquement les points finalisés
+            pts.push({
+                x: pos.x,
+                y: pos.y,
+                alpha: alpha2,
+                fret: h.fret
+            });
+        }
 
         pop();
     }
+
+    // ---------------------------------------------------------
+    // 2) RELIAGE DES POINTS FINAUX SELON TA RÈGLE
+    // ---------------------------------------------------------
+    if (pts.length < 2)
+        return;
+
+    // Trier gauche → droite
+    pts.sort((a, b) => a.x - b.x);
+
+    // Regrouper par frette
+    const groups = [];
+    let current = [pts[0]];
+
+    for (let i = 1; i < pts.length; i++) {
+        if (pts[i].fret === current[0].fret) {
+            current.push(pts[i]);
+        } else {
+            groups.push(current);
+            current = [pts[i]];
+        }
+    }
+    groups.push(current);
+
+    strokeWeight(2);
+
+    for (let gi = 0; gi < groups.length; gi++) {
+
+        const G = groups[gi];       // groupe courant (ex : 3,4,5)
+        const prev = groups[gi-1];  // groupe précédent (ex : 2)
+        const next = groups[gi+1];  // groupe suivant (ex : 6)
+
+        // A) RELIER LE POINT PRÉCÉDENT À TOUS LES POINTS DE LA FRETTTE
+        if (prev) {
+            const p = prev[prev.length - 1];
+            for (const a of G) {
+                const alpha = Math.min(p.alpha, a.alpha);
+                stroke(255, 0, 0, alpha);
+                line(p.x, p.y, a.x, a.y);
+            }
+        }
+
+        // B) RELIER TOUS LES POINTS DE LA FRETTTE AU POINT SUIVANT
+        if (next) {
+            const target = next[0];
+            for (const a of G) {
+                const alpha = Math.min(a.alpha, target.alpha);
+                stroke(255, 0, 0, alpha);
+                line(a.x, a.y, target.x, target.y);
+            }
+        }
+    }
 }
+
+
 
 
 
@@ -796,9 +857,9 @@ drawDebugInfo() {
         this.drawFrets();
         
         this.drawStrings();
+        this.drawOpenStringLabels();
         this.drawPinnedNotes();
 
-        this.drawOpenStringLabels();
         this.drawSelectedNotes();
         
         this.drawHoverDot();
