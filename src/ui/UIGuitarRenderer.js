@@ -97,24 +97,7 @@ detectPlatformAdjustments() {
     // --------------------------------------------------------
     //  MÉTHODE DÉDIÉE À L’ANIMATION DES ROOTS
     // --------------------------------------------------------
-    drawHighlights() {
-        const g = this.g;
 
-        if (!g.highlighted || g.highlighted.length === 0)
-            return;
-
-        for (let h of g.highlighted) {
-
-            const alpha = 255 * (1 - h.t);      // fade-out
-            const scale = 1 + 0.3 * (1 - h.t);  // pulse
-
-            const pos = this.getFretPosition(h.s, h.f);
-
-            fill(255, 0, 0, alpha);
-            noStroke();
-            ellipse(pos.x, pos.y, this.fretMarkerSize * scale);
-        }
-    }
 
 
     // ------------------------------------------------------------
@@ -545,6 +528,67 @@ drawPinnedNotes() {
     }
 }
 
+drawHighlights() {
+    const g = this.g;
+
+    if (!g.highlighted || g.highlighted.length === 0)
+        return;
+
+    for (let h of g.highlighted) {
+
+        const pos = g.toScreen(h.fret, h.string);
+        if (!pos) continue;
+
+        const t = h.t;
+        const alpha = 255 * (1 - t);
+        const scale = 1 + 0.3 * (1 - t);
+
+        const baseR = g.getThickness() * 0.20 * scale;
+
+        push();
+        translate(pos.x, pos.y);
+        noStroke();
+
+        // --- CERCLES CONCENTRIQUES ROUGE / BLANC ---
+        const rings = [
+            { r: baseR * 1.00, col: [255, 0, 0] },   // rouge
+            { r: baseR * 0.70, col: [255, 255, 255] }, // blanc
+            { r: baseR * 0.40, col: [255, 0, 0] },   // rouge
+            { r: baseR * 0.15, col: [255, 255, 255] }  // blanc (centre)
+        ];
+
+        for (const ring of rings) {
+            fill(ring.col[0], ring.col[1], ring.col[2], alpha);
+            circle(0, 0, ring.r);
+        }   
+
+
+        
+        // --- Pastille rouge finale avec fade-out long ---
+        if (h.t >= 1) {
+
+            // fade = 1 → 0 entre t=1 et t=6
+            const fade = 1 - Math.min((h.t - 1) / 5, 1);
+            const alpha2 = 255 * fade;
+
+            noStroke();
+            fill(255, 0, 0, alpha2);
+
+            // Taille FIXE, ne change jamais
+            const finalR = g.getThickness() * 0.12;
+            circle(0, 0, finalR);
+        }
+
+
+
+
+
+        pop();
+    }
+}
+
+
+
 drawSelectedNotes() {
     const g = this.g;
     const app = g.app;
@@ -658,7 +702,7 @@ drawOpenStringLabels() {
     const names = ["E", "A", "D", "G", "B", "E"]; // corde 1 → aiguë
     const c0 = g.cases[0]; // case à vide
 
-    const x = c0.xc;       // 🔥 même emplacement horizontal que la pastille
+    const x = c0.xc;       //même emplacement horizontal que la pastille
     const t = g.getThickness();
     const col = this.style.getInlayColor();
 
@@ -668,7 +712,7 @@ drawOpenStringLabels() {
 
     for (let i = 0; i < g.strings.length; i++) {
         const s = g.strings[i];
-        text(names[i], x, s.y);  // 🔥 même y que la pastille
+        text(names[i], x, s.y);  // même y que la pastille
     }
 }
 

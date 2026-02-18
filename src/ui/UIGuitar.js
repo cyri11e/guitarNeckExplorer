@@ -97,8 +97,29 @@ setLabelType(type) {
     }
 
     getNutWidth() {
-        return this.getThickness() / 20;
+        return this.getThickness() / 10;
     }
+
+    getPositionsForPitchClass(pc) {
+    const app = this.app;
+    if (!app || !app.instrument) return [];
+
+    const out = [];
+
+    for (let s = 1; s <= this.strings.length; s++) {
+        for (let f = 0; f <= this.fretCount; f++) {
+
+            const raw = app.instrument.getNoteAt(s - 1, f);
+            if (!raw) continue;
+
+            if (raw.index === pc) {
+                out.push({ string: s, fret: f });
+            }
+        }
+    }
+
+    return out;
+}
 
     // ------------------------------------------------------------
     // COORDONNÉES
@@ -144,6 +165,14 @@ setLabelType(type) {
         return this.hoveredNote;
     }
 
+    highlightNote(pc) {
+        this.highlighted = this.getPositionsForPitchClass(pc)
+            .map(p => ({ ...p, t: 0 }));
+
+        this._startHighlightTimer();
+        this.invalidate();
+    }
+
     // ------------------------------------------------------------
     // DRAW
     // ------------------------------------------------------------
@@ -185,6 +214,42 @@ toggleSelected(fret, string) {
     this.invalidate();
 }
 
+_startHighlightTimer() {
+    if (this._highlightTimer) return;
+
+    this.targetTime = 1.0;  // durée de la cible (en secondes)
+    this.dotTime    = 15.0;  // durée du fade-out du point final (en secondes)
+
+    const dt = 0.02; // vitesse d’incrémentation (≈60 FPS)
+    const totalT = this.targetTime + this.dotTime; // durée totale
+
+    this._highlightTimer = setInterval(() => {
+
+        let done = true;
+
+        for (let h of this.highlighted) {
+            h.t += dt;
+
+            // Phase 1 : 0 → targetTime
+            // Phase 2 : targetTime → targetTime + dotTime
+            if (h.t < totalT) done = false;
+        }
+
+        this.invalidate();
+
+        if (done) {
+            clearInterval(this._highlightTimer);
+            this._highlightTimer = null;
+            this.highlighted = [];
+            this.invalidate();
+        }
+
+    }, 16);
+}
+
+
+
+
 
 
     togglePinnedNote(fret, string) {
@@ -199,42 +264,6 @@ toggleSelected(fret, string) {
         this.invalidate();
     }
 
-highlightNote(noteIndex) {
-    this.highlighted = [];
-
-    for (let s = 0; s < this.strings.length; s++) {
-        for (let f = 0; f < this.frets; f++) {
-            if (this.getNoteAt(s, f) === noteIndex) {
-                this.highlighted.push({ s, f, t: 0 });
-            }
-        }
-    }
-
-    this._startHighlightTimer();
-    this.invalidate();
-}
-
-_startHighlightTimer() {
-    if (this._highlightTimer) return;
-
-    this._highlightTimer = setInterval(() => {
-
-        let done = true;
-
-        for (let h of this.highlighted) {
-            h.t += 0.05; // vitesse animation
-            if (h.t < 1) done = false;
-        }
-
-        this.invalidate();
-
-        if (done) {
-            clearInterval(this._highlightTimer);
-            this._highlightTimer = null;
-        }
-
-    }, 16); // ~60 FPS
-}
 
 
 moveSelectedFrets(delta) {

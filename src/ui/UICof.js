@@ -44,19 +44,28 @@ class COF extends UIComponent {
         }, 16); // ~60 FPS
     }
 
-    mouseMoved(evt) {
-        const idx = this._hitTest(evt.x, evt.y);
+mouseMoved(evt) {
+    const idx = this._hitTest(evt.x, evt.y);
 
-        const oldHover = this.hoverIndex;
-        this.hoverIndex = idx;
+    // 🔥 Le centre (-2) ne doit PAS devenir un hover
+    const hover = (idx === -2) ? -1 : idx;
 
-        if (idx !== oldHover) {
-            this.onChange?.(idx);
-        }
+    const oldHover = this.hoverIndex;
+    this.hoverIndex = hover;
 
-        this.invalidate();
-        return (idx >= 0);
+    if (hover !== oldHover) {
+        this.onChange?.({
+            type: "hover",
+            index: hover
+        });
     }
+
+    this.invalidate();
+    return (hover >= 0);
+}
+
+
+
 
     mousePressed(evt) {
         const idx = this._hitTest(evt.x, evt.y);
@@ -65,28 +74,49 @@ class COF extends UIComponent {
 
 mouseClicked(evt) {
     const idx = this._hitTest(evt.x, evt.y);
+
+    // --- CLIC CENTRAL : highlight ONLY ---
+    if (idx === -2) {
+        if (this.rootIndex !== null) {
+
+            // 🔥 On envoie un événement "root" identique à un clic segment
+            // mais SANS changer la root
+            this.onChange?.({
+                type: "root",
+                index: this.rootIndex
+            });
+        }
+        return true;
+    }
+
+    // --- CLIC HORS ZONE ---
     if (idx < 0) return false;
 
+    // --- CLIC SEGMENT : toggle root ---
     if (this.rootIndex === idx) {
         this.rootIndex = null;
         this.targetAngle = 0;
-        this.onChange?.(null);
+
+        this.onChange?.({
+            type: "root",
+            index: null
+        });
+
     } else {
         this.rootIndex = idx;
 
         const seg = TWO_PI / 12;
-        let newAngle = -idx * seg;
+        const newAngle = -idx * seg;
 
-        // différence brute
         let delta = newAngle - this.animAngle;
-
-        // normalisation dans [-π, +π]
         delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
 
-        // angle cible = angle actuel + delta minimal
         this.targetAngle = this.animAngle + delta;
 
-        this.onChange?.(idx);
+        this.onChange?.({
+            type: "root",
+            index: idx
+        });
     }
 
     this._startAnimationLoop();
@@ -95,34 +125,46 @@ mouseClicked(evt) {
 }
 
 
-    _hitTest(px, py) {
-        const cx = this.x + this.w/2;
-        const cy = this.y + this.h/2;
 
-        const dx = px - cx;
-        const dy = py - cy;
 
-        const dist = Math.sqrt(dx*dx + dy*dy);
 
-        const rOuter = this.w/2;
-        const rInner = this.w/2 * 0.45;
+_hitTest(px, py) {
+    const cx = this.x + this.w/2;
+    const cy = this.y + this.h/2;
 
-        if (dist > rOuter) return -1;
-        if (dist < rInner) return -1;
+    const dx = px - cx;
+    const dy = py - cy;
 
-        let angle = Math.atan2(dy, dx);
+    const dist = Math.sqrt(dx*dx + dy*dy);
 
-        const segAngle = TWO_PI / 12;
-        const root = this.rootIndex ?? 0;
-        const offset = -PI / 12 - root * segAngle;
+    const rOuter = this.w/2;
+    const rInner = this.w/2 * 0.45;
 
-        angle = angle + HALF_PI - offset;
+    const centerRadius = this.w * 0.20;
 
-        if (angle < 0) angle += TWO_PI;
-        if (angle >= TWO_PI) angle -= TWO_PI;
-
-        return Math.floor(angle / segAngle);
+    // --- Zone centrale ---
+    if (dist < centerRadius) {
+        return -2; // clic spécial, mais PAS une note
     }
+
+    if (dist > rOuter) return -1;
+    if (dist < rInner) return -1;
+
+    let angle = Math.atan2(dy, dx);
+
+    const segAngle = TWO_PI / 12;
+    const root = this.rootIndex ?? 0;
+    const offset = -PI / 12 - root * segAngle;
+
+    angle = angle + HALF_PI - offset;
+
+    if (angle < 0) angle += TWO_PI;
+    if (angle >= TWO_PI) angle -= TWO_PI;
+
+    return Math.floor(angle / segAngle);
+}
+
+
 
     draw() {
         this.renderer.draw();
