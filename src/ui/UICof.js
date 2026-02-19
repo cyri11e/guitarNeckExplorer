@@ -164,6 +164,10 @@ _hitTest(px, py) {
     return Math.floor(angle / segAngle);
 }
 
+setLabelType(type) {
+    this.labelType = type;
+    this.invalidate();
+}
 
 
     draw() {
