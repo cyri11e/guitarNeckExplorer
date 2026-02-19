@@ -204,10 +204,10 @@ resize() {
     mouseDragged(x, y)  { this.ui.mouseDragged(x, y); }
     mouseWheel(e)       { return this.ui.mouseWheel(e); }
 
-    mouseClicked(x, y)  {
-        this.ui.mouseClicked(x, y);
-        this.invalidate();
-    }
+    // mouseClicked(x, y)  {
+    //     this.ui.mouseClicked(x, y);
+    //     this.invalidate();
+    // }
 
     keyPressed(k, kc) {
         this.ui.handleShortcut(k, kc);

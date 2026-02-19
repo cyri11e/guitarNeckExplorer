@@ -3,8 +3,19 @@ class UIInteractionManager {
     constructor() {
         this.components = [];
         this.shortcuts = {};
-        this.captureOwner = null;   // 🔥 composant qui a capturé la souris
+        this.captureOwner = null;
         this.mouseIsDown = false;
+
+        // ============================================================
+        // INTERACTIONS GUITARE (globales)
+        // ============================================================
+        this.guitar = null;       // détectée automatiquement
+        this.brushActive = false; // clic gauche = pinceau
+        this.eraseActive = false; // clic droit = gomme
+        this.dragActive = false;  // CTRL = drag du manche
+
+        this.lastX = 0;
+        this.lastY = 0;
     }
 
     // ============================================================
@@ -13,6 +24,11 @@ class UIInteractionManager {
 
     register(component) {
         this.components.push(component);
+
+        // Détection automatique de la guitare
+        if (component instanceof Guitar) {
+            this.guitar = component;
+        }
 
         if (component.shortcutKey) {
             this.shortcuts[component.shortcutKey.toLowerCase()] = component;
@@ -23,118 +39,199 @@ class UIInteractionManager {
         this.components = this.components.filter(c => c !== component);
     }
 
-
-
     // ============================================================
-    // MOUSE EVENTS WITH CAPTURE
+    // EVENT BUILDER
     // ============================================================
-_buildEvent(mx, my) {
-    return {
-        x: mx,
-        y: my,
-        shift: keyIsDown(SHIFT),
-        alt: keyIsDown(ALT),
-        ctrl: keyIsDown(CONTROL),
-        button: mouseButton
-    };
-}
 
-mouseMoved(mx, my) {
-    const evt = this._buildEvent(mx, my);
-
-    for (const c of this.components) {
-        c.mouseMoved?.(evt);
+    _buildEvent(mx, my) {
+        return {
+            x: mx,
+            y: my,
+            shift: keyIsDown(SHIFT),
+            alt: keyIsDown(ALT),
+            ctrl: keyIsDown(CONTROL),
+            button: mouseButton
+        };
     }
-}
 
+    // ============================================================
+    // INTERACTIONS GUITARE — HANDLERS INTERNES
+    // ============================================================
 
+    _handleGlobalMousePressed(evt) {
+        if (!this.guitar) return false;
+        if (!this.guitar.containsRect(evt)) return false;
 
- mousePressed(mx, my) {
-    this.mouseIsDown = true;
+        this.lastX = evt.x;
+        this.lastY = evt.y;
 
-    const evt = this._buildEvent(mx, my);
-
-    // top → bottom
-    for (let i = this.components.length - 1; i >= 0; i--) {
-        const c = this.components[i];
-
-        if (c.mousePressed?.(evt)) {
-            this.captureOwner = c;
+        // CTRL = drag du manche
+        if (evt.ctrl) {
+            this.dragActive = true;
+            this.brushActive = false;
+            this.eraseActive = false;
             return true;
+        }
+
+        // Clic gauche = pinceau
+        if (evt.button === 0) {
+            this.brushActive = true;
+            this.eraseActive = false;
+            this.dragActive = false;
+            this.guitar.addNoteAtEvent(evt);
+            return true;
+        }
+
+        // Clic droit = gomme
+        if (evt.button === 2) {
+            this.eraseActive = true;
+            this.brushActive = false;
+            this.dragActive = false;
+            this.guitar.removeNoteAtEvent(evt);
+            return true;
+        }
+
+        return false;
+    }
+
+    _handleGlobalMouseMoved(evt) {
+        if (!this.guitar) return false;
+
+        if (this.brushActive) {
+            this.guitar.addNoteAtEvent(evt);
+            return true;
+        }
+
+        if (this.eraseActive) {
+            this.guitar.removeNoteAtEvent(evt);
+            return true;
+        }
+
+        return false;
+    }
+
+    _handleGlobalMouseDragged(evt) {
+        if (!this.guitar) return false;
+
+        if (this.dragActive) {
+            const dx = evt.x - this.lastX;
+            const dy = evt.y - this.lastY;
+
+            this.lastX = evt.x;
+            this.lastY = evt.y;
+
+            this.guitar.moveBy(dx, dy);
+            return true;
+        }
+
+        return false;
+    }
+
+    _handleGlobalMouseReleased(evt) {
+        this.brushActive = false;
+        this.eraseActive = false;
+        this.dragActive = false;
+        return false;
+    }
+
+    // ============================================================
+    // MOUSE EVENTS WITH CAPTURE + GLOBAL GUITAR LAYER
+    // ============================================================
+
+    mouseMoved(mx, my) {
+        const evt = this._buildEvent(mx, my);
+
+        if (this._handleGlobalMouseMoved(evt)) return true;
+
+        // propagation UI
+        for (const c of this.components) {
+            c.mouseMoved?.(evt);
         }
     }
 
-    return false;
-}
+    mousePressed(mx, my) {
+        this.mouseIsDown = true;
+        const evt = this._buildEvent(mx, my);
 
+        // 1) Interactions guitare
+        if (this._handleGlobalMousePressed(evt)) return true;
 
-mouseDragged(mx, my) {
-    const evt = this._buildEvent(mx, my);
+        // 2) Sinon propagation UI (top → bottom)
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
 
-    if (this.captureOwner) {
-        return this.captureOwner.mouseDragged?.(evt) || false;
+            if (c.mousePressed?.(evt)) {
+                this.captureOwner = c;
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    for (let i = this.components.length - 1; i >= 0; i--) {
-        const c = this.components[i];
-        if (c.mouseDragged?.(evt)) return true;
+    mouseDragged(mx, my) {
+        const evt = this._buildEvent(mx, my);
+
+        // 1) Interactions guitare
+        if (this._handleGlobalMouseDragged(evt)) return true;
+
+        // 2) Capture UI
+        if (this.captureOwner) {
+            return this.captureOwner.mouseDragged?.(evt) || false;
+        }
+
+        // 3) Propagation UI
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseDragged?.(evt)) return true;
+        }
+
+        return false;
     }
 
-    return false;
-}
+    mouseReleased(mx, my) {
+        this.mouseIsDown = false;
+        const evt = this._buildEvent(mx, my);
 
+        // 1) Interactions guitare
+        this._handleGlobalMouseReleased(evt);
 
-mouseReleased(mx, my) {
-    this.mouseIsDown = false;
+        // 2) Capture UI
+        if (this.captureOwner) {
+            const consumed = this.captureOwner.mouseReleased?.(evt) || false;
+            this.captureOwner = null;
+            return consumed;
+        }
 
-    const evt = this._buildEvent(mx, my);
+        // 3) Propagation UI
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseReleased?.(evt)) return true;
+        }
 
-    if (this.captureOwner) {
-        const consumed = this.captureOwner.mouseReleased?.(evt) || false;
-        this.captureOwner = null;
-        return consumed;
+        return false;
     }
 
-    for (let i = this.components.length - 1; i >= 0; i--) {
-        const c = this.components[i];
-        if (c.mouseReleased?.(evt)) return true;
+    // ============================================================
+    // WHEEL
+    // ============================================================
+
+    mouseWheel(event) {
+        const evt = {
+            x: mouseX,
+            y: mouseY,
+            delta: event.delta,
+            shift: keyIsDown(SHIFT),
+            alt: keyIsDown(ALT),
+            ctrl: keyIsDown(CONTROL)
+        };
+
+        for (let i = this.components.length - 1; i >= 0; i--) {
+            const c = this.components[i];
+            if (c.mouseWheel?.(evt)) return true;
+        }
+        return false;
     }
-
-    return false;
-}
-
-
-mouseClicked(mx, my) {
-    if (this.captureOwner) return false;
-
-    const evt = this._buildEvent(mx, my);
-
-    for (let i = this.components.length - 1; i >= 0; i--) {
-        const c = this.components[i];
-        if (c.mouseClicked?.(evt)) return true;
-    }
-
-    return false;
-}
-
-
-mouseWheel(event) {
-    const evt = {
-        x: mouseX,
-        y: mouseY,
-        delta: event.delta,
-        shift: keyIsDown(SHIFT),
-        alt: keyIsDown(ALT),
-        ctrl: keyIsDown(CONTROL)
-    };
-
-    for (let i = this.components.length - 1; i >= 0; i--) {
-        const c = this.components[i];
-        if (c.mouseWheel?.(evt)) return true;
-    }
-    return false;
-}
-
 
     // ============================================================
     // KEYBOARD + SHORTCUTS
@@ -142,7 +239,6 @@ mouseWheel(event) {
 
     keyPressed(k, kc) {
         const lower = k.toLowerCase();
-
 
         // Guitar orientation toggle
         for (let c of this.components) {
@@ -153,8 +249,7 @@ mouseWheel(event) {
             }
         }
 
-
-        // Sinon propagation normale (z-index)
+        // Propagation UI
         for (let i = this.components.length - 1; i >= 0; i--) {
             const c = this.components[i];
             if (c.keyPressed?.(k, kc)) return true;
@@ -172,7 +267,7 @@ mouseWheel(event) {
     }
 
     // ============================================================
-    // SHORTCUTS (ancienne API, mais en z-index)
+    // SHORTCUTS
     // ============================================================
 
     handleShortcut(k, code) {
@@ -192,25 +287,6 @@ mouseWheel(event) {
             }
         }
 
-        return false;
-    }
-
-    // ============================================================
-    // CLICK LOGIQUE (z-index)
-    // ============================================================
-
-    handleClick(x, y) {
-        // 🔥 un click logique ne doit PAS passer si captureOwner existe
-        if (this.captureOwner) return false;
-
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
-
-            if (c.containsRect?.(x, y)) {
-                c.onClick?.();
-                return true;
-            }
-        }
         return false;
     }
 

@@ -35,7 +35,7 @@ function mouseWheel(e) {
     return false;
 }
 
-function mouseClicked()  { app.mouseClicked(mouseX, mouseY); }
+//function mouseClicked()  { app.mouseClicked(mouseX, mouseY); }
 
 function keyPressed()    { app.keyPressed(key, keyCode); }
 function keyReleased()   { app.keyReleased(key, keyCode); }

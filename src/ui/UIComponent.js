@@ -242,65 +242,91 @@ triggerChange(newState) {
 }
 
 
-// ============================================================
-// INTERACTIONS SOURIS — VERSION PROPRE ET FIABLE
-// ============================================================
 
-mousePressed(evt) {
-    if (!this.containsRect(evt)) return false;
+    // ------------------------------------------------------------
+    // GÉOMÉTRIE / HIT
+    // ------------------------------------------------------------
+    containsRect(evt) {
+        const x = evt.x;
+        const y = evt.y;
+        return x >= this.x && x <= this.x + this.w &&
+               y >= this.y && y <= this.y + this.h;
+    }
 
-    this.isPressed = true;
-    this.dragging = false;      // pas encore un vrai drag
-    this.pressX = evt.x;
-    this.pressY = evt.y;
+    moveToAbsolute(nx, ny) {
+        this.x = nx;
+        this.y = ny;
+        this.invalidate?.();
+    }
 
-    if (this.isDraggable) {
+    // ------------------------------------------------------------
+    // SOURIS
+    // ------------------------------------------------------------
+    mousePressed(evt) {
+        if (!this.containsRect(evt)) return false;
+
+        this.isPressed = true;
+        this.dragging  = false;
+
+        this.pressX = evt.x;
+        this.pressY = evt.y;
+
         this.dragOffsetX = evt.x - this.x;
         this.dragOffsetY = evt.y - this.y;
+
+        return true; // capturé
     }
 
-    return true;
-}
+    mouseDragged(evt) {
+        if (!this.isPressed) return false;
 
-mouseDragged(evt) {
-    if (!this.isPressed) return false;
+        const dx = evt.x - this.pressX;
+        const dy = evt.y - this.pressY;
+        const dist2 = dx * dx + dy * dy;
 
-    // Détection d’un vrai drag
-    const dx = evt.x - this.pressX;
-    const dy = evt.y - this.pressY;
-    const dist2 = dx * dx + dy * dy;
+        const DRAG_THRESHOLD = 10;
 
-    const DRAG_THRESHOLD = 4; // 2px
-    if (!this.dragging && dist2 < DRAG_THRESHOLD * DRAG_THRESHOLD) {
-        return false; // pas encore un vrai drag
+        // tant qu'on n'a pas dépassé le seuil → pas un drag
+        if (!this.dragging) {
+            if (dist2 < DRAG_THRESHOLD * DRAG_THRESHOLD) {
+                return false; // on laisse la possibilité au clic
+            }
+
+            // on dépasse le seuil → drag actif
+            this.dragging = true;
+
+            // si pas draggable → on ne consomme pas l'event
+            if (!this.isDraggable) {
+                return false;
+            }
+        }
+
+        // drag actif et autorisé
+        if (this.isDraggable) {
+            const nx = evt.x - this.dragOffsetX;
+            const ny = evt.y - this.dragOffsetY;
+            this.moveToAbsolute(nx, ny);
+            return true;
+        }
+
+        return false;
     }
 
-    this.dragging = true;
+    mouseReleased(evt) {
+        const wasDragging = this.dragging;
 
-    if (this.isDraggable) {
-        const nx = evt.x - this.dragOffsetX;
-        const ny = evt.y - this.dragOffsetY;
-        this.moveToAbsolute(nx, ny);
+        this.isPressed = false;
+        this.dragging  = false;
+
+        // pas de drag + relâché dedans → clic
+        if (!wasDragging && this.containsRect(evt)) {
+            this.onClick?.();
+            return true;    // consommé
+        }
+
+        // si drag → on considère que le drag consomme l'event
+        return wasDragging;
     }
 
-    return true;
+
 }
-
-mouseReleased(evt) {
-    const wasDragging = this.dragging;
-    this.isPressed = false;
-    this.dragging = false;
-
-    // pas de drag + relâché dedans → clic
-    if (!wasDragging && this.containsRect(evt)) {
-        this.onClick?.();
-        return true;    // consommé
-    }
-
-    return wasDragging; // consommé si drag
-}
-
-    keyPressed(k, kc) { return false; }
-    keyReleased(k, kc) { return false; }
-}
-

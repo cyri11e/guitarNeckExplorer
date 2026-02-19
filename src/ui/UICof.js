@@ -67,20 +67,26 @@ mouseMoved(evt) {
 
 
 
-    mousePressed(evt) {
-        const idx = this._hitTest(evt.x, evt.y);
-        return (idx >= 0);
-    }
+  mousePressed(evt) {
+    this._lastEvt = evt; //  indispensable
 
-mouseClicked(evt) {
+    const idx = this._hitTest(evt.x, evt.y);
+
+    // capture uniquement si on clique sur un segment ou le centre
+    return (idx >= 0);
+}
+
+
+
+onClick() {
+    const evt = this._lastEvt;
+    if (!evt) return false;
+
     const idx = this._hitTest(evt.x, evt.y);
 
     // --- CLIC CENTRAL : highlight ONLY ---
     if (idx === -2) {
         if (this.rootIndex !== null) {
-
-            // 🔥 On envoie un événement "root" identique à un clic segment
-            // mais SANS changer la root
             this.onChange?.({
                 type: "root",
                 index: this.rootIndex
@@ -123,7 +129,6 @@ mouseClicked(evt) {
     this.invalidate();
     return true;
 }
-
 
 
 

@@ -319,69 +319,77 @@ moveSelectedStrings(delta) {
 }
 
 
-
-    // 🔥 Ajout : gestion propre du drag/click
-
+   // ------------------------------------------------------------
+    // INTERACTIONS SOURIS
+    // ------------------------------------------------------------
     mousePressed(evt) {
-        this.wasDragged = false; // reset
+        // on stocke l'event pour onClick
+        this._lastEvt = evt;
+
+        // debug utile
+        // console.log("🎸 Guitar.mousePressed", evt.x, evt.y);
+
+        // on laisse UIComponent gérer press / drag / capture
         return super.mousePressed(evt);
     }
 
     mouseDragged(evt) {
-        this.wasDragged = true; // un vrai drag a eu lieu
+        // si tu veux un flag wasDragged pour d'autres usages :
+        if (this.isPressed) {
+            this.wasDragged = true;
+        }
         return super.mouseDragged(evt);
     }
 
     mouseReleased(evt) {
-        return super.mouseReleased(evt);
+        const res = super.mouseReleased(evt);
+        // on pourrait reset wasDragged ici si besoin
+        return res;
     }
-
 
     mouseMoved(evt) {
-    const inside = this.containsRect(evt);
-    this.isHovered = inside;
+        const inside = this.containsRect(evt);
+        this.isHovered = inside;
 
-    if (inside) {
-        this.fromScreen(evt.x, evt.y);
-    }
-
-    this.invalidate();
-    return inside;
-}
-
-mouseClicked(evt) {
-    if (this.wasDragged) {
-        this.wasDragged = false;
-        return false;
-    }
-
-    if (!this.containsRect(evt)) return false;
-
-    const hit = this.fromScreen(evt.x, evt.y);
-    if (!hit) return false;
-
-    const { fret, string } = hit;
-
-    if (evt.shift) {
-       
-        //this.togglePinnedNote(fret, string);
-            this.toggleSelected(fret, string);
-        
-    } else {
-        // comportement existant : pin / unpin
-        this.togglePinnedNote(fret, string);
-
-        // si on unpin une note, on la retire aussi de la sélection
-        if (!this.isPinned(fret, string)) {
-            this.selectedNotes = this.selectedNotes.filter(
-                n => !(n.fret === fret && n.string === string)
-            );
+        if (inside) {
+            this.fromScreen(evt.x, evt.y);
         }
+
         this.invalidate();
+        return inside;
     }
 
-    return true;
-}
+    // 👉 C’est ICI que ta logique de clic vit désormais
+    onClick() {
+        const evt = this._lastEvt;
+        if (!evt) return false;
+
+        if (!this.containsRect(evt)) return false;
+
+        const hit = this.fromScreen(evt.x, evt.y);
+        if (!hit) return false;
+
+        const { fret, string } = hit;
+
+        if (evt.shift) {
+            this.toggleSelected(fret, string);
+        } else {
+            this.togglePinnedNote(fret, string);
+
+            if (!this.isPinned(fret, string)) {
+                this.selectedNotes = this.selectedNotes.filter(
+                    n => !(n.fret === fret && n.string === string)
+                );
+            }
+            this.invalidate();
+        }
+
+        return true;
+    }
+
+
+
+
 keyPressed(k, kc) {
     if (this.selectedNotes.length === 0) return false;
 
