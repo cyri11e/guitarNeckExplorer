@@ -68,7 +68,9 @@ class Guitar extends UIComponent {
         // animations
         this.highlighted       = [];
         this.interactionBursts = [];
-        // 🔥 _animTimer supprimé ici
+        //  _animTimer supprimé ici
+        this.shiftDown = false;
+
     }
 
     setDisplayMode(mode) {
@@ -377,63 +379,160 @@ class Guitar extends UIComponent {
     mousePressed(evt) {
         // on stocke l'event pour onClick
         this._lastEvt = evt;
-
+        
         // on laisse UIComponent gérer press / drag / capture
         return super.mousePressed(evt);
     }
-
+    
     mouseDragged(evt) {
         if (this.isPressed) {
             this.wasDragged = true;
         }
         return super.mouseDragged(evt);
     }
-
+    
     mouseReleased(evt) {
         const res = super.mouseReleased(evt);
         return res;
     }
-
+    
     mouseMoved(evt) {
+
+        super.mouseMoved?.(evt);
+
         const inside = this.containsRect(evt);
         this.isHovered = inside;
+        this.shiftDown = evt.shiftKey;
 
-        if (inside) {
-            this.fromScreen(evt.x, evt.y);
-        }
+if (inside) {
+    this.hoveredNote = this.fromScreen(evt.x, evt.y);
+} else {
+    this.hoveredNote = null;
+}
 
         this.invalidate();
         return inside;
     }
 
     onClick() {
-        const evt = this._lastEvt;
-        if (!evt) return false;
+    const evt = this._lastEvt;
+    if (!evt) return false;
 
-        if (!this.containsRect(evt)) return false;
+    if (!this.containsRect(evt)) return false;
 
-        const hit = this.fromScreen(evt.x, evt.y);
-        if (!hit) return false;
+    const hit = this.fromScreen(evt.x, evt.y);
+    if (!hit) return false;
 
-        const { fret, string } = hit;
+    const { fret, string } = hit;
 
-        if (evt.shift) {
-            this.toggleSelected(fret, string);
-        } else {
-            this.togglePinnedNote(fret, string);
+    // ------------------------------------------------------------
+    // 1) NOTIFIER LES RÈGLES (comme COF)
+    // ------------------------------------------------------------
+    this.onChange?.({
+        type: "noteClick",
+        fret,
+        string,
+        ctrlKey: evt.ctrlKey,
+        shiftKey: evt.shiftKey
+    });
 
-            if (!this.isPinned(fret, string)) {
-                this.selectedNotes = this.selectedNotes.filter(
-                    n => !(n.fret === fret && n.string === string)
-                );
-            }
-            this.invalidate();
-        }
+    // ------------------------------------------------------------
+    // 2) INTERACTIONS LOCALES (PIN / SELECT)
+    //    (CTRL est géré par les règles → on ne touche pas ici)
+    // ------------------------------------------------------------
 
+    // SHIFT → selected
+    if (evt.shiftKey) {
+        this.toggleSelected(fret, string);
         return true;
     }
 
+    // clic normal → pinned
+    this.togglePinnedNote(fret, string);
+
+    // si on dépinne → on retire aussi de selected
+    if (!this.isPinned(fret, string)) {
+        this.selectedNotes = this.selectedNotes.filter(
+            n => !(n.fret === fret && n.string === string)
+        );
+    }
+
+    this.invalidate();
+    return true;
+}
+
+
+
+// keyPressed(k, kc) {
+
+//     const usePinned = keyIsDown(SHIFT);
+
+//     // --- BACKSPACE / DELETE ---
+//     if (kc === BACKSPACE || kc === DELETE) {
+
+//         // SHIFT + BACKSPACE → selected
+//         if (usePinned) {
+//             if (this.selectedNotes.length > 0) {
+//                 this.selectedNotes.pop();   // retire la dernière
+//                 this.invalidate();
+//             }
+//         }
+
+//         // BACKSPACE seul → pinned
+//         else {
+//             if (this.pinnedNotes.length > 0) {
+//                 this.pinnedNotes.pop();     // retire la dernière
+//                 this.invalidate();
+//             }
+//         }
+
+//         return true;
+//     }
+
+//     // --- ARROWS (déjà existants) ---
+//     switch (kc) {
+
+//         case LEFT_ARROW:
+//             if (usePinned) this.movePinnedFrets(-1);
+//             else this.moveSelectedFrets(-1);
+//             return true;
+
+//         case RIGHT_ARROW:
+//             if (usePinned) this.movePinnedFrets(+1);
+//             else this.moveSelectedFrets(+1);
+//             return true;
+
+//         case UP_ARROW:
+//             if (usePinned) this.movePinnedStrings(+1);
+//             else this.moveSelectedStrings(+1);
+//             return true;
+
+//         case DOWN_ARROW:
+//             if (usePinned) this.movePinnedStrings(-1);
+//             else this.moveSelectedStrings(-1);
+//             return true;
+//     }
+
+//     return false;
+// }
+
+keyReleased(k, kc) {
+    if (kc === SHIFT) {
+        this.shiftDown = false;  // retour au hover normal
+        this.invalidate();       // redessine la guitare
+        return true;
+    }
+
+    return false;
+}
+
 keyPressed(k, kc) {
+    // SHIFT : change l’aspect du hover
+    if (kc === SHIFT) {
+        this.shiftDown = true;   // utilisé par drawHoverDot
+        this.invalidate();       // redessine la guitare
+        return true;
+    }
 
     const usePinned = keyIsDown(SHIFT);
 
@@ -443,7 +542,7 @@ keyPressed(k, kc) {
         // SHIFT + BACKSPACE → selected
         if (usePinned) {
             if (this.selectedNotes.length > 0) {
-                this.selectedNotes.pop();   // retire la dernière
+                this.selectedNotes.pop();
                 this.invalidate();
             }
         }
@@ -451,7 +550,7 @@ keyPressed(k, kc) {
         // BACKSPACE seul → pinned
         else {
             if (this.pinnedNotes.length > 0) {
-                this.pinnedNotes.pop();     // retire la dernière
+                this.pinnedNotes.pop();
                 this.invalidate();
             }
         }
@@ -461,7 +560,6 @@ keyPressed(k, kc) {
 
     // --- ARROWS (déjà existants) ---
     switch (kc) {
-
         case LEFT_ARROW:
             if (usePinned) this.movePinnedFrets(-1);
             else this.moveSelectedFrets(-1);

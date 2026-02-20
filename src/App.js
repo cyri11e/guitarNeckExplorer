@@ -52,6 +52,11 @@ class App {
                     comp = new COF(cfg); 
                     comp.theory = this.theory;
                     break;  
+
+                case "markerSelector":
+                    comp = new MarkerSelector(cfg); 
+                    break;    
+
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;

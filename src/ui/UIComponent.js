@@ -104,12 +104,12 @@ class UIComponent {
         this.invalidate();
     }
 
-    moveToAbsolute(nx, ny) {
-        this.x = nx;
-        this.y = ny;
-        this._updateRelativeFromAbsolute();
-        this.invalidate();
-    }
+    // moveToAbsolute(nx, ny) {
+    //     this.x = nx;
+    //     this.y = ny;
+    //     this._updateRelativeFromAbsolute();
+    //     this.invalidate();
+    // }
 
     applyZoomAt(factor, cx, cy) {
         // cx, cy : point de zoom en coordonnées absolues (ex: mouseX, mouseY)
@@ -246,12 +246,12 @@ triggerChange(newState) {
     // ------------------------------------------------------------
     // GÉOMÉTRIE / HIT
     // ------------------------------------------------------------
-    containsRect(evt) {
-        const x = evt.x;
-        const y = evt.y;
-        return x >= this.x && x <= this.x + this.w &&
-               y >= this.y && y <= this.y + this.h;
-    }
+    // containsRect(evt) {
+    //     const x = evt.x;
+    //     const y = evt.y;
+    //     return x >= this.x && x <= this.x + this.w &&
+    //            y >= this.y && y <= this.y + this.h;
+    // }
 
     moveToAbsolute(nx, ny) {
         this.x = nx;

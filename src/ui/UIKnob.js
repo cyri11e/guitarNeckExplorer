@@ -97,21 +97,21 @@ onClick() {
         };
     }
 
-    updateHover(evt) {
-        let extraW = this.w * (this.hitboxScale - 1);
-        let extraH = this.h * (this.hitboxScale - 1);
+    // updateHover(evt) {
+    //     let extraW = this.w * (this.hitboxScale - 1);
+    //     let extraH = this.h * (this.hitboxScale - 1);
 
-        let x = this.x - extraW / 2;
-        let y = this.y - extraH / 2;
-        let w = this.w + extraW;
-        let h = this.h + extraH;
+    //     let x = this.x - extraW / 2;
+    //     let y = this.y - extraH / 2;
+    //     let w = this.w + extraW;
+    //     let h = this.h + extraH;
 
-        this.hoverDrag.hitZone = { x, y, w, h };
+    //     this.hoverDrag.hitZone = { x, y, w, h };
 
-        let inside = evt.x >= x && evt.x <= x + w && evt.y >= y && evt.y <= y + h;
-        this.hover = inside;
-        this.hoverDrag.isHovered = inside;
-    }
+    //     let inside = evt.x >= x && evt.x <= x + w && evt.y >= y && evt.y <= y + h;
+    //     this.hover = inside;
+    //     this.hoverDrag.isHovered = inside;
+    // }
 
 containsRect(evt) {
     // centre réel du knob (pas le centre du composant)

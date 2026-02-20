@@ -43,16 +43,17 @@ class UIInteractionManager {
     // EVENT BUILDER
     // ============================================================
 
-    _buildEvent(mx, my) {
-        return {
-            x: mx,
-            y: my,
-            shift: keyIsDown(SHIFT),
-            alt: keyIsDown(ALT),
-            ctrl: keyIsDown(CONTROL),
-            button: mouseButton
-        };
-    }
+_buildEvent(mx, my) {
+    return {
+        x: mx,
+        y: my,
+        shiftKey: keyIsDown(SHIFT),
+        altKey: keyIsDown(ALT),
+        ctrlKey: keyIsDown(CONTROL),
+        button: mouseButton
+    };
+}
+
 
     // ============================================================
     // INTERACTIONS GUITARE — HANDLERS INTERNES
@@ -66,12 +67,12 @@ class UIInteractionManager {
         this.lastY = evt.y;
 
         // CTRL = drag du manche
-        if (evt.ctrl) {
-            this.dragActive = true;
-            this.brushActive = false;
-            this.eraseActive = false;
-            return true;
-        }
+        // if (evt.ctrl) {
+        //     this.dragActive = true;
+        //     this.brushActive = false;
+        //     this.eraseActive = false;
+        //     return true;
+        // }
 
         // Clic gauche = pinceau
         if (evt.button === 0) {
@@ -240,18 +241,10 @@ class UIInteractionManager {
     keyPressed(k, kc) {
         const lower = k.toLowerCase();
 
-        // Guitar orientation toggle
-        for (let c of this.components) {
-            if (c.toggleOrientationShortcut &&
-                lower === c.toggleOrientationShortcut.toLowerCase()) {
-                c.toggleOrientation?.();
-                return true;
-            }
-        }
-
         // Propagation UI
         for (let i = this.components.length - 1; i >= 0; i--) {
             const c = this.components[i];
+
             if (c.keyPressed?.(k, kc)) return true;
         }
 
@@ -259,6 +252,7 @@ class UIInteractionManager {
     }
 
     keyReleased(k, kc) {
+        this.invalidateAll();
         for (let i = this.components.length - 1; i >= 0; i--) {
             const c = this.components[i];
             if (c.keyReleased?.(k, kc)) return true;

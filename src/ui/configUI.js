@@ -12,7 +12,7 @@ const UI_CONFIG = {
         isZoomable: true,
         toggleOnClick: true,
         //toggleShortcut: "v",
-        children: ["knob1",
+        children: ["markerSelector1","knob1",
             "knob2",
             "metalSwitch1",
             "metalSwitchENFR"
@@ -110,7 +110,17 @@ cof1 : {
     xp: 50,
     yp: 50,
     sp: 100
-}
+},
+
+
+
+markerSelector1: {
+    type: "markerSelector",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    shortcutKey: "k"   // optionnel
+},
 
 
     // // Exemple futur : un knob

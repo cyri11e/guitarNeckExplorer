@@ -406,7 +406,6 @@ drawNote(x, y, opts = {}) {
 }
 
 
-
 drawHoverDot() {
     const g = this.g;
     const app = g.app;
@@ -419,63 +418,55 @@ drawHoverDot() {
     const baseIndex = baseRaw.index;
     const baseMidi  = baseRaw.midi;
 
-    // --- MODE CURSEUR : comportement actuel ---
+    // ------------------------------------------------------------
+    // SHIFT = hover en mode "selected"
+    // ------------------------------------------------------------
+    const isShift = g.shiftDown === true;
+
+    const selectedStyle = {
+        fillColor: "#ffd00055",
+        strokeColor: "#ffd000",
+        hasShadow: true,
+        shapeType: "square"          // 🔥 ajouté
+    };
+
+    const hoverStyle = {
+        fillColor: "#5156127d",
+        strokeColor: "white",
+        hasShadow: true,
+        shapeType: "circle"          // 🔥 ajouté
+    };
+
+    const style = isShift ? selectedStyle : hoverStyle;
+
+
+    // ------------------------------------------------------------
+    // MODE CURSOR : juste la note sous la souris
+    // ------------------------------------------------------------
     if (g.hoverMode === "cursor") {
         const pos = g.toScreen(h.fret, h.string);
         const label = app.theory.getNoteLabel(
             baseIndex,
             g.displayMode === "note" ? g.labelType : g.displayMode
         );
+
         this.drawNote(pos.x, pos.y, {
-            fillColor: "#5156127d",
-            strokeColor: "white",
-            hasShadow: true,
+            ...style,
             label
         });
         return;
     }
 
-    // --- MODE NOTE : toutes les occurrences du même index ---
-// --- MODE NOTE : même MIDI EXACT ---
-if (g.hoverMode === "note") {
-
-    for (let s = 1; s <= g.strings.length; s++) {
-        for (let f = 0; f <= g.fretCount; f++) {
-
-            const raw = app.instrument.getNoteAt(s - 1, f);
-
-            // 🔥 comparaison stricte MIDI
-            if (raw.midi !== baseMidi) continue;
-
-            const pos = g.toScreen(f, s);
-            const label = app.theory.getNoteLabel(
-                raw.index,
-                g.displayMode === "note" ? g.labelType : g.displayMode
-            );
-
-            this.drawNote(pos.x, pos.y, {
-                fillColor: "#5156127d",
-                strokeColor: "white",
-                hasShadow: true,
-                label
-            });
-        }
-    }
-
-    return;
-}
-
-
-    // --- MODE OCTAVE : même note + toutes les octaves ---
-    if (g.hoverMode === "octave") {
+    // ------------------------------------------------------------
+    // MODE NOTE : même MIDI exact
+    // ------------------------------------------------------------
+    if (g.hoverMode === "note") {
         for (let s = 1; s <= g.strings.length; s++) {
             for (let f = 0; f <= g.fretCount; f++) {
+
                 const raw = app.instrument.getNoteAt(s - 1, f);
+                if (raw.midi !== baseMidi) continue;
 
-                // même note (index) → OK
-                if (raw.index !== baseIndex) continue;
-
-                // octave différente → OK aussi
                 const pos = g.toScreen(f, s);
                 const label = app.theory.getNoteLabel(
                     raw.index,
@@ -483,9 +474,32 @@ if (g.hoverMode === "note") {
                 );
 
                 this.drawNote(pos.x, pos.y, {
-                    fillColor: "#5156127d",
-                    strokeColor: "white",
-                    hasShadow: true,
+                    ...style,
+                    label
+                });
+            }
+        }
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // MODE OCTAVE : même note (index), toutes octaves
+    // ------------------------------------------------------------
+    if (g.hoverMode === "octave") {
+        for (let s = 1; s <= g.strings.length; s++) {
+            for (let f = 0; f <= g.fretCount; f++) {
+
+                const raw = app.instrument.getNoteAt(s - 1, f);
+                if (raw.index !== baseIndex) continue;
+
+                const pos = g.toScreen(f, s);
+                const label = app.theory.getNoteLabel(
+                    raw.index,
+                    g.displayMode === "note" ? g.labelType : g.displayMode
+                );
+
+                this.drawNote(pos.x, pos.y, {
+                    ...style,
                     label
                 });
             }

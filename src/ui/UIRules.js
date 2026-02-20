@@ -140,7 +140,64 @@ const UI_RULES = [
         guitar.highlightNote(noteIndex);
         return;
     }
+},
+
+
+// ============================================================
+// GUITAR (CTRL + clic) → définir une nouvelle root
+// ============================================================
+(components, source, evt) => {
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // On ne réagit qu’aux événements venant du Guitar
+    if (source !== guitar) return;
+
+    // On ne traite que les événements onChange()
+    if (!evt || evt.type !== "noteClick") return;
+
+    // CTRL doit être enfoncé
+    if (!evt.ctrlKey) return;
+
+    const { fret, string } = evt;
+
+    const raw = guitar.instrument.getNoteAt(string - 1, fret);
+    if (!raw) return;
+
+    guitar.theory.setRoot(raw.index);
+
+// notifier les autres composants (comme COF)
+guitar.onChange?.({
+    type: "root",
+    index: raw.index
+});
+
+guitar.invalidate();
+
+},
+
+// ============================================================
+// Quand Guitar change la root → COF doit se mettre à jour
+// ============================================================
+(components, source, evt) => {
+
+    if (!evt || evt.type !== "root") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const cof = components.find(c => c.name === "cof1");
+
+    if (!guitar || !cof) return;
+
+    // Si la root vient de la guitare
+    if (source === guitar) {
+        cof.rootIndex = evt.index;
+        cof.invalidate();
+    }
 }
+
+
+
 
 
 
