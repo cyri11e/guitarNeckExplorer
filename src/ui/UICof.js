@@ -19,30 +19,30 @@ class COF extends UIComponent {
         this.theory = cfg.theory ?? null;
         this.renderer = new COFRenderer(this);
 
-        // Animation
-        this.animAngle = 0;
-        this.targetAngle = 0;
-        this.animSpeed = 0.15;
+        // // Animation
+        // this.animAngle = 0;
+        // this.targetAngle = 0;
+        // this.animSpeed = 0.15;
 
-        this._animTimer = null; // 🔥 timer interne
+        // this._animTimer = null; // 🔥 timer interne
     }
 
-    _startAnimationLoop() {
-        if (this._animTimer) return; // déjà en cours
+    // _startAnimationLoop() {
+    //     if (this._animTimer) return; // déjà en cours
 
-        this._animTimer = setInterval(() => {
-            // si l’animation est finie → stop
-            if (Math.abs(this.animAngle - this.targetAngle) < 0.0001) {
-                clearInterval(this._animTimer);
-                this._animTimer = null;
-                return;
-            }
+    //     this._animTimer = setInterval(() => {
+    //         // si l’animation est finie → stop
+    //         if (Math.abs(this.animAngle - this.targetAngle) < 0.0001) {
+    //             clearInterval(this._animTimer);
+    //             this._animTimer = null;
+    //             return;
+    //         }
 
-            // sinon → redraw
-            this.invalidate();
+    //         // sinon → redraw
+    //         this.invalidate();
 
-        }, 16); // ~60 FPS
-    }
+    //     }, 16); // ~60 FPS
+    // }
 
 mouseMoved(evt) {
     const idx = this._hitTest(evt.x, evt.y);
@@ -101,35 +101,18 @@ onClick() {
     // --- CLIC SEGMENT : toggle root ---
     if (this.rootIndex === idx) {
         this.rootIndex = null;
-        this.targetAngle = 0;
-
-        this.onChange?.({
-            type: "root",
-            index: null
-        });
-
     } else {
         this.rootIndex = idx;
-
-        const seg = TWO_PI / 12;
-        const newAngle = -idx * seg;
-
-        let delta = newAngle - this.animAngle;
-        delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
-
-        this.targetAngle = this.animAngle + delta;
-
-        this.onChange?.({
-            type: "root",
-            index: idx
-        });
     }
 
-    this._startAnimationLoop();
+    this.onChange?.({
+        type: "root",
+        index: this.rootIndex
+    });
+
     this.invalidate();
     return true;
 }
-
 
 
 
@@ -187,100 +170,99 @@ class COFRenderer {
         this.c = cof;
     }
 
-    draw() {
-        const c = this.c;
+draw() {
+    const c = this.c;
 
-        const cx = c.x + c.w/2;
-        const cy = c.y + c.h/2;
+    const cx = c.x + c.w/2;
+    const cy = c.y + c.h/2;
 
-        const rOuter = c.w/2;
-        const rInner = c.w/2 * 0.45;
+    const rOuter = c.w/2;
+    const rInner = c.w/2 * 0.45;
 
-        const segAngle = TWO_PI / 12;
+    const segAngle = TWO_PI / 12;
 
-        // interpolation
-        c.animAngle += (c.targetAngle - c.animAngle) * c.animSpeed;
+    // ⭐ OFFSET DIRECT, SANS ANIMATION
+    const offset = -PI / 12 - (c.rootIndex ?? 0) * segAngle;
 
-        const offset = -PI / 12 + c.animAngle;
+    const epsilon  = 0.01;
 
-        const epsilon  = 0.01;
+    for (let i = 0; i < 12; i++) {
 
-        for (let i = 0; i < 12; i++) {
+        const a0 = i * segAngle + offset - HALF_PI - epsilon;
+        const a1 = (i+1) * segAngle + offset - HALF_PI + epsilon;
 
-            const a0 = i * segAngle + offset - HALF_PI - epsilon;
-            const a1 = (i+1) * segAngle + offset - HALF_PI + epsilon;
+        if (i === c.rootIndex) fill(255, 20, 20);
+        else if (i === c.hoverIndex) fill(200);
+        else fill(150);
 
-            if (i === c.rootIndex) fill(255, 20, 20);
-            else if (i === c.hoverIndex) fill(200);
-            else fill(150);
+        beginShape();
+        for (let a = a0; a <= a1; a += 0.02) {
+            vertex(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
+        }
+        for (let a = a1; a >= a0; a -= 0.02) {
+            vertex(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
+        }
+        endShape(CLOSE);
 
-            beginShape();
-            for (let a = a0; a <= a1; a += 0.02) {
-                vertex(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
-            }
-            for (let a = a1; a >= a0; a -= 0.02) {
-                vertex(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
-            }
-            endShape(CLOSE);
+        const noteIndex = c.chroma[i];
+        if (noteIndex == null) continue;
 
-            const noteIndex = c.chroma[i];
-            if (noteIndex == null) continue;
+        const mode = (c.displayMode === "note")
+            ? c.labelType
+            : c.displayMode;
 
-            const mode = (c.displayMode === "note")
-                ? c.labelType
-                : c.displayMode;
+        const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+        if (!labelObj || !labelObj.base) continue;
 
-            const labelObj = c.theory.getNoteLabel(noteIndex, mode);
-            if (!labelObj || !labelObj.base) continue;
+        const noteTxt = labelObj.base + (labelObj.alt ?? "");
 
-            const noteTxt = labelObj.base + (labelObj.alt ?? "");
+        const mid = (a0 + a1) * 0.5;
+        const lr  = (rInner + rOuter) * 0.55;
+        const lx  = cx + Math.cos(mid) * lr;
+        const ly  = cy + Math.sin(mid) * lr;
 
-            const mid = (a0 + a1) * 0.5;
-            const lr  = (rInner + rOuter) * 0.55;
-            const lx  = cx + Math.cos(mid) * lr;
-            const ly  = cy + Math.sin(mid) * lr;
+        fill(0);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(c.w * 0.10);
+        text(noteTxt, lx, ly);
+
+        if (c.rootIndex !== null) {
+            const degObj = c.theory.getNoteLabel(noteIndex, "degree");
+            if (!degObj || !degObj.base) continue;
+
+            const degreeTxt = (degObj.alt ?? "") + degObj.base;
+
+            const lr2 = (rInner + rOuter) * 0.38;
+            const lx2 = cx + Math.cos(mid) * lr2;
+            const ly2 = cy + Math.sin(mid) * lr2;
 
             fill(0);
             noStroke();
             textAlign(CENTER, CENTER);
-            textSize(c.w * 0.10);
-            text(noteTxt, lx, ly);
-
-            if (c.rootIndex !== null) {
-                const degObj = c.theory.getNoteLabel(noteIndex, "degree");
-                if (!degObj || !degObj.base) continue;
-
-                const degreeTxt = (degObj.alt ?? "") + degObj.base;
-
-                const lr2 = (rInner + rOuter) * 0.38;
-                const lx2 = cx + Math.cos(mid) * lr2;
-                const ly2 = cy + Math.sin(mid) * lr2;
-
-                fill(0);
-                noStroke();
-                textAlign(CENTER, CENTER);
-                textSize(c.w * 0.08);
-                text(degreeTxt, lx2, ly2);
-            }
-        }
-
-        if (c.rootIndex !== null) {
-            const noteIndex = c.chroma[c.rootIndex];
-            const mode = (c.displayMode === "note")
-                ? c.labelType
-                : c.displayMode;
-
-            const labelObj = c.theory.getNoteLabel(noteIndex, mode);
-            if (!labelObj || !labelObj.base) return;
-
-            const txt = labelObj.base + (labelObj.alt ?? "");
-
-            fill(255);
-            noStroke();
-            textAlign(CENTER, CENTER);
-            textSize(c.w * 0.25);
-            text(txt, cx, cy);
+            textSize(c.w * 0.08);
+            text(degreeTxt, lx2, ly2);
         }
     }
+
+    if (c.rootIndex !== null) {
+        const noteIndex = c.chroma[c.rootIndex];
+        const mode = (c.displayMode === "note")
+            ? c.labelType
+            : c.displayMode;
+
+        const labelObj = c.theory.getNoteLabel(noteIndex, mode);
+        if (!labelObj || !labelObj.base) return;
+
+        const txt = labelObj.base + (labelObj.alt ?? "");
+
+        fill(255);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(c.w * 0.25);
+        text(txt, cx, cy);
+    }
+}
+
 }
 

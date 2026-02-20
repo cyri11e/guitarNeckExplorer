@@ -41,45 +41,49 @@ class Guitar extends UIComponent {
         this.geometry.projectGeometry();
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
-        this.pinnedNotes = [ { fret: 1, string: 6 }, 
+        this.pinnedNotes = [ 
+            { fret: 1, string: 6 }, 
             // { fret: 1, string: 5 }, 
             // { fret: 1, string: 1 }, 
             // { fret: 3, string: 2 }, 
             // { fret: 3, string: 3 },
-             { fret: 2, string: 4 } ]; // { fret, string }
-        this.selectedNotes = [
-                                { fret: 3, string: 3 },
-                                // { fret: 5, string: 3 },
-                                // { fret: 7, string: 3 },
-                                // { fret: 7, string: 4 },
-                                // { fret: 5, string: 4 }
-                                ]
-                                ; // { fret, string }
+            { fret: 2, string: 4 } 
+        ]; // { fret, string }
 
-        // 🔥 Ajout : flag anti-clic-après-drag
+        this.selectedNotes = [
+            { fret: 3, string: 3 },
+            // { fret: 5, string: 3 },
+            // { fret: 7, string: 3 },
+            // { fret: 7, string: 4 },
+            // { fret: 5, string: 4 }
+        ]; // { fret, string }
+
+        //  Ajout : flag anti-clic-après-drag
         this.wasDragged = false;
 
         this.displayMode = cfg.displayMode ?? "note";     // note | degree | none
         this.labelType   = cfg.labelType   ?? "noteEN";   // noteEN | noteFR
-        this.hoverMode = "cursor"; // "cursor" | "note" | "octave"
+        this.hoverMode   = "cursor"; // "cursor" | "note" | "octave"
 
+        // animations
+        this.highlighted       = [];
+        this.interactionBursts = [];
+        // 🔥 _animTimer supprimé ici
     }
 
+    setDisplayMode(mode) {
+        const allowed = ["note", "degree", "none"];
+        if (!allowed.includes(mode)) return;
+        this.displayMode = mode;
+        this.invalidate();
+    }
 
-setDisplayMode(mode) {
-    const allowed = ["note", "degree", "none"];
-    if (!allowed.includes(mode)) return;
-    this.displayMode = mode;
-    this.invalidate();
-}
-
-setLabelType(type) {
-    const allowed = ["noteEN", "noteFR"];
-    if (!allowed.includes(type)) return;
-    this.labelType = type;
-    this.invalidate();
-}
-
+    setLabelType(type) {
+        const allowed = ["noteEN", "noteFR"];
+        if (!allowed.includes(type)) return;
+        this.labelType = type;
+        this.invalidate();
+    }
 
     // ------------------------------------------------------------
     // GETTERS
@@ -101,25 +105,25 @@ setLabelType(type) {
     }
 
     getPositionsForPitchClass(pc) {
-    const app = this.app;
-    if (!app || !app.instrument) return [];
+        const app = this.app;
+        if (!app || !app.instrument) return [];
 
-    const out = [];
+        const out = [];
 
-    for (let s = 1; s <= this.strings.length; s++) {
-        for (let f = 0; f <= this.fretCount; f++) {
+        for (let s = 1; s <= this.strings.length; s++) {
+            for (let f = 0; f <= this.fretCount; f++) {
 
-            const raw = app.instrument.getNoteAt(s - 1, f);
-            if (!raw) continue;
+                const raw = app.instrument.getNoteAt(s - 1, f);
+                if (!raw) continue;
 
-            if (raw.index === pc) {
-                out.push({ string: s, fret: f });
+                if (raw.index === pc) {
+                    out.push({ string: s, fret: f });
+                }
             }
         }
-    }
 
-    return out;
-}
+        return out;
+    }
 
     // ------------------------------------------------------------
     // COORDONNÉES
@@ -186,166 +190,199 @@ setLabelType(type) {
     // ------------------------------------------------------------
     // INTERACTIONS
     // ------------------------------------------------------------
-onNoteClicked(noteIndex) {
-    if (!this.theory.hasRoot()) {
-        this.theory.setRoot(noteIndex);
-        console.log("new tonic "+noteIndex)
-        this.invalidate();
-        return;
-    }
 
-    // sinon comportement normal (sélection, highlight, etc.)
-}
-isPinned(fret, string) {
-    return this.pinnedNotes.some(n => n.fret === fret && n.string === string);
-}
-
-isSelected(fret, string) {
-    return this.selectedNotes.some(n => n.fret === fret && n.string === string);
-}
-
-toggleSelected(fret, string) {
-    const idx = this.selectedNotes.findIndex(n => n.fret === fret && n.string === string);
-    if (idx >= 0) {
-        this.selectedNotes.splice(idx, 1);
-    } else {
-        this.selectedNotes.push({ fret, string });
-    }
-    this.invalidate();
-}
-
-_startHighlightTimer() {
-    if (this._highlightTimer) return;
-
-    this.targetTime = 1.0;  // durée de la cible (en secondes)
-    this.dotTime    = 15.0;  // durée du fade-out du point final (en secondes)
-
-    const dt = 0.02; // vitesse d’incrémentation (≈60 FPS)
-    const totalT = this.targetTime + this.dotTime; // durée totale
-
-    this._highlightTimer = setInterval(() => {
-
-        let done = true;
-
-        for (let h of this.highlighted) {
-            h.t += dt;
-
-            // Phase 1 : 0 → targetTime
-            // Phase 2 : targetTime → targetTime + dotTime
-            if (h.t < totalT) done = false;
-        }
-
-        this.invalidate();
-
-        if (done) {
-            clearInterval(this._highlightTimer);
-            this._highlightTimer = null;
-            this.highlighted = [];
+    onNoteClicked(noteIndex) {
+        if (!this.theory.hasRoot()) {
+            this.theory.setRoot(noteIndex);
+            console.log("new tonic "+noteIndex)
             this.invalidate();
+            return;
         }
+        
+        // sinon comportement normal (sélection, highlight, etc.)
+    }
 
-    }, 16);
-}
+    isPinned(fret, string) {
+        return this.pinnedNotes.some(n => n.fret === fret && n.string === string);
+    }
 
-
-
-
-
+    isSelected(fret, string) {
+        return this.selectedNotes.some(n => n.fret === fret && n.string === string);
+    }
 
     togglePinnedNote(fret, string) {
         const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);
 
         if (idx >= 0) {
+            // Dépin
             this.pinnedNotes.splice(idx, 1);
+
         } else {
+            // Pin
             this.pinnedNotes.push({ fret, string });
+
+            // Animation rapide
+            this.interactionBursts.push({
+                fret,
+                string,
+                t: 0,
+                type: "pin"
+            });
+            this._startBurstTimer();
+        }
+        this.invalidate();
+    }
+
+    toggleSelected(fret, string) {
+        const idx = this.selectedNotes.findIndex(n => n.fret === fret && n.string === string);
+
+        if (idx >= 0) {
+            // Déselection
+            this.selectedNotes.splice(idx, 1);
+
+        } else {
+            // Sélection
+            this.selectedNotes.push({ fret, string });
+
+            // Animation rapide
+            this.interactionBursts.push({
+                fret,
+                string,
+                t: 0,
+                type: "select"
+            });
+            this._startBurstTimer();
         }
 
         this.invalidate();
     }
 
+    _startHighlightTimer() {
+        if (this._highlightTimer) return;
 
-_moveFrets(list, delta) {
-    return list.map(n => ({
-        fret: n.fret + delta,
-        string: n.string
-    }));
-}
+        this.targetTime = 1.0;   // durée de la cible (en secondes)
+        this.dotTime    = 15.0;  // durée du fade-out du point final (en secondes)
 
-_moveStrings(list, delta) {
-    const minString = 1;
-    const maxString = this.strings.length;
-    const tuning    = this.instrument.tuning;
+        const dt      = 0.02; // vitesse d’incrémentation (≈60 FPS)
+        const totalT  = this.targetTime + this.dotTime; // durée totale
 
-    return list.map(n => {
-        let string = n.string;
-        let fret   = n.fret;
+        this._highlightTimer = setInterval(() => {
 
-        const step = Math.sign(delta);
-        let remaining = Math.abs(delta);
+            let done = true;
 
-        while (remaining > 0) {
-            const oldString = string;
-            let newString = oldString + step;
+            for (let h of this.highlighted) {
+                h.t += dt;
 
-            if (newString < minString) newString = maxString;
-            if (newString > maxString) newString = minString;
-
-            const midiOld = tuning[oldString - 1].midi;
-            const midiNew = tuning[newString - 1].midi;
-            const diff    = Math.abs(midiNew - midiOld);
-
-            if (diff === 4) {
-                fret += (step > 0 ? 1 : -1);
+                // Phase 1 : 0 → targetTime
+                // Phase 2 : targetTime → targetTime + dotTime
+                if (h.t < totalT) done = false;
             }
 
-            string = newString;
-            remaining--;
+            this.invalidate();
+
+            if (done) {
+                clearInterval(this._highlightTimer);
+                this._highlightTimer = null;
+                this.highlighted = [];
+                this.invalidate();
+            }
+
+        }, 16);
+    }
+
+    _startBurstTimer() {
+    if (this._burstTimer) return;
+
+    this._burstTimer = setInterval(() => {
+
+        // si plus aucun burst → stop
+        if (!this.interactionBursts || this.interactionBursts.length === 0) {
+            clearInterval(this._burstTimer);
+            this._burstTimer = null;
+            return;
         }
 
-        return { fret, string };
-    });
+        // sinon → redraw
+        this.invalidate();
+
+    }, 16); // ~60 FPS
 }
 
+    _moveFrets(list, delta) {
+        return list.map(n => ({
+            fret: n.fret + delta,
+            string: n.string
+        }));
+    }
 
-moveSelectedFrets(delta) {
-    this.selectedNotes = this._moveFrets(this.selectedNotes, delta);
-    this.invalidate();
-}
+    _moveStrings(list, delta) {
+        const minString = 1;
+        const maxString = this.strings.length;
+        const tuning    = this.instrument.tuning;
 
-moveSelectedStrings(delta) {
-    this.selectedNotes = this._moveStrings(this.selectedNotes, delta);
-    this.invalidate();
-}
+        return list.map(n => {
+            let string = n.string;
+            let fret   = n.fret;
 
-movePinnedFrets(delta) {
-    this.pinnedNotes = this._moveFrets(this.pinnedNotes, delta);
-    this.invalidate();
-}
+            const step = Math.sign(delta);
+            let remaining = Math.abs(delta);
 
-movePinnedStrings(delta) {
-    this.pinnedNotes = this._moveStrings(this.pinnedNotes, delta);
-    this.invalidate();
-}
+            while (remaining > 0) {
+                const oldString = string;
+                let newString = oldString + step;
 
+                if (newString < minString) newString = maxString;
+                if (newString > maxString) newString = minString;
 
+                const midiOld = tuning[oldString - 1].midi;
+                const midiNew = tuning[newString - 1].midi;
+                const diff    = Math.abs(midiNew - midiOld);
 
-   // ------------------------------------------------------------
+                if (diff === 4) {
+                    fret += (step > 0 ? 1 : -1);
+                }
+
+                string = newString;
+                remaining--;
+            }
+
+            return { fret, string };
+        });
+    }
+
+    moveSelectedFrets(delta) {
+        this.selectedNotes = this._moveFrets(this.selectedNotes, delta);
+        this.invalidate();
+    }
+
+    moveSelectedStrings(delta) {
+        this.selectedNotes = this._moveStrings(this.selectedNotes, delta);
+        this.invalidate();
+    }
+
+    movePinnedFrets(delta) {
+        this.pinnedNotes = this._moveFrets(this.pinnedNotes, delta);
+        this.invalidate();
+    }
+
+    movePinnedStrings(delta) {
+        this.pinnedNotes = this._moveStrings(this.pinnedNotes, delta);
+        this.invalidate();
+    }
+
+    // ------------------------------------------------------------
     // INTERACTIONS SOURIS
     // ------------------------------------------------------------
+
     mousePressed(evt) {
         // on stocke l'event pour onClick
         this._lastEvt = evt;
-
-        // debug utile
-        // console.log("🎸 Guitar.mousePressed", evt.x, evt.y);
 
         // on laisse UIComponent gérer press / drag / capture
         return super.mousePressed(evt);
     }
 
     mouseDragged(evt) {
-        // si tu veux un flag wasDragged pour d'autres usages :
         if (this.isPressed) {
             this.wasDragged = true;
         }
@@ -354,7 +391,6 @@ movePinnedStrings(delta) {
 
     mouseReleased(evt) {
         const res = super.mouseReleased(evt);
-        // on pourrait reset wasDragged ici si besoin
         return res;
     }
 
@@ -370,7 +406,6 @@ movePinnedStrings(delta) {
         return inside;
     }
 
-    // 👉 C’est ICI que ta logique de clic vit désormais
     onClick() {
         const evt = this._lastEvt;
         if (!evt) return false;
@@ -398,13 +433,33 @@ movePinnedStrings(delta) {
         return true;
     }
 
-
-
-
 keyPressed(k, kc) {
 
     const usePinned = keyIsDown(SHIFT);
 
+    // --- BACKSPACE / DELETE ---
+    if (kc === BACKSPACE || kc === DELETE) {
+
+        // SHIFT + BACKSPACE → selected
+        if (usePinned) {
+            if (this.selectedNotes.length > 0) {
+                this.selectedNotes.pop();   // retire la dernière
+                this.invalidate();
+            }
+        }
+
+        // BACKSPACE seul → pinned
+        else {
+            if (this.pinnedNotes.length > 0) {
+                this.pinnedNotes.pop();     // retire la dernière
+                this.invalidate();
+            }
+        }
+
+        return true;
+    }
+
+    // --- ARROWS (déjà existants) ---
     switch (kc) {
 
         case LEFT_ARROW:

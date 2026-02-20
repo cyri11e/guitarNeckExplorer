@@ -8,6 +8,7 @@ class GuitarRenderer {
         this.style = style;
         this.detectPlatformAdjustments();
     }
+    
 detectPlatformAdjustments() {
     const ua = navigator.userAgent;
 
@@ -511,8 +512,7 @@ drawSelectedNotes() {
     });
 }
 
-
-drawHighlights() {
+drawHighlightOctave() {
     const g = this.g;
 
     if (!g.highlighted || g.highlighted.length === 0)
@@ -524,6 +524,8 @@ drawHighlights() {
     // 1) DESSIN DES CIBLES (t < 1) ET DES POINTS FINAUX (t >= 1)
     // ---------------------------------------------------------
     for (let h of g.highlighted) {
+
+    h.t += 0.01;   //  AJOUTER CETTE LIGNE
 
         const pos = g.toScreen(h.fret, h.string);
         if (!pos) continue;
@@ -628,6 +630,55 @@ drawHighlights() {
         }
     }
 }
+
+drawInteractionBursts() {
+    const g = this.g;
+
+    if (!g.interactionBursts || g.interactionBursts.length === 0)
+        return;
+
+    g.interactionBursts = g.interactionBursts.filter(b => {
+
+        // Animation
+        b.t += 0.05;   // vitesse idéale
+        if (b.t >= 1) return false;
+
+        const pos = g.toScreen(b.fret, b.string);
+        if (!pos) return false;
+
+        // Alpha plus fort
+        const alpha = 255 * Math.pow(1 - b.t, 0.7); // fade plus lent
+        const baseR = g.getThickness() * 0.18;
+
+        // Couleurs boostées
+        const col = (b.type === "select")
+            ? [255, 200, 0]     // jaune plus chaud
+            : [50, 150, 255];   // bleu plus saturé
+
+        // --- Shockwave principal (anneau explosif) ---
+        stroke(col[0], col[1], col[2], alpha);
+        strokeWeight(4); // plus épais
+        noFill();
+        circle(pos.x, pos.y, baseR * (1 + b.t * 1.8)); // explosion plus large
+
+        // --- Halo secondaire (subtil mais visible) ---
+        stroke(col[0], col[1], col[2], alpha * 0.4);
+        strokeWeight(2);
+        circle(pos.x, pos.y, baseR * (1 + b.t * 1.3));
+
+        // --- Flash central (plus lumineux) ---
+        noStroke();
+        fill(col[0], col[1], col[2], alpha * 0.9);
+        circle(pos.x, pos.y, baseR * (0.7 - b.t * 0.5));
+
+        return true;
+    });
+
+    if (g.interactionBursts.length > 0) g.invalidate();
+}
+
+
+
 
 
 drawNoteList(list, opts = {}) {
@@ -899,7 +950,12 @@ drawDebugInfo() {
         this.drawSelectedNotes();
         
         this.drawHoverDot();
-        this.drawHighlights();
+
+
+        this.drawInteractionBursts();  //  rapide
+        this.drawHighlightOctave();    //  lent
+
+
 
         if (g.debug) this.drawDebugInfo();
     }
