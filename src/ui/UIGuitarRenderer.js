@@ -494,40 +494,23 @@ if (g.hoverMode === "note") {
 
 
 drawPinnedNotes() {
-    const g = this.g;
-    const app = g.app;
-
-    for (const pin of g.pinnedNotes) {
-        const pos = g.toScreen(pin.fret, pin.string);
-        if (!pos) continue;
-
-        const raw = app.instrument.getNoteAt(pin.string - 1, pin.fret);
-
-        const label = app.theory.getNoteLabel(
-            raw.index,
-            g.displayMode === "note"
-                ? g.labelType
-                : g.displayMode
-        );
-
-        // 🎯 RÉCUPÉRER LE DEGRÉ
-        const degObj = app.theory.getNoteLabel(raw.index, "degree");
-        const isTonic = (degObj.base === "1"); // degré 1
-
-        // 🎯 AJOUT : récupérer le chroma (si root existe)
-        const full = app.theory.getFullNote(raw.index);
-        label.chroma = full.chroma;   // ← EXACTEMENT ce que tu veux
-
-        // 🎯 ENVOYER À drawNote
-        this.drawNote(pos.x, pos.y, {
-            fillColor: "#3494f3",
-            strokeColor: "black",
-            hasShadow: false,
-            isTonic: isTonic,
-            label
-        });
-    }
+    this.drawNoteList(this.g.pinnedNotes, {
+        fillColor: "#3494f3",
+        strokeColor: "black",
+        shapeType: "circle",
+        hasShadow: false
+    });
 }
+
+drawSelectedNotes() {
+    this.drawNoteList(this.g.selectedNotes, {
+        fillColor: "#fcb900",
+        strokeColor: "black",
+        shapeType: "square",
+        hasShadow: true
+    });
+}
+
 
 drawHighlights() {
     const g = this.g;
@@ -647,6 +630,59 @@ drawHighlights() {
 }
 
 
+drawNoteList(list, opts = {}) {
+    const g = this.g;
+    const app = g.app;
+
+    const {
+        fillColor = "#ffffff",
+        strokeColor = "black",
+        shapeType = "circle",
+        hasShadow = false,
+        outOfBoundsColor = "white"
+    } = opts;
+
+    for (let n of list) {
+
+        const inFretRange   = n.fret   >= 0 && n.fret   <= g.fretCount;
+        const inStringRange = n.string >= 1 && n.string <= g.strings.length;
+
+        // --- Hors manche → même logique que drawSelectedNotes ---
+        if (!inFretRange || !inStringRange) {
+            this.drawOutOfBoundsMarker(n);
+            continue;
+        }
+
+        const pos = g.toScreen(n.fret, n.string);
+        if (!pos) continue;
+
+        const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
+
+        const label = app.theory.getNoteLabel(
+            raw.index,
+            g.displayMode === "note"
+                ? g.labelType
+                : g.displayMode
+        );
+
+        // chroma (comme pinned + selected)
+        const full = app.theory.getFullNote(raw.index);
+        label.chroma = full.chroma;
+
+        // tonic (optionnel)
+        const degObj = app.theory.getNoteLabel(raw.index, "degree");
+        const isTonic = (degObj.base === "1");
+
+        this.drawNote(pos.x, pos.y, {
+            fillColor,
+            strokeColor,
+            shapeType,
+            hasShadow,
+            label,
+            isTonic
+        });
+    }
+}
 
 
 

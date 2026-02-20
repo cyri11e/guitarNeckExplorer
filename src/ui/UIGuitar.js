@@ -265,24 +265,19 @@ _startHighlightTimer() {
     }
 
 
-
-moveSelectedFrets(delta) {
-    const maxFret = this.fretCount;
-
-    this.selectedNotes = this.selectedNotes.map(n => ({
-        fret: n.fret + delta,   // PAS de clamp ici !
+_moveFrets(list, delta) {
+    return list.map(n => ({
+        fret: n.fret + delta,
         string: n.string
     }));
-
-    this.invalidate();
 }
 
-moveSelectedStrings(delta) {
+_moveStrings(list, delta) {
     const minString = 1;
     const maxString = this.strings.length;
-    const tuning    = this.instrument.tuning; // E2, A2, D3, G3, B3, E4...
+    const tuning    = this.instrument.tuning;
 
-    this.selectedNotes = this.selectedNotes.map(n => {
+    return list.map(n => {
         let string = n.string;
         let fret   = n.fret;
 
@@ -293,19 +288,15 @@ moveSelectedStrings(delta) {
             const oldString = string;
             let newString = oldString + step;
 
-            // 1) WRAP VERTICAL
             if (newString < minString) newString = maxString;
             if (newString > maxString) newString = minString;
 
-            // 2) DÉTECTION SOL–SI PAR L’ACCORDAGE (intervalle de 4 demi‑tons)
             const midiOld = tuning[oldString - 1].midi;
             const midiNew = tuning[newString - 1].midi;
             const diff    = Math.abs(midiNew - midiOld);
 
             if (diff === 4) {
-                // paire SOL–SI, on applique ton décalage de frette
-                if (step > 0) fret += 1;   // vers "le bas" visuel → frette suivante
-                else if (step < 0) fret -= 1; // vers "le haut" visuel → frette précédente
+                fret += (step > 0 ? 1 : -1);
             }
 
             string = newString;
@@ -314,9 +305,29 @@ moveSelectedStrings(delta) {
 
         return { fret, string };
     });
+}
 
+
+moveSelectedFrets(delta) {
+    this.selectedNotes = this._moveFrets(this.selectedNotes, delta);
     this.invalidate();
 }
+
+moveSelectedStrings(delta) {
+    this.selectedNotes = this._moveStrings(this.selectedNotes, delta);
+    this.invalidate();
+}
+
+movePinnedFrets(delta) {
+    this.pinnedNotes = this._moveFrets(this.pinnedNotes, delta);
+    this.invalidate();
+}
+
+movePinnedStrings(delta) {
+    this.pinnedNotes = this._moveStrings(this.pinnedNotes, delta);
+    this.invalidate();
+}
+
 
 
    // ------------------------------------------------------------
@@ -391,23 +402,29 @@ moveSelectedStrings(delta) {
 
 
 keyPressed(k, kc) {
-    if (this.selectedNotes.length === 0) return false;
+
+    const usePinned = keyIsDown(SHIFT);
 
     switch (kc) {
+
         case LEFT_ARROW:
-            this.moveSelectedFrets(-1);
+            if (usePinned) this.movePinnedFrets(-1);
+            else this.moveSelectedFrets(-1);
             return true;
 
         case RIGHT_ARROW:
-            this.moveSelectedFrets(+1);
+            if (usePinned) this.movePinnedFrets(+1);
+            else this.moveSelectedFrets(+1);
             return true;
 
         case UP_ARROW:
-            this.moveSelectedStrings(+1);
+            if (usePinned) this.movePinnedStrings(+1);
+            else this.moveSelectedStrings(+1);
             return true;
 
         case DOWN_ARROW:
-            this.moveSelectedStrings(-1);
+            if (usePinned) this.movePinnedStrings(-1);
+            else this.moveSelectedStrings(-1);
             return true;
     }
 
