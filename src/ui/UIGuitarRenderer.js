@@ -95,12 +95,6 @@ detectPlatformAdjustments() {
 }
 
 
-    // --------------------------------------------------------
-    //  MÉTHODE DÉDIÉE À L’ANIMATION DES ROOTS
-    // --------------------------------------------------------
-
-
-
     // ------------------------------------------------------------
     // FRETTES
     // ------------------------------------------------------------
@@ -271,73 +265,30 @@ drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
     text(label, x, y);
 }
 
-
-// parseNoteLabel(label) {
-//     label = label.trim();
-
-//     // Normalisation des altérations
-//     const flat  = ["b", "♭"];
-//     const sharp = ["#", "♯"];
-
-//     // Remplacement automatique
-//     label = label
-//         .replace(/^b(?=\d)/, "♭")   // b3 → ♭3
-//         .replace(/b$/, "♭")         // Eb → E♭
-//         .replace(/#/, "♯");         // C# → C♯
-
-//     // Degré : ♭3, ♯5…
-//     if (/^[♭♯]\d+$/.test(label)) {
-//         return {
-//             base: label.slice(1),
-//             alt: label[0],
-//             type: "degree"
-//         };
-//     }
-
-//     // Note : C♯, E♭…
-//     if (/^[A-G][♭♯]?$/.test(label)) {
-//         return {
-//             base: label[0],
-//             alt: label.slice(1),
-//             type: "note"
-//         };
-//     }
-
-//     // Fallback
-//     return { base: label, alt: "", type: "raw" };
-// }
-
 drawNote(x, y, opts = {}) {
 
-    // --- extraction des options ---
     let {
         fillColor = color("#ffffff"),
         strokeColor = "black",
         strokeW = 1,
-        shapeType = "circle",   // "circle" | "square"
+        shapeType = "circle",
         opacity = 255,
         hasShadow = false,
-
-        label = null // { base, alt, type, chroma }
+        label = null
     } = opts;
 
-    // --- sécurité : label doit exister ---
     if (!label) return;
 
     const { base, alt, type, chroma } = label;
 
-    // --- priorité couleur chromatique ---
-    // si chroma existe ET style fournit une couleur → priorité
     if (chroma != null && this.style && this.style.getChromaColor) {
         const chromaCol = this.style.getChromaColor(chroma);
         if (chromaCol) fillColor = chromaCol;
     }
 
-    // --- rayon et offset ---
     const r = this.g.getThickness() * 0.15;
     const offset = hasShadow ? (r / 8) : 0;
 
-    // --- ombre ---
     if (hasShadow) {
         noStroke();
         fill(0, 80);
@@ -352,7 +303,6 @@ drawNote(x, y, opts = {}) {
         }
     }
 
-    // --- forme principale ---
     fill(fillColor);
     stroke(strokeColor);
     strokeWeight((shapeType === "square") ? strokeW *2 : strokeW);
@@ -370,33 +320,28 @@ drawNote(x, y, opts = {}) {
     }
     pop();
 
-    // --- texte ---
     noStroke();
     fill((shapeType === "square") ? 255 : strokeColor);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
 
-    // base centrée
     textSize(r * 0.75);
     if (base.length === 3)  textSize(r * 0.50); 
     text(base, x - offset, y - offset);
 
-    // --- altération ---
     if (alt) {
         textSize(r * 0.90);
 
         let ax = x - offset;
         let ay = y - offset - r * 0.15;
 
-        // ajustement OS
         ax += this.altAdjustX;
         ay += this.altAdjustY;
 
-        // placement selon type
         if (type === "degree") {
-            ax -= r * 0.30; // à gauche
+            ax -= r * 0.30;
         } else {
-            ax += r * 0.45; // à droite
+            ax += r * 0.45;
         }
 
         text(alt, ax, ay);
@@ -406,7 +351,12 @@ drawNote(x, y, opts = {}) {
 }
 
 
+// ------------------------------------------------------------
+// HOVER DOT NORMAL (désactivé en mode marker)
+// ------------------------------------------------------------
 drawHoverDot() {
+    if (this.g.markerMode) return;   // 🔥 micro‑patch
+
     const g = this.g;
     const app = g.app;
 
@@ -418,31 +368,24 @@ drawHoverDot() {
     const baseIndex = baseRaw.index;
     const baseMidi  = baseRaw.midi;
 
-    // ------------------------------------------------------------
-    // SHIFT = hover en mode "selected"
-    // ------------------------------------------------------------
     const isShift = g.shiftDown === true;
 
     const selectedStyle = {
         fillColor: "#ffd00055",
         strokeColor: "#ffd000",
         hasShadow: true,
-        shapeType: "square"          // 🔥 ajouté
+        shapeType: "square"
     };
 
     const hoverStyle = {
         fillColor: "#5156127d",
         strokeColor: "white",
         hasShadow: true,
-        shapeType: "circle"          // 🔥 ajouté
+        shapeType: "circle"
     };
 
     const style = isShift ? selectedStyle : hoverStyle;
 
-
-    // ------------------------------------------------------------
-    // MODE CURSOR : juste la note sous la souris
-    // ------------------------------------------------------------
     if (g.hoverMode === "cursor") {
         const pos = g.toScreen(h.fret, h.string);
         const label = app.theory.getNoteLabel(
@@ -457,9 +400,6 @@ drawHoverDot() {
         return;
     }
 
-    // ------------------------------------------------------------
-    // MODE NOTE : même MIDI exact
-    // ------------------------------------------------------------
     if (g.hoverMode === "note") {
         for (let s = 1; s <= g.strings.length; s++) {
             for (let f = 0; f <= g.fretCount; f++) {
@@ -482,9 +422,6 @@ drawHoverDot() {
         return;
     }
 
-    // ------------------------------------------------------------
-    // MODE OCTAVE : même note (index), toutes octaves
-    // ------------------------------------------------------------
     if (g.hoverMode === "octave") {
         for (let s = 1; s <= g.strings.length; s++) {
             for (let f = 0; f <= g.fretCount; f++) {
@@ -508,6 +445,61 @@ drawHoverDot() {
 }
 
 
+// ------------------------------------------------------------
+// MARKER — SEGMENTS
+// ------------------------------------------------------------
+drawMarkedSegments() {
+    const g = this.g;
+    if (!g.markerMode) return;
+
+    // épaisseur = diamètre note × 1.3
+    const thickness = g.getThickness() * 0.22;
+    strokeWeight(thickness);
+
+    for (let s of g.markerSegments) {
+
+        // Couleur + transparence
+        const col = color(s.color);
+        col.setAlpha(180); // ← transparence légère, propre
+
+        stroke(col);
+
+        const p1 = g.toScreen(s.a.fret, s.a.string);
+        const p2 = g.toScreen(s.b.fret, s.b.string);
+
+        if (p1 && p2) {
+            line(p1.x, p1.y, p2.x, p2.y);
+        }
+    }
+}
+
+
+
+// ------------------------------------------------------------
+// MARKER — HOVER DOT SPÉCIAL
+// ------------------------------------------------------------
+drawMarkerHoverDot() {
+    const g = this.g;
+    if (!g.markerMode || !g.hoveredNote) return;
+
+    const p = g.toScreen(g.hoveredNote.fret, g.hoveredNote.string);
+
+    const thickness = g.getThickness() * 0.1;
+
+    // Couleur + légère transparence
+    const col = color(g.markerColor);
+    col.setAlpha(180); // ← même transparence que les segments
+
+    strokeWeight(thickness);
+    stroke(col);
+    noFill();
+    circle(p.x, p.y, thickness);
+}
+
+
+// ------------------------------------------------------------
+// PINNED / SELECTED
+// ------------------------------------------------------------
 drawPinnedNotes() {
     this.drawNoteList(this.g.pinnedNotes, {
         fillColor: "#3494f3",
@@ -526,20 +518,66 @@ drawSelectedNotes() {
     });
 }
 
+
+// ------------------------------------------------------------
+// ANIMATIONS (désactivées en mode marker)
+// ------------------------------------------------------------
+drawInteractionBursts() {
+    if (this.g.markerMode) return;   // 🔥 micro‑patch
+
+    const g = this.g;
+
+    if (!g.interactionBursts || g.interactionBursts.length === 0)
+        return;
+
+    g.interactionBursts = g.interactionBursts.filter(b => {
+
+        b.t += 0.05;
+        if (b.t >= 1) return false;
+
+        const pos = g.toScreen(b.fret, b.string);
+        if (!pos) return false;
+
+        const alpha = 255 * Math.pow(1 - b.t, 0.7);
+        const baseR = g.getThickness() * 0.18;
+
+        const col = (b.type === "select")
+            ? [255, 200, 0]
+            : [50, 150, 255];
+
+        stroke(col[0], col[1], col[2], alpha);
+        strokeWeight(4);
+        noFill();
+        circle(pos.x, pos.y, baseR * (1 + b.t * 1.8));
+
+        stroke(col[0], col[1], col[2], alpha * 0.4);
+        strokeWeight(2);
+        circle(pos.x, pos.y, baseR * (1 + b.t * 1.3));
+
+        noStroke();
+        fill(col[0], col[1], col[2], alpha * 0.9);
+        circle(pos.x, pos.y, baseR * (0.7 - b.t * 0.5));
+
+        return true;
+    });
+
+    if (g.interactionBursts.length > 0) g.invalidate();
+}
+
+
 drawHighlightOctave() {
+    if (this.g.markerMode) return;   // 🔥 micro‑patch
+
     const g = this.g;
 
     if (!g.highlighted || g.highlighted.length === 0)
         return;
 
-    const pts = []; // points finalisés uniquement
+    const pts = [];
 
-    // ---------------------------------------------------------
-    // 1) DESSIN DES CIBLES (t < 1) ET DES POINTS FINAUX (t >= 1)
-    // ---------------------------------------------------------
     for (let h of g.highlighted) {
 
-    h.t += 0.01;   //  AJOUTER CETTE LIGNE
+        h.t += 0.01;
 
         const pos = g.toScreen(h.fret, h.string);
         if (!pos) continue;
@@ -619,9 +657,9 @@ drawHighlightOctave() {
 
     for (let gi = 0; gi < groups.length; gi++) {
 
-        const G = groups[gi];       // groupe courant (ex : 3,4,5)
-        const prev = groups[gi-1];  // groupe précédent (ex : 2)
-        const next = groups[gi+1];  // groupe suivant (ex : 6)
+        const G = groups[gi];       // groupe courant
+        const prev = groups[gi-1];  // groupe précédent
+        const next = groups[gi+1];  // groupe suivant
 
         // A) RELIER LE POINT PRÉCÉDENT À TOUS LES POINTS DE LA FRETTTE
         if (prev) {
@@ -644,57 +682,6 @@ drawHighlightOctave() {
         }
     }
 }
-
-drawInteractionBursts() {
-    const g = this.g;
-
-    if (!g.interactionBursts || g.interactionBursts.length === 0)
-        return;
-
-    g.interactionBursts = g.interactionBursts.filter(b => {
-
-        // Animation
-        b.t += 0.05;   // vitesse idéale
-        if (b.t >= 1) return false;
-
-        const pos = g.toScreen(b.fret, b.string);
-        if (!pos) return false;
-
-        // Alpha plus fort
-        const alpha = 255 * Math.pow(1 - b.t, 0.7); // fade plus lent
-        const baseR = g.getThickness() * 0.18;
-
-        // Couleurs boostées
-        const col = (b.type === "select")
-            ? [255, 200, 0]     // jaune plus chaud
-            : [50, 150, 255];   // bleu plus saturé
-
-        // --- Shockwave principal (anneau explosif) ---
-        stroke(col[0], col[1], col[2], alpha);
-        strokeWeight(4); // plus épais
-        noFill();
-        circle(pos.x, pos.y, baseR * (1 + b.t * 1.8)); // explosion plus large
-
-        // --- Halo secondaire (subtil mais visible) ---
-        stroke(col[0], col[1], col[2], alpha * 0.4);
-        strokeWeight(2);
-        circle(pos.x, pos.y, baseR * (1 + b.t * 1.3));
-
-        // --- Flash central (plus lumineux) ---
-        noStroke();
-        fill(col[0], col[1], col[2], alpha * 0.9);
-        circle(pos.x, pos.y, baseR * (0.7 - b.t * 0.5));
-
-        return true;
-    });
-
-    if (g.interactionBursts.length > 0) g.invalidate();
-}
-
-
-
-
-
 drawNoteList(list, opts = {}) {
     const g = this.g;
     const app = g.app;
@@ -712,7 +699,6 @@ drawNoteList(list, opts = {}) {
         const inFretRange   = n.fret   >= 0 && n.fret   <= g.fretCount;
         const inStringRange = n.string >= 1 && n.string <= g.strings.length;
 
-        // --- Hors manche → même logique que drawSelectedNotes ---
         if (!inFretRange || !inStringRange) {
             this.drawOutOfBoundsMarker(n);
             continue;
@@ -730,11 +716,9 @@ drawNoteList(list, opts = {}) {
                 : g.displayMode
         );
 
-        // chroma (comme pinned + selected)
         const full = app.theory.getFullNote(raw.index);
         label.chroma = full.chroma;
 
-        // tonic (optionnel)
         const degObj = app.theory.getNoteLabel(raw.index, "degree");
         const isTonic = (degObj.base === "1");
 
@@ -749,56 +733,11 @@ drawNoteList(list, opts = {}) {
     }
 }
 
-
-
-drawSelectedNotes() {
-    const g = this.g;
-    const app = g.app;
-
-    for (let s of g.selectedNotes) {
-
-        const inFretRange   = s.fret   >= 0 && s.fret   <= g.fretCount;
-        const inStringRange = s.string >= 1 && s.string <= g.strings.length;
-
-        if (!inFretRange || !inStringRange) {
-            this.drawOutOfBoundsMarker(s);
-            continue;
-        }
-
-        const pos = g.toScreen(s.fret, s.string);
-        const raw = app.instrument.getNoteAt(s.string - 1, s.fret);
-
-        const label = app.theory.getNoteLabel(
-            raw.index,
-            g.displayMode === "note"
-                ? g.labelType
-                : g.displayMode
-        );
-
-        // AJOUT : chroma (exactement comme pinned)
-        const full = app.theory.getFullNote(raw.index);
-        label.chroma = full.chroma;
-
-        // ET ON GARDE L’ASPECT D’ORIGINE
-        this.drawNote(pos.x, pos.y, {
-            fillColor: "#fcb900",      // couleur d’origine
-            strokeColor: "black",
-            shapeType: "square",
-            hasShadow: true,
-            label
-        });
-    }
-}
-
-
 getStringY(stringIndex) {
     const g = this.g;
 
-    // clamp
     const safe = Math.min(Math.max(stringIndex, 1), g.stringRatio.length);
 
-    // stringRatio[0] = corde 6 (haut)
-    // stringRatio[5] = corde 1 (bas)
     const ratioIndex = g.stringRatio.length - safe;
 
     return g.y + g.h * g.stringRatio[ratioIndex];
@@ -814,9 +753,6 @@ drawOutOfBoundsMarker(sel) {
 
     let x, y;
 
-    // ---------------------------------------------------------
-    // 1) X (inchangé)
-    // ---------------------------------------------------------
     if (sel.fret < minFret) {
         x = g.x;
     }
@@ -829,27 +765,18 @@ drawOutOfBoundsMarker(sel) {
         x = pos ? pos.x : (g.x + g.w * (sel.fret / maxFret));
     }
 
-    // ---------------------------------------------------------
-    // 2) Y (corrigé pour les sorties par le côté)
-    // ---------------------------------------------------------
     if (sel.string < minString) {
-        // sortie par le haut/bas → tu avais dit que ça, c'était OK
         y = g.y;
     }
     else if (sel.string > maxString) {
         y = g.y + g.h;
     }
     else {
-        // corde valide → on veut être EXACTEMENT sur la corde,
-        // même si la frette est hors manche
         const safeFret = Math.min(Math.max(sel.fret, minFret), maxFret);
         const pos = g.toScreen(safeFret, sel.string);
         y = pos ? pos.y : (g.y + g.h * (sel.string / maxString));
     }
 
-    // ---------------------------------------------------------
-    // 3) Dessin
-    // ---------------------------------------------------------
     fill(255);
     stroke(0);
     textAlign(CENTER, CENTER);
@@ -857,14 +784,12 @@ drawOutOfBoundsMarker(sel) {
     text("+", x, y);
 }
 
-
-
 drawOpenStringLabels() {
     const g = this.g;
-    const names = ["E", "A", "D", "G", "B", "E"]; // corde 1 → aiguë
-    const c0 = g.cases[0]; // case à vide
+    const names = ["E", "A", "D", "G", "B", "E"];
+    const c0 = g.cases[0];
 
-    const x = c0.xc;       //même emplacement horizontal que la pastille
+    const x = c0.xc;
     const t = g.getThickness();
     const col = this.style.getInlayColor();
 
@@ -874,15 +799,9 @@ drawOpenStringLabels() {
 
     for (let i = 0; i < g.strings.length; i++) {
         const s = g.strings[i];
-        text(names[i], x, s.y);  // même y que la pastille
+        text(names[i], x, s.y);
     }
 }
-
-
-
-    // ------------------------------------------------------------
-    // DEBUG
-    // ------------------------------------------------------------
 
 drawDebugInfo() {
     const g = this.g;
@@ -894,83 +813,60 @@ drawDebugInfo() {
 
     const ratio = (w / h).toFixed(2);
 
-    // Interaction
     const isHovered    = g.isHovered;
     const pressed  = g.isPressed;
     const dragging = g.dragging;
 
-    // Coordonnées souris
     const mx = mouseX.toFixed(0);
     const my = mouseY.toFixed(0);
 
-    // Conversion guitare
     const hit = g.fromScreen(mouseX, mouseY);
 
     const fretStr   = hit ? hit.fret : "-";
     const stringStr = hit ? hit.string : "-";
-    const caseStr   = hit ? hit.fret : "-";   // même index pour l’instant
+    const caseStr   = hit ? hit.fret : "-";
 
     push();
-    // fill("green");
-    // textSize(12);
-    // textAlign(LEFT, TOP);
-
-    // text(
-    //     `x: ${x.toFixed(1)}\n` +
-    //     `y: ${y.toFixed(1)}\n` +
-    //     `w: ${w.toFixed(1)}\n` +
-    //     `h: ${h.toFixed(1)}\n` +
-    //     `ratio: ${ratio}\n` +
-    //     `frets: ${g.fretCount}\n` +
-    //     `cases: ${g.cases.length}\n\n` +
-
-    //     `hover: ${isHovered}\n` +
-    //     `pressed: ${pressed}\n` +
-    //     `dragging: ${dragging}\n` +
-    //     `mouse: ${mx}, ${my}\n` +
-    //     `case: ${caseStr}\n` +
-    //     `fret: ${fretStr}\n` +
-    //     `string: ${stringStr}`,
-    //     x + 18,
-    //     y + 36
-    // );
-
     pop();
 }
 
 
-    // ------------------------------------------------------------
-    // DRAW GLOBAL
-    // ------------------------------------------------------------
+// ------------------------------------------------------------
+// DRAW GLOBAL
+// ------------------------------------------------------------
+draw() {
+    const g = this.g;
 
-    draw() {
-        const g = this.g;
+    const neck = g.getNeckRect();
+    fill(this.style.getWoodFill());
+    stroke(40);
+    strokeWeight(2);
+    rect(neck.x, neck.y, neck.w, neck.h);
 
-        const neck = g.getNeckRect();
-        fill(this.style.getWoodFill());
-        stroke(40);
-        strokeWeight(2);
-        rect(neck.x, neck.y, neck.w, neck.h);
+    this.drawInlays();
+    this.drawHead();
+    this.drawStringShadows();
+    this.drawFrets();
+    
+    this.drawStrings();
+    this.drawOpenStringLabels();
 
-        this.drawInlays();
-        this.drawHead();
-        this.drawStringShadows();
-        this.drawFrets();
-        
-        this.drawStrings();
-        this.drawOpenStringLabels();
-        this.drawPinnedNotes();
+    // MARKER SEGMENTS
+    this.drawMarkedSegments();
 
-        this.drawSelectedNotes();
-        
-        this.drawHoverDot();
+    // PINNED / SELECTED
+    this.drawPinnedNotes();
+    this.drawSelectedNotes();
+    
+    // HOVER DOT NORMAL OU MARKER
+    this.drawHoverDot();
+    this.drawMarkerHoverDot();
 
+    // ANIMATIONS (désactivées en mode marker)
+    this.drawInteractionBursts();
+    this.drawHighlightOctave();
 
-        this.drawInteractionBursts();  //  rapide
-        this.drawHighlightOctave();    //  lent
+    if (g.debug) this.drawDebugInfo();
+}
 
-
-
-        if (g.debug) this.drawDebugInfo();
-    }
 }

@@ -194,7 +194,47 @@ guitar.invalidate();
         cof.rootIndex = evt.index;
         cof.invalidate();
     }
-}
+},
+// ============================================================
+// MARKER SELECTOR → GUITAR
+// ============================================================
+(components, source, evt) => {
+
+    // 1) Trouver le MarkerSelector
+    const marker = components.find(c => c.name === "markerSelector1");
+    if (!marker) return;
+
+    // 2) On ne réagit que si c’est LUI la source
+    if (source !== marker) return;
+
+    // 3) Trouver la guitare
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    console.log("[RULE:MARKER] Reçu :", evt);
+
+    // 4) Toggle ON/OFF
+    if (evt.type === "markerToggle") {
+        guitar.markerMode = (evt.state === 1);
+        guitar.markerPendingPoint = null;
+
+        console.log("[MARKER] Mode =", guitar.markerMode ? "ON" : "OFF");
+
+        guitar.invalidate();
+        return;
+    }
+
+    // 5) Changement de couleur
+    if (evt.type === "markerColor") {
+        guitar.markerColor = marker.noteColors[evt.index];
+
+        console.log("[MARKER] Nouvelle couleur =", guitar.markerColor);
+
+        guitar.invalidate();
+        return;
+    }
+},
+
 
 
 
