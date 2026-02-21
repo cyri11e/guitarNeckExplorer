@@ -61,8 +61,8 @@ guitar1: {
     isDraggable: true,
     isZoomable: true,
     fretCount: 22,
-    inlayStyle: 'dot',
-    woodColor: "maple",
+    inlayStyle: 'dots',
+    woodColor: "mapple",
     orientation: "horizontal",
     toggleOrientationShortcut: "o" ,  // NEW
     displayMode: "note"

@@ -267,12 +267,13 @@ drawNoteOnFretboard(label, string, fret, color = null, isHover = false) {
 
 drawNote(x, y, opts = {}) {
 
+    // -----------------------------
+    // 1) Extraction des options
+    // -----------------------------
     let {
         fillColor = color("#ffffff"),
         strokeColor = "black",
-        strokeW = 1,
         shapeType = "circle",
-        opacity = 255,
         hasShadow = false,
         label = null
     } = opts;
@@ -281,54 +282,76 @@ drawNote(x, y, opts = {}) {
 
     const { base, alt, type, chroma } = label;
 
-    if (chroma != null && this.style && this.style.getChromaColor) {
+    // -----------------------------
+    // 2) Couleur chromatique
+    // -----------------------------
+    if (chroma != null && this.style?.getChromaColor) {
         const chromaCol = this.style.getChromaColor(chroma);
         if (chromaCol) fillColor = chromaCol;
     }
 
+    // -----------------------------
+    // 3) Géométrie
+    // -----------------------------
     const r = this.g.getThickness() * 0.15;
-    const offset = hasShadow ? (r / 8) : 0;
+    const weight = r / 10;
+    const offset = hasShadow ? (r / 12) : 0;
 
+    push();
+
+    // -----------------------------
+    // 4) Ombre
+    // -----------------------------
     if (hasShadow) {
         noStroke();
         fill(0, 80);
 
         if (shapeType === "square") {
-            push();
             rectMode(CENTER);
             rect(x + offset, y + offset, r, r, r * 0.2);
-            pop();
         } else {
-            ellipse(x + offset, y + offset, r , r );
+            ellipse(x + offset, y + offset, r, r);
         }
     }
 
+    // -----------------------------
+    // 5) Fond (cercle ou carré)
+    // -----------------------------
     fill(fillColor);
     stroke(strokeColor);
-    strokeWeight((shapeType === "square") ? strokeW *2 : strokeW);
-    if (base=="") {
-       fill(0); 
-    }
-        
-    push();
+    strokeWeight(weight);
+
+    if (base === "") fill(0);
+
     if (shapeType === "square") {
         rectMode(CENTER);
         stroke(255);
-        rect(x - offset, y - offset, r * 1.1, r *1.1, r * 0.2);
+        rect(x - offset, y - offset, r, r, r * 0.2);
     } else {
         circle(x - offset, y - offset, r);
     }
-    pop();
 
+    // -----------------------------
+    // 6) Texte principal
+    // -----------------------------
     noStroke();
-    fill((shapeType === "square") ? 255 : strokeColor);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
 
-    textSize(r * 0.75);
-    if (base.length === 3)  textSize(r * 0.50); 
+    textSize(r * (base.length === 3 ? 0.50 : 0.80));
+
+    // ombre du texte
+    fill(shapeType === "square" ? "#00000076" : "#ffffff7d");
+    text(base, x - offset + 1, y - offset + 1
+    );
+
+    // texte principal
+    fill(shapeType === "square" ? 255 : strokeColor);
     text(base, x - offset, y - offset);
 
+    // -----------------------------
+    // 7) Altération (#, b)
+    // -----------------------------
     if (alt) {
         textSize(r * 0.90);
 
@@ -338,16 +361,20 @@ drawNote(x, y, opts = {}) {
         ax += this.altAdjustX;
         ay += this.altAdjustY;
 
-        if (type === "degree") {
-            ax -= r * 0.30;
-        } else {
-            ax += r * 0.45;
-        }
+        if (type === "degree") ax -= r * 0.30;
+        else ax += r * 0.45;
 
+        // ombre
+        fill(shapeType === "square" ? "#00000076" : "#ffffff7d");
+        text(alt, ax + 1, ay + 1);
+
+        // texte
+        fill(shapeType === "square" ? 255 : strokeColor);
         text(alt, ax, ay);
     }
 
     textStyle(NORMAL);
+    pop();
 }
 
 
