@@ -57,6 +57,10 @@ class App {
                     comp = new MarkerSelector(cfg); 
                     break;    
 
+                case "switch":
+                    comp = new Switch(cfg); 
+                    break; 
+                    
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;

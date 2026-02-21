@@ -59,6 +59,8 @@ class Guitar extends UIComponent {
         this.labelType   = cfg.labelType   ?? "noteEN";   // noteEN | noteFR
         this.hoverMode   = "cursor"; // "cursor" | "note" | "octave"
 
+        this.multiNotes = false;
+        this.intervals =[];
         // animations
         this.highlighted       = [];
         this.interactionBursts = [];

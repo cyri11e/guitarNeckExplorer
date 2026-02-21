@@ -236,7 +236,102 @@ guitar.invalidate();
 },
 
 
+// RÈGLE : switchDeg1 ↔ autres switchesDeg
+(components, source, newState) => {
 
+    // On ne s'intéresse qu'aux switchesDeg
+    if (!source.name.startsWith("switchDeg")) return;
+
+    // Récupérer tous les switchesDeg
+    const switches = components.filter(c => c.name.startsWith("switchDeg"));
+    const root     = switches.find(c => c.name === "switchDeg1");
+    if (!root) return;
+
+    // --- CAS 1 : un switch (2–7) est activé → root ON ---
+    if (source !== root && newState !== 0) {
+        if (root.state === 0) {
+            root.setState(1);
+        }
+        return;
+    }
+
+    // --- CAS 2 : tous les switches (2–7) sont OFF → root OFF ---
+    if (source !== root && newState === 0) {
+
+        // Vérifier si tous les autres sont OFF
+        const othersOn = switches.some(sw =>
+            sw !== root && sw.state !== 0
+        );
+
+        if (!othersOn && root.state !== 0) {
+            root.setState(0);
+        }
+
+        return;
+    }
+
+    // --- CAS 3 : root OFF → tout le monde OFF ---
+    if (source === root && newState === 0) {
+        for (const sw of switches) {
+            if (sw !== root && sw.state !== 0) {
+                sw.setState(0);
+            }
+        }
+        return;
+    }
+},
+
+(components, source, newState) => {
+
+    if (!source.name.startsWith("switchDeg")) return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    const MAJOR = {
+        1: 0,
+        2: 2,
+        3: 4,
+        4: 5,
+        5: 7,
+        6: 9,
+        7: 11
+    };
+
+    const ALTER = {
+        1: { 1: 0, 2: 0 },
+        2: { 1: 0, 2: -1 },
+        3: { 1: 0, 2: -1 },
+        4: { 1: 0, 2: +1 },
+        5: { 1: 0, 2: -1, 3: +1 },
+        6: { 1: 0, 2: -1 },
+        7: { 1: 0, 2: -1, 4: -2 }
+    };
+
+    const intervals = [];
+
+    for (let i = 1; i <= 7; i++) {
+
+        const sw = components.find(c => c.name === "switchDeg" + i);
+        if (!sw) continue;
+
+        const state = sw.state;
+        if (state === 0) continue; // OFF
+
+        const degree = parseInt(sw.name.replace("switchDeg", ""));
+
+
+        let interval = MAJOR[degree];
+
+        const adj = ALTER[degree][state];
+        if (adj != null) interval += adj;
+
+        intervals.push(interval);
+    }
+
+    guitar.intervals = intervals;
+    guitar.invalidate();
+},
 
 
 

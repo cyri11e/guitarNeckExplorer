@@ -19,6 +19,127 @@ const UI_CONFIG = {
         ]
     },
 
+// PANEL HARMONIE
+harmonyPanel: {
+    type: "panel",
+    xp: 15,
+    yp: 75,
+    sp: 20,
+    aspectRatio: 1.2,
+    visible: true,
+    isDraggable: true,
+    isZoomable: true,
+    toggleOnClick: true,
+
+    children: [
+        "knobChordType",
+        "switchDeg1",
+        "switchDeg2",
+        "switchDeg3",
+        "switchDeg4",
+        "switchDeg5",
+        "switchDeg6",
+        "switchDeg7"
+    ]
+},
+
+
+
+// --- KNOB 2 : Type d’accord ---
+knobChordType: {
+    type: "knob",
+    xp: 50,
+    yp: 25,
+    sp: 100,
+    hideBottom: true,
+    items: [
+        { symbol: "1", label: "Unique" },
+        { symbol: "3", label: "Triade" },
+        { symbol: "4", label: "Tetrade" },
+        { symbol: "5", label: "Pentatonique" },
+        { symbol: "7", label: "Diatonique" }
+    ],
+    shortcutKey: "g"
+},
+
+// --- SWITCHES (1 à 7) ---
+switchDeg1: {
+    type: "switch",
+    xp: 50,
+    yp: 40,
+    sp: 100,
+    aspectRatio: 0.3,
+    title: "1",
+    topLabel: "",
+    bottomLabel: ""
+},
+
+switchDeg2: {
+    type: "switch",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    aspectRatio: 0.4,
+    title: "2",
+    topLabel: "M",
+    bottomLabel: "m"
+},
+
+switchDeg3: {
+    type: "switch",
+    xp: 50,
+    yp: 60,
+    sp: 100,
+    aspectRatio: 0.40,
+    title: "3",
+    topLabel: "M",
+    bottomLabel: "m"
+},
+
+switchDeg4: {
+    type: "switch",
+    xp: 50,
+    yp: 70,
+    sp: 100,
+    aspectRatio: 0.40,
+    title: "4",
+    topLabel: "P",
+    bottomLabel: "a"
+},
+
+switchDeg5: {
+    type: "switch",
+    xp: 50,
+    yp: 80,
+    sp: 100,
+    aspectRatio: 0.40,
+    title: "5",
+    topLabel: "P",
+    bottomLabel: "d"
+},
+
+switchDeg6: {
+    type: "switch",
+    xp: 50,
+    yp: 90,
+    sp: 100,
+    aspectRatio: 0.40,
+    title: "6",
+    topLabel: "M",
+    bottomLabel: "m"
+},
+
+switchDeg7: {
+    type: "switch",
+    xp: 50,
+    yp: 100,
+    sp: 100,
+    aspectRatio: 0.40,
+    title: "7",
+    topLabel: "M",
+    bottomLabel: "m"
+},
+
 
 metalSwitch1: {
     type: "metalSwitch",
@@ -121,6 +242,8 @@ markerSelector1: {
     sp: 100,
     shortcutKey: "k"   // optionnel
 },
+
+
 
 
     // // Exemple futur : un knob
