@@ -32,6 +32,8 @@ class Guitar extends UIComponent {
         this.style    = new GuitarStyle(this);
         this.geometry = new GuitarGeometry(this);
         this.renderer = new GuitarRenderer(this, this.style);
+        this.overlays = new GuitarOverlays(this, this.style);
+
 
         // géométrie logique (ratios)
         this.fretRatio   = this.geometry.computeFretRatios();
@@ -200,7 +202,10 @@ class Guitar extends UIComponent {
 
     draw() {
         this.geometry.projectGeometry();
+
         this.renderer.draw();
+        this.overlays.draw();
+
         super.draw();
     }
 
