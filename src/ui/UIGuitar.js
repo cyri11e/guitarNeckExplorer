@@ -91,6 +91,47 @@ class Guitar extends UIComponent {
     } 
 }
 
+resolveMultiNotes() {
+
+    if (!this.intervals || this.intervals.length === 0) {
+        this.notePositions = [];
+        return;
+    }
+
+    const tuning    = this.instrument.tuning;
+    const fretCount = this.fretCount;
+    const intervals = this.intervals;
+
+    const notes = [];
+
+    for (let s = 0; s < tuning.length; s++) {
+
+        const openNote = tuning[s];
+
+        for (let f = 0; f <= fretCount; f++) {
+
+            const note = (openNote + f) % 12;
+
+            // MATCH DIRECT : note absolue ∈ intervalles absolus
+            for (let i = 0; i < intervals.length; i++) {
+
+                if (note === intervals[i]) {
+
+                    notes.push({
+                        string: s,
+                        fret: f,
+                        note: note,
+                        interval: intervals[i]
+                    });
+                }
+            }
+        }
+    }
+
+    this.notePositions = notes;
+}
+
+
 
     setDisplayMode(mode) {
         const allowed = ["note", "degree", "none"];

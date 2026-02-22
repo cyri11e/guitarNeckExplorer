@@ -328,8 +328,10 @@ guitar.invalidate();
 
         intervals.push(interval);
     }
-
     guitar.intervals = intervals;
+    
+    guitar.multiNotes = intervals.length > 0; 
+    guitar.resolveMultiNotes();
     guitar.invalidate();
 },
 

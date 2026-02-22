@@ -183,7 +183,7 @@ guitar1: {
     isZoomable: true,
     fretCount: 22,
     inlayStyle: 'dots',
-    woodColor: "mapple",
+    woodColor: "rosewood",
     orientation: "horizontal",
     toggleOrientationShortcut: "o" ,  // NEW
     displayMode: "note"
