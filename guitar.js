@@ -1306,7 +1306,7 @@ s
         fill(150);
         textSize(this.textSize /2 );
         textAlign(CENTER, CENTER);
-        for (let i = 0; i < this.fretCount -1; i++) {
+        for (let i = 0; i < Math.min(this.fretCount, 12) -1; i++) {
             let x = this.neckX + i * (this.neckWidth / (this.fretCount ));
             if (!this.ENoteNames[i].includes('#'))
                 drawTextCentered(this.ENoteNames[i], x + (this.neckWidth / (this.fretCount )/2), this.neckY +this.neckHeight *1.1 );
