@@ -18,11 +18,11 @@ computeFretRatios() {
 
     // 1) courbe originale
     for (let i = 0; i <= max; i++) {
-        arr[i] = 1 - 1 / Math.pow(2, i / 12);
+        arr[i] = 1 - 1 / Math.pow(2, i / 20);
     }
 
     // 2) adoucissement de la pente
-    const p = 1.1;   // ← ajuste ici (0.7 = 30% plus petit environ)
+    const p = 1;   // ← ajuste ici (0.7 = 30% plus petit environ)
     for (let i = 0; i <= max; i++) {
         arr[i] = Math.pow(arr[i], p);
     }

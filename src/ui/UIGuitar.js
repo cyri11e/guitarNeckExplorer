@@ -61,6 +61,7 @@ class Guitar extends UIComponent {
 
         this.multiNotes = false;
         this.intervals =[];
+        this.intervalMode = "OneString"; // mode par défaut
         // animations
         this.highlighted       = [];
         this.interactionBursts = [];
@@ -131,7 +132,35 @@ resolveMultiNotes() {
     this.notePositions = notes;
 }
 
+setIntervalMode(mode) {
+    this.intervalMode = mode;
+    this.invalidate();
+}
 
+setNextIntervalMode() {
+
+    const modes = [
+        "OneString",
+        "Chord",
+        "BoxR",
+        "BoxL",
+        "3NPS"
+    ];
+
+    const i = modes.indexOf(this.intervalMode);
+
+    if (i < 0) {
+        this.intervalMode = modes[0];
+        this.invalidate();
+        return;
+    }
+
+    const next = (i + 1) % modes.length;
+
+    this.intervalMode = modes[next];
+    this.invalidate();
+    return this.intervalMode
+}
 
     setDisplayMode(mode) {
         const allowed = ["note", "degree", "none"];

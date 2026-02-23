@@ -99,6 +99,25 @@ translateENtoFR(nameEN) {
     return baseFR + altFR;
 }
 
+parseDegreeLabel(deg) {
+    if (!deg) return null;
+
+    let alt  = "";
+    let base = deg;
+
+    // altération en tête : b3, #5, etc.
+    if (deg[0] === "b" || deg[0] === "#") {
+        alt  = deg[0];
+        base = deg.slice(1);
+    }
+
+    return {
+        base,          // "3"
+        alt,           // "b" ou ""
+        type: "degree",
+        chroma: null
+    };
+}
 
 getDegreeLabel(interval) {
 

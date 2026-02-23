@@ -6,6 +6,21 @@ class GuitarOverlays {
     constructor(guitar, style) {
         this.g = guitar;
         this.style = style;
+        this.intervalSelectorLabels = [
+            "1",  // 0
+            "b2", // 1
+            "2",  // 2
+            "b3", // 3
+            "3",  // 4
+            "4",  // 5
+            "#4", // 6
+            "5",  // 7
+            "b6", // 8
+            "6",  // 9
+            "b7", // 10
+            "7"   // 11
+        ]; // fallback par defaut
+
     }
 
     // ------------------------------------------------------------
@@ -31,7 +46,7 @@ class GuitarOverlays {
             if (chromaCol) fillColor = chromaCol;
         }
 
-        const r = this.g.getThickness() * 0.15;
+        const r = this.g.getThickness() * 0.17;
         const weight = r / 10;
         const offset = hasShadow ? (r / 12) : 0;
 
@@ -62,7 +77,12 @@ class GuitarOverlays {
             stroke(255);
             rect(x - offset, y - offset, r, r, r * 0.2);
         } else {
+            stroke(0);
             circle(x - offset, y - offset, r);
+            stroke(255)
+            circle(x - offset , y - offset, r * 0.9);
+            //stroke(0)
+            
         }
 
         // Texte principal
@@ -171,9 +191,20 @@ class GuitarOverlays {
         });
     }
 
-    // ------------------------------------------------------------
-    // HOVER DOT NORMAL
-    // ------------------------------------------------------------
+getRelativeDegreeLabel(interval) {
+    const theory = this.g.app.theory;
+    const d = theory.getDegreeLabel(interval);
+    if (!d) return null;
+
+    return {
+        base: d.base,     // "3"
+        alt:  d.alt,      // "♭" ou "♯" ou ""
+        type: "degree",
+        chroma: null
+    };
+}
+
+
 // ------------------------------------------------------------
 // HOVER DOT NORMAL (désactivé en mode marker)
 // ------------------------------------------------------------
@@ -192,6 +223,58 @@ drawHoverDot() {
 
     const baseIndex = baseRaw.index;
     const baseMidi  = baseRaw.midi;
+
+// ------------------------------------------------------------
+// MODE MULTINOTE : dessiner les intervalles relatifs
+// ------------------------------------------------------------
+const mode = g.intervalMode;
+const intervals = g.intervals;
+
+const list = this.dispatchIntervals(mode, intervals);
+
+for (let i = 0; i < list.length; i++) {
+    const n = list[i];
+
+
+    const pos = g.toScreen(n.fret, n.string);
+    if (!pos) continue;
+
+    const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
+
+    let label;
+
+    // règle d'affichage globale
+    switch (g.displayMode) {
+
+        case "note":
+            label = app.theory.getNoteLabel(raw.index, g.labelType);
+            break;
+
+case "degree":
+    label = this.getRelativeDegreeLabel(intervals[i+1]);
+
+    break;
+
+
+        case "index":
+            label = raw.index.toString();
+            break;
+
+        default:
+            label = app.theory.getNoteLabel(raw.index, g.labelType);
+            break;
+    }
+
+    this.drawNote(pos.x, pos.y, {
+        fillColor: "#ff8800",
+        strokeColor: "black",
+        hasShadow: true,
+        shapeType: "circle",
+        label
+    });
+}
+
+
 
     const isShift = g.shiftDown === true;
 
@@ -271,6 +354,280 @@ drawHoverDot() {
         }
     }
 }
+
+findInterval(interval, mode) {
+
+    const g = this.g;
+    const app = g.app;
+    const inst = app.instrument;
+
+    const h = g.hoveredNote;
+    if (!h) return null;
+
+    const baseRaw = inst.getNoteAt(h.string - 1, h.fret);
+    if (!baseRaw) return null;
+
+    const baseMidi = baseRaw.midi;
+    const targetMidi = baseMidi + interval;
+
+    const maxFret = g.fretCount;
+
+    // ------------------------------------------------------------
+    // MODE H : même corde
+    // ------------------------------------------------------------
+    if (mode === "H") {
+
+        const s = h.string - 1;
+
+        for (let f = 0; f <= maxFret; f++) {
+
+            const raw = inst.getNoteAt(s, f);
+            if (!raw) continue;
+
+            if (raw.midi === targetMidi) {
+                return { string: s + 1, fret: f, midi: raw.midi };
+            }
+        }
+
+        return null;
+    }
+
+    // ------------------------------------------------------------
+    // MODE V : corde suivante
+    // ------------------------------------------------------------
+    if (mode === "V") {
+
+        const s = h.string; // corde suivante
+        if (s >= inst.tuning.length) return null;
+
+        for (let f = 0; f <= maxFret; f++) {
+
+            const raw = inst.getNoteAt(s, f);
+            if (!raw) continue;
+
+            if (raw.midi === targetMidi) {
+                return { string: s + 1, fret: f, midi: raw.midi };
+            }
+        }
+
+        return null;
+    }
+
+    return null;
+}
+
+
+dispatchIntervals(mode, intervals) {
+
+    const g = this.g;
+    const app = g.app;
+    const inst = app.instrument;
+
+    const h = g.hoveredNote;
+    if (!h) return [];
+
+    const results = [];
+
+    const baseRaw = inst.getNoteAt(h.string - 1, h.fret);
+    if (!baseRaw) return [];
+
+    const baseMidi = baseRaw.midi;
+    const maxFret = g.fretCount;
+
+    // ------------------------------------------------------------
+    // MODE OneString : tout sur la même corde
+    // ------------------------------------------------------------
+    if (mode === "OneString") {
+
+        for (let i = 0; i < intervals.length; i++) {
+
+            const interval = intervals[i];
+            if (interval === 0) continue; // hover déjà affichée
+
+            const found = this.findInterval(interval, "H");
+            if (found) results.push(found);
+        }
+
+        return results;
+    }
+
+    // ------------------------------------------------------------
+    // MODE Chord : une note par corde
+    // ------------------------------------------------------------
+    if (mode === "Chord") {
+
+        for (let i = 0; i < intervals.length; i++) {
+
+            const interval = intervals[i];
+            if (interval === 0) continue; // hover déjà affichée
+
+            const s = h.string - 1 + (results.length + 1);
+            if (s >= inst.tuning.length) break;
+
+            const targetMidi = baseMidi + interval;
+            let found = null;
+
+            for (let f = 0; f <= maxFret; f++) {
+
+                const raw = inst.getNoteAt(s, f);
+                if (!raw) continue;
+
+                if (raw.midi === targetMidi) {
+                    found = { string: s + 1, fret: f, midi: raw.midi };
+                    break;
+                }
+            }
+
+            if (found) results.push(found);
+        }
+
+        return results;
+    }
+
+    // ------------------------------------------------------------
+    // MODE BoxR : fenêtre -1 → +4
+    // ------------------------------------------------------------
+// ------------------------------------------------------------
+// MODE BOX R
+// ------------------------------------------------------------
+// ------------------------------------------------------------
+// MODE BOXR — scan toutes cordes, frettes vers la droite
+// ------------------------------------------------------------
+if (mode === "BoxR") {
+
+    const minDf = 0;   // à partir de la frette actuelle
+    const maxDf = +4;  // jusqu'à 4 frettes à droite (comme BoxL mais inversé)
+
+    for (let i = 0; i < intervals.length; i++) {
+
+        const interval = intervals[i];
+        if (interval === 0) continue;
+
+        const targetMidi = baseMidi + interval;
+        let found = null;
+
+        for (let s = 0; s < inst.tuning.length; s++) {
+
+            for (let df = minDf; df <= maxDf; df++) {
+
+                const f = h.fret + df;
+                if (f < 0 || f > maxFret) continue;
+
+                const raw = inst.getNoteAt(s, f);
+                if (!raw) continue;
+
+                if (raw.midi === targetMidi) {
+                    found = { string: s + 1, fret: f, midi: raw.midi };
+                    break;
+                }
+            }
+
+            if (found) break;
+        }
+
+        if (found) results.push(found);
+    }
+
+    return results;
+}
+
+
+
+
+    // ------------------------------------------------------------
+    // MODE BoxL : fenêtre -4 → +1
+    // ------------------------------------------------------------
+if (mode === "BoxL") {
+
+    const minDf = -4;
+    const maxDf = +1;
+
+    for (let i = 0; i < intervals.length; i++) {
+
+        const interval = intervals[i];
+        if (interval === 0) continue;
+
+        const targetMidi = baseMidi + interval;
+        let found = null;
+
+        for (let s = 0; s < inst.tuning.length; s++) {
+
+            for (let df = minDf; df <= maxDf; df++) {
+
+                const f = h.fret + df;
+                if (f < 0 || f > maxFret) continue;
+
+                const raw = inst.getNoteAt(s, f);
+                if (!raw) continue;
+
+                if (raw.midi === targetMidi) {
+                    found = { string: s + 1, fret: f, midi: raw.midi };
+                    break;
+                }
+            }
+
+            if (found) break;
+        }
+
+        if (found) results.push(found);
+    }
+
+    return results;
+}
+
+
+    // ------------------------------------------------------------
+    // MODE 3NPS : 3 notes max par corde
+    // ------------------------------------------------------------
+if (mode === "3NPS") {
+
+    let s = h.string - 1;      // corde courante
+    let notesOnString = 1;     // hovered = 1 note sur la première corde
+
+    for (let i = 0; i < intervals.length; i++) {
+
+        const interval = intervals[i];
+        if (interval === 0) continue;
+
+        // si on a atteint la limite sur cette corde
+        if (notesOnString >= 3) {
+            s++;
+            if (s >= inst.tuning.length) break;
+
+            // sur les cordes suivantes, il n'y a PAS de hovered
+            notesOnString = 0;
+        }
+
+        const targetMidi = baseMidi + interval;
+        let found = null;
+
+        // chercher la première occurrence sur la corde courante
+        for (let f = 0; f <= maxFret; f++) {
+
+            const raw = inst.getNoteAt(s, f);
+            if (!raw) continue;
+
+            if (raw.midi === targetMidi) {
+                found = { string: s + 1, fret: f, midi: raw.midi };
+                break;
+            }
+        }
+
+        if (found) {
+            results.push(found);
+            notesOnString++;
+        }
+    }
+
+    return results;
+}
+
+
+
+
+    return results;
+}
+
 
 
     // ------------------------------------------------------------
