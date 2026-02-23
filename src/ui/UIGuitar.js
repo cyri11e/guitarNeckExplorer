@@ -137,6 +137,17 @@ setIntervalMode(mode) {
     this.invalidate();
 }
 
+setWoodColor(type) {
+    this.woodColor = type; // "rose" ou "map"
+    this.invalidate();
+}
+
+setInlayStyle(type) {
+    this.inlayStyle = type; // "dots" / "superstrat" / "trapeze"
+    this.invalidate();
+}
+
+
 setNextIntervalMode() {
 
     const modes = [

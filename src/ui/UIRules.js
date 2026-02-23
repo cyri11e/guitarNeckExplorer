@@ -349,6 +349,42 @@ guitar.invalidate();
     guitar.setNextIntervalMode();
 },
 
+// ============================================================
+// METALSWITCH WOOD → change la couleur du bois de la guitare
+// ============================================================
+(components, source, newState) => {
+
+    const sw = components.find(c => c.name === "metalWood");
+    if (source !== sw) return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // 0 = rosewood, 1 = mapple
+    const wood = (newState === 0) ? "rosewood" : "mapple";
+
+    guitar.setWoodColor(wood);
+},
+// ============================================================
+// METALSWITCH INLAY → change le style des repères (inlays)
+// ============================================================
+(components, source, newState) => {
+
+    const sw = components.find(c => c.name === "knobInlays");
+    if (source !== sw) return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // 0 = dots
+    // 1 = superStrat
+    // 2 = trapeze
+    const map = ["dots", "superstrat", "trapeze"];
+
+    const style = map[newState] || "dots";
+
+    guitar.setInlayStyle(style);
+},
 
 
 ];

@@ -15,7 +15,9 @@ const UI_CONFIG = {
         children: ["markerSelector1","knob1",
             "knob2",
             "metalSwitch1",
-            "metalSwitchENFR"
+            "metalSwitchENFR",
+            "metalWood",
+            "knobInlays"
         ]
     },
 
@@ -78,6 +80,21 @@ knobMultiCursor: {
         { symbol: "3N", label: "3 Notes/c" }
     ],
     shortcutKey: "x"
+},
+
+knobInlays: {
+    type: "knob",
+    xp: 50,
+    yp: 25,
+    sp: 100,
+    hideBottom: true,
+    items: [
+        { symbol: "●", label: "Classique" },
+        { symbol: "•", label: "S. Strat" },
+        { symbol: "▬", label: "Les Paul" },
+
+    ],
+    shortcutKey: "i"
 },
 
 // --- SWITCHES (1 à 7) ---
@@ -175,6 +192,13 @@ metalSwitchENFR: {
     shortcutKey: "f"
 },
 
+metalWood: {
+    type: "metalSwitch",
+    sp: 100,     // % de la hauteur du panel
+    topLabel: "map",
+    bottomLabel: "rose",
+    shortcutKey: "w"
+},
     panel2: {
         type: "panel",
         xp: 60,
