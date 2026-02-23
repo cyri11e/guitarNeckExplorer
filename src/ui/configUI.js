@@ -39,7 +39,8 @@ harmonyPanel: {
         "switchDeg4",
         "switchDeg5",
         "switchDeg6",
-        "switchDeg7"
+        "switchDeg7",
+        "knobMultiCursor"
     ]
 },
 
@@ -60,6 +61,23 @@ knobChordType: {
         { symbol: "7", label: "Diatonique" }
     ],
     shortcutKey: "g"
+},
+
+// --- KNOB 2 : Type d’accord ---
+knobMultiCursor: {
+    type: "knob",
+    xp: 50,
+    yp: 25,
+    sp: 100,
+    hideBottom: true,
+    items: [
+        { symbol: "1S", label: "1 Corde" },
+        { symbol: "C", label: "Accord" },
+        { symbol: "B>", label: "Box Droite" },
+        { symbol: "<B", label: "Box Gauche" },
+        { symbol: "3N", label: "3 Notes/c" }
+    ],
+    shortcutKey: "x"
 },
 
 // --- SWITCHES (1 à 7) ---

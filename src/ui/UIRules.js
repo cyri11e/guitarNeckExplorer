@@ -336,6 +336,19 @@ guitar.invalidate();
 },
 
 
+// ============================================================
+// KNOB MULTI CURSOR → avance au prochain mode multinote
+// ============================================================
+(components, source, newState) => {
+
+    if (source.name !== "knobMultiCursor") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    guitar.setNextIntervalMode();
+},
+
 
 
 ];

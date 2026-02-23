@@ -295,19 +295,40 @@ case "degree":
     const style = isShift ? selectedStyle : hoverStyle;
 
     // MODE C : CURSOR → un seul dot sous la souris
-    if (g.hoverMode === "cursor") {
-        const pos = g.toScreen(h.fret, h.string);
-        const label = app.theory.getNoteLabel(
+// MODE C : CURSOR → un seul dot sous la souris
+if (g.hoverMode === "cursor") {
+
+    const pos = g.toScreen(h.fret, h.string);
+
+    let label;
+
+    // MULTINOTE + MODE DEGREE → afficher "1"
+    if (intervals.length > 0 && g.displayMode === "degree") {
+
+        label = {
+            base: "1",
+            alt: "",
+            type: "degree",
+            chroma: 0
+        };
+
+    } else {
+
+        // comportement normal (mononote ou mode note)
+        label = app.theory.getNoteLabel(
             baseIndex,
             g.displayMode === "note" ? g.labelType : g.displayMode
         );
-
-        this.drawNote(pos.x, pos.y, {
-            ...style,
-            label
-        });
-        return;
     }
+
+    this.drawNote(pos.x, pos.y, {
+        ...style,
+        label
+    });
+
+    return;
+}
+
 
     // MODE N : NOTE → toutes les occurrences même MIDI
     if (g.hoverMode === "note") {
