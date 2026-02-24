@@ -2,7 +2,7 @@ const UI_CONFIG = {
 
     aspectPanel: {
         type: "panel",
-        xp: 15,
+        xp: 5,
         yp: 55,
         sp: 20,
         aspectRatio: 1.5,
@@ -24,7 +24,7 @@ const UI_CONFIG = {
 // PANEL HARMONIE
 harmonyPanel: {
     type: "panel",
-    xp: 15,
+    xp: 5,
     yp: 75,
     sp: 20,
     aspectRatio: 1.2,
@@ -44,7 +44,8 @@ harmonyPanel: {
         "switchDeg7",
         "knobMultiCursor",
         "metalWay",
-        "knobOctaves"
+        "knobOctaves",
+        "knobInversions"
     ]
 },
 
@@ -99,6 +100,7 @@ knobInlays: {
     ],
     shortcutKey: "i"
 },
+
 knobOctaves: {
     type: "knob",
     xp: 50,
@@ -113,6 +115,22 @@ knobOctaves: {
     ],
     shortcutKey: "o"
 },
+knobInversions: {
+    type: "knob",
+    xp: 50,
+    yp: 25,
+    sp: 100,
+    hideBottom: true,
+    items: [
+        { symbol: "R", label: "Root" },
+        { symbol: "1", label: "1st Inv" },
+        { symbol: "2", label: "2nd Inv" },
+        { symbol: "3", label: "3rd Inv" },
+    ],
+    shortcutKey: "i"
+},
+
+
 // --- SWITCHES (1 à 7) ---
 switchDeg1: {
     type: "switch",

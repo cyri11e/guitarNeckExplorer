@@ -473,4 +473,23 @@ guitar.invalidate();
     guitar.invalidate();
 },
 
+// KNOB INVERSIONS → met à jour g.inversion
+(components, source, newState) => {
+
+    const knob = components.find(c => c.name === "knobInversions");
+    if (source !== knob) return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // newState = 0 → "R"
+    // newState = 1 → "1st Inv"
+    // newState = 2 → "2nd Inv"
+    // newState = 3 → "3rd Inv"
+    guitar.inversion = newState; // 0,1,2,3
+
+    guitar.invalidate();
+},
+
+
 ];

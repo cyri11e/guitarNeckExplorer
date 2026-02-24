@@ -73,6 +73,7 @@ class Guitar extends UIComponent {
         this.intervalMode = "OneString"; // mode par défaut
         this.intervalWay = 'up';
         this.octaveShown = "1" ;
+        this.inversion = 0 ;
         // animations
         this.highlighted       = [];
         this.interactionBursts = [];
