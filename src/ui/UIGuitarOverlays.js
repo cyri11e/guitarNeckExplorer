@@ -759,31 +759,6 @@ prepareChordIntervals(intervals, inversion) {
 }
 
 
-prepareForChordDispatch(intervals, inversion) {
-
-    const n = intervals.length;
-
-    // 1) rotation
-    const rot = intervals.slice(inversion).concat(intervals.slice(0, inversion));
-
-    // CAS PARTICULIER : 3 notes, 1er renversement
-    if (n === 3 && inversion === 1) {
-        return {
-            graves: rot,   // un seul tableau
-            aigus: [],     // rien à traiter
-        };
-    }
-
-    // CAS GÉNÉRAL
-    const rootIndex = rot.indexOf(0);
-
-    const graves = rot.slice(0, rootIndex + 1); // avant 0 + 0
-    const aigus  = rot.slice(rootIndex);        // 0 + après 0
-
-    return { graves, aigus };
-}
-
-
 
     // ------------------------------------------------------------
     // DIAGONAL — helpers internes
@@ -880,70 +855,6 @@ prepareForChordDispatch(intervals, inversion) {
         return paths;
     }
 
-
-    _prepareChord(intervals) {
-
-        const rootIndex = intervals.indexOf(0);
-
-        const negatives = intervals.slice(0, rootIndex);      // avant 0
-        const positives = intervals.slice(rootIndex + 1);     // après 0
-
-        // normaliser les négatifs avec TON système
-        const negNorm = negatives.map(i => this._complementInterval(i));
-
-        // normaliser les positifs (juste abs % 12)
-        const posNorm = positives.map(i => Math.abs(i) % 12);
-
-        return { negNorm, posNorm };
-    }
-
-    applyInversion(intervals, count = 1, direction = +1) {
-        let out = [...intervals];
-
-        for (let i = 0; i < count; i++) {
-            out = this.applyInversionOnce(out, direction);
-        }
-
-        return out;
-    }
-
-    applyInversionOnce(intervals, direction = +1) {
-
-        // 1) rotation dans un sens ou dans l'autre
-        let rotated;
-        if (direction === +1) {
-            rotated = intervals.slice(1).concat(intervals[0]);
-        } else {
-            rotated = [intervals[intervals.length - 1]].concat(intervals.slice(0, -1));
-        }
-
-        // 2) trouver la root (0)
-        const rootIndex = rotated.indexOf(0);
-
-        // 3) appliquer la règle de signe
-        return rotated.map((v, i) => {
-
-            if (v === 0) return 0;
-
-            const isBeforeRoot = i < rootIndex;
-
-            // Avant root → doit être NEGATIF
-            if (isBeforeRoot) {
-                if (v > 0) {
-                    return -(12 - v); // complément vers négatif
-                }
-                return v; // déjà négatif
-            }
-
-            // Après root → doit être POSITIF
-            if (!isBeforeRoot) {
-                if (v < 0) {
-                    return (12 - Math.abs(v)) % 12; // renormalisation vers positif
-                }
-                return v; // déjà positif
-            }
-        });
-    }
 
 
     // ---------------------------------------------------------
