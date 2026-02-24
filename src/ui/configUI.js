@@ -42,7 +42,8 @@ harmonyPanel: {
         "switchDeg5",
         "switchDeg6",
         "switchDeg7",
-        "knobMultiCursor"
+        "knobMultiCursor",
+        "metalWay"
     ]
 },
 
@@ -77,7 +78,8 @@ knobMultiCursor: {
         { symbol: "C", label: "Accord" },
         { symbol: "B>", label: "Box Droite" },
         { symbol: "<B", label: "Box Gauche" },
-        { symbol: "3N", label: "3 Notes/c" }
+        { symbol: "3N", label: "3 Notes/c" },
+        { symbol: "/", label: "Diagonal" }
     ],
     shortcutKey: "x"
 },
@@ -198,6 +200,16 @@ metalWood: {
     topLabel: "map",
     bottomLabel: "rose",
     shortcutKey: "w"
+},
+
+metalWay: {
+    type: "metalSwitch",
+    sp: 100,     // % de la hauteur du panel
+    topLabel: "↗",
+    bottomLabel: "↙",
+    shortcutKey: "u",
+    defaultState: 1,   // ← ON par défaut
+    shortcutKey: "u"
 },
     panel2: {
         type: "panel",

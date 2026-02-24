@@ -19,7 +19,9 @@ class MetalSwitch extends UIComponent {
         this.shortcutKey = cfg.toggleShortcut || cfg.shortcutKey || null;
 
         // --- ÉTAT ---
-        this._state = 0; // 0 = bas, 1 = haut
+        this._state = cfg.defaultState ? 1 : 0;
+
+        // 0 = bas, 1 = haut
         this.isPassive = false;
 
         // --- TEST ERGO ---

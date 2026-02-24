@@ -644,12 +644,135 @@ if (mode === "3NPS") {
 }
 
 
+// ------------------------------------------------------------
+// MODE "diagonal" : tout doit tenir dans le rectangle fondamentale–octave
+// ------------------------------------------------------------
+// ------------------------------------------------------------
+// MODE "Diagonal" : toutes combinaisons valides, puis chemin le plus compact
+// ------------------------------------------------------------
+if (mode === "Diagonal") {
+
+    const inst = app.instrument;
+    const maxFret = g.fretCount;
+
+    const root = { string: h.string - 1, fret: h.fret };
+    const baseMidi = inst.getNoteAt(root.string, root.fret)?.midi;
+    if (baseMidi == null) return [];
+
+    // octave géométrique L : +2 cordes, +2 ou +3 cases
+    const octaveCandidates = [];
+    const sOct = root.string + 2;
+
+    if (sOct < inst.tuning.length) {
+        const f2 = root.fret + 2;
+        const f3 = root.fret + 3;
+        if (f2 <= maxFret) octaveCandidates.push({ string: sOct + 1, fret: f2 });
+        if (f3 <= maxFret) octaveCandidates.push({ string: sOct + 1, fret: f3 });
+    }
+
+    const paths = this._diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret);
+
+    if (!paths.length || !octaveCandidates.length) return [];
+
+    let bestPath = null;
+    let bestScore = Infinity;
+
+    for (const path of paths) {
+        for (const oct of octaveCandidates) {
+            const score = this._diagonalScorePath(
+                { string: root.string + 1, fret: root.fret },
+                path,
+                oct
+            );
+            if (score < bestScore) {
+                bestScore = score;
+                bestPath = path;
+            }
+        }
+    }
+
+    return bestPath || [];
+}
+
+
+
 
 
     return results;
 }
 
+// ------------------------------------------------------------
+// DIAGONAL — helpers internes
+// ------------------------------------------------------------
+_diagonalScorePath(root, path, octaveL) {
 
+    const full = [root, ...path, octaveL];
+
+    let minF = Infinity, maxF = -Infinity;
+    let minS = Infinity, maxS = -Infinity;
+
+    for (const p of full) {
+        minF = Math.min(minF, p.fret);
+        maxF = Math.max(maxF, p.fret);
+        minS = Math.min(minS, p.string);
+        maxS = Math.max(maxS, p.string);
+    }
+
+    const width  = maxF - minF;
+    const height = maxS - minS;
+
+    return width + height * 3; // surface pondérée, mais SANS pénalité artificielle
+}
+
+_diagonalFindCandidates(inst, targetMidi, prev, maxFret) {
+    const out = [];
+
+    for (let s = 0; s < inst.tuning.length; s++) {
+        for (let f = 0; f <= maxFret; f++) {
+
+            const raw = inst.getNoteAt(s, f);
+            if (!raw || raw.midi !== targetMidi) continue;
+
+            const dF = f - prev.fret;
+
+            if (Math.abs(dF) >= 5) continue; // TA SEULE CONTRAINTE
+
+            out.push({ string: s + 1, fret: f, midi: raw.midi });
+        }
+    }
+
+    return out;
+}
+_diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret) {
+
+    const paths = [];
+
+    const recurse = (i, prev, current) => {
+
+        if (i >= intervals.length) {
+            paths.push([...current]);
+            return;
+        }
+
+        const interval = intervals[i];
+        if (interval === 0) {
+            recurse(i + 1, prev, current);
+            return;
+        }
+
+        const targetMidi = baseMidi + interval;
+        const candidates = this._diagonalFindCandidates(inst, targetMidi, prev, maxFret);
+
+        for (const c of candidates) {
+            current.push(c);
+            recurse(i + 1, { string: c.string - 1, fret: c.fret }, current);
+            current.pop();
+        }
+    };
+
+    recurse(0, root, []);
+    return paths;
+}
 
     // ------------------------------------------------------------
     // MARKER — SEGMENTS

@@ -386,5 +386,20 @@ guitar.invalidate();
     guitar.setInlayStyle(style);
 },
 
+// ============================================================
+// METAL WAY → met à jour le sens intervalWay (up/down)
+// ============================================================
+(components, source, newState) => {
+
+    if (source.name !== "metalWay") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // newState = 1 → up (↗)
+    // newState = 0 → down (↙)
+    guitar.intervalWay = newState === 1 ? "up" : "down";
+},
+
 
 ];

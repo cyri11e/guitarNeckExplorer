@@ -61,7 +61,17 @@ class Guitar extends UIComponent {
 
         this.multiNotes = false;
         this.intervals =[];
+        this.intervalMode = this.intervalModes = [
+            "OneString",
+            "Chord",
+            "BoxR",
+            "BoxL",
+            "3NPS",
+            "Diagonal"
+        ];
+
         this.intervalMode = "OneString"; // mode par défaut
+        this.intervalWay = 'up';
         // animations
         this.highlighted       = [];
         this.interactionBursts = [];
@@ -150,28 +160,15 @@ setInlayStyle(type) {
 
 setNextIntervalMode() {
 
-    const modes = [
-        "OneString",
-        "Chord",
-        "BoxR",
-        "BoxL",
-        "3NPS"
-    ];
-
+    const modes = this.intervalModes;
     const i = modes.indexOf(this.intervalMode);
 
-    if (i < 0) {
-        this.intervalMode = modes[0];
-        this.invalidate();
-        return;
-    }
-
     const next = (i + 1) % modes.length;
+    this.setIntervalMode(modes[next]); // utilise le setter propre
 
-    this.intervalMode = modes[next];
-    this.invalidate();
-    return this.intervalMode
+    return this.intervalMode;
 }
+
 
     setDisplayMode(mode) {
         const allowed = ["note", "degree", "none"];
