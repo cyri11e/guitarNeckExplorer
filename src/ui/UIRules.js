@@ -401,5 +401,58 @@ guitar.invalidate();
     guitar.intervalWay = newState === 1 ? "up" : "down";
 },
 
+// RÈGLE : knob13457 → presets automatiques des switchDeg
+(components, source, newState) => {
+
+    if (source.name !== "knob13457") return;
+
+    // Récupérer tous les switchDeg1..7
+    const switches = components.filter(c => c.name.startsWith("switchDeg"));
+    if (switches.length === 0) return;
+
+    const set = (deg, state) => {
+        const sw = switches.find(s => s.name === "switchDeg" + deg);
+        if (sw && sw.state !== state) sw.setState(state);
+    };
+
+    // 1) Tout OFF d'abord
+    for (let i = 1; i <= 7; i++) set(i, 0);
+
+    // 2) Appliquer le preset selon l'INDEX du knob
+    switch (newState) {
+
+        case 0: // "1" / Unique
+            // tout OFF → rien à faire
+            break;
+
+        case 1: // "3" / Triade
+            set(3, 1);
+            set(5, 1);
+            break;
+
+        case 2: // "4" / Tetrade
+            set(3, 1);
+            set(5, 1);
+            set(7, 1);
+            break;
+
+        case 3: // "5" / Pentatonique
+            set(2, 1);
+            set(3, 1);
+            set(5, 1);
+            set(6, 1);
+            break;
+
+        case 4: // "7" / Diatonique
+            set(2, 1);
+            set(3, 1);
+            set(4, 1);
+            set(5, 1);
+            set(6, 1);
+            set(7, 1);
+            break;
+    }
+},
+
 
 ];

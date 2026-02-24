@@ -192,17 +192,22 @@ class GuitarOverlays {
     }
 
 getRelativeDegreeLabel(interval) {
+
+    // normalisation modulo 12 pour supporter les intervalles négatifs
+    interval = ((interval % 12) + 12) % 12;
+
     const theory = this.g.app.theory;
     const d = theory.getDegreeLabel(interval);
     if (!d) return null;
 
     return {
-        base: d.base,     // "3"
-        alt:  d.alt,      // "♭" ou "♯" ou ""
+        base: d.base,
+        alt:  d.alt,
         type: "degree",
         chroma: null
     };
 }
+
 
 
 // ------------------------------------------------------------
@@ -228,7 +233,11 @@ drawHoverDot() {
 // MODE MULTINOTE : dessiner les intervalles relatifs
 // ------------------------------------------------------------
 const mode = g.intervalMode;
-const intervals = g.intervals;
+const intervals = this._prepareIntervalsForWay(
+    g.intervals,
+    g.intervalWay
+);
+
 
 const list = this.dispatchIntervals(mode, intervals);
 
@@ -266,7 +275,7 @@ case "degree":
     }
 
     this.drawNote(pos.x, pos.y, {
-        fillColor: "#ff8800",
+        fillColor: "#ff88008a",
         strokeColor: "black",
         hasShadow: true,
         shapeType: "circle",
@@ -475,35 +484,40 @@ dispatchIntervals(mode, intervals) {
     // ------------------------------------------------------------
     // MODE Chord : une note par corde
     // ------------------------------------------------------------
-    if (mode === "Chord") {
+if (mode === "Chord") {
 
-        for (let i = 0; i < intervals.length; i++) {
+    for (let i = 0; i < intervals.length; i++) {
 
-            const interval = intervals[i];
-            if (interval === 0) continue; // hover déjà affichée
+        const interval = intervals[i];
+        if (interval === 0) continue;
 
-            const s = h.string - 1 + (results.length + 1);
-            if (s >= inst.tuning.length) break;
+        const index = results.length + 1;
 
-            const targetMidi = baseMidi + interval;
-            let found = null;
+        // direction selon le signe
+        const direction = (interval > 0) ? +1 : -1;
 
-            for (let f = 0; f <= maxFret; f++) {
+        const s = (h.string - 1) + direction * index;
 
-                const raw = inst.getNoteAt(s, f);
-                if (!raw) continue;
+        if (s < 0 || s >= inst.tuning.length) break;
 
-                if (raw.midi === targetMidi) {
-                    found = { string: s + 1, fret: f, midi: raw.midi };
-                    break;
-                }
+        const targetMidi = baseMidi + interval;
+        let found = null;
+
+        for (let f = 0; f <= maxFret; f++) {
+            const raw = inst.getNoteAt(s, f);
+            if (!raw) continue;
+            if (raw.midi === targetMidi) {
+                found = { string: s + 1, fret: f, midi: raw.midi };
+                break;
             }
-
-            if (found) results.push(found);
         }
 
-        return results;
+        if (found) results.push(found);
     }
+
+    return results;
+}
+
 
     // ------------------------------------------------------------
     // MODE BoxR : fenêtre -1 → +4
@@ -600,6 +614,9 @@ if (mode === "BoxL") {
     // ------------------------------------------------------------
     // MODE 3NPS : 3 notes max par corde
     // ------------------------------------------------------------
+// ------------------------------------------------------------
+// MODE 3NPS : 3 notes max par corde, direction selon le signe
+// ------------------------------------------------------------
 if (mode === "3NPS") {
 
     let s = h.string - 1;      // corde courante
@@ -610,12 +627,16 @@ if (mode === "3NPS") {
         const interval = intervals[i];
         if (interval === 0) continue;
 
-        // si on a atteint la limite sur cette corde
-        if (notesOnString >= 3) {
-            s++;
-            if (s >= inst.tuning.length) break;
+        // direction géométrique selon le signe de l’intervalle
+        const direction = (interval > 0) ? +1 : -1;
 
-            // sur les cordes suivantes, il n'y a PAS de hovered
+        // si on a atteint la limite sur cette corde → changer de corde
+        if (notesOnString >= 3) {
+            s += direction;
+
+            // hors limites → stop
+            if (s < 0 || s >= inst.tuning.length) break;
+
             notesOnString = 0;
         }
 
@@ -644,6 +665,7 @@ if (mode === "3NPS") {
 }
 
 
+
 // ------------------------------------------------------------
 // MODE "diagonal" : tout doit tenir dans le rectangle fondamentale–octave
 // ------------------------------------------------------------
@@ -659,16 +681,19 @@ if (mode === "Diagonal") {
     const baseMidi = inst.getNoteAt(root.string, root.fret)?.midi;
     if (baseMidi == null) return [];
 
-    // octave géométrique L : +2 cordes, +2 ou +3 cases
-    const octaveCandidates = [];
-    const sOct = root.string + 2;
+// octave géométrique L : dépend du sens (up/down)
+const octaveCandidates = [];
+const way = g.intervalWay;
 
-    if (sOct < inst.tuning.length) {
-        const f2 = root.fret + 2;
-        const f3 = root.fret + 3;
-        if (f2 <= maxFret) octaveCandidates.push({ string: sOct + 1, fret: f2 });
-        if (f3 <= maxFret) octaveCandidates.push({ string: sOct + 1, fret: f3 });
-    }
+const sOct = root.string + (way === "up" ? 2 : -2);
+const f2  = root.fret   + (way === "up" ? 2 : -2);
+const f3  = root.fret   + (way === "up" ? 3 : -3);
+
+//  IMPORTANT : on NE vérifie PAS les limites du manche
+// C’est une octave VIRTUELLE, géométrique, hors manche si nécessaire
+octaveCandidates.push({ string: sOct + 1, fret: f2 });
+octaveCandidates.push({ string: sOct + 1, fret: f3 });
+
 
     const paths = this._diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret);
 
@@ -712,17 +737,27 @@ _diagonalScorePath(root, path, octaveL) {
     let minS = Infinity, maxS = -Infinity;
 
     for (const p of full) {
+
+        // ⚠️ IGNORER les points virtuels ou hors manche
+        if (p.virtual) continue;
+        if (p.fret < 0 || p.fret > this.g.fretCount) continue;
+        if (p.string < 1 || p.string > this.g.app.instrument.tuning.length) continue;
+
         minF = Math.min(minF, p.fret);
         maxF = Math.max(maxF, p.fret);
         minS = Math.min(minS, p.string);
         maxS = Math.max(maxS, p.string);
     }
 
+    // Si aucune note jouable → score très mauvais mais pas bloquant
+    if (minF === Infinity) return 9999;
+
     const width  = maxF - minF;
     const height = maxS - minS;
 
-    return width + height * 3; // surface pondérée, mais SANS pénalité artificielle
+    return width + height * 3;
 }
+
 
 _diagonalFindCandidates(inst, targetMidi, prev, maxFret) {
     const out = [];
@@ -734,15 +769,27 @@ _diagonalFindCandidates(inst, targetMidi, prev, maxFret) {
             if (!raw || raw.midi !== targetMidi) continue;
 
             const dF = f - prev.fret;
-
-            if (Math.abs(dF) >= 5) continue; // TA SEULE CONTRAINTE
+            if (Math.abs(dF) >= 5) continue;
 
             out.push({ string: s + 1, fret: f, midi: raw.midi });
         }
     }
 
+    // ⚠️ IMPORTANT :
+    // Si aucune note jouable n'existe → on retourne un placeholder virtuel
+    // pour garder la continuité du chemin.
+    if (out.length === 0) {
+        out.push({
+            string: prev.string,   // même corde
+            fret: prev.fret,       // même frette
+            midi: targetMidi,      // mais note virtuelle
+            virtual: true          // marquage
+        });
+    }
+
     return out;
 }
+
 _diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret) {
 
     const paths = [];
@@ -773,6 +820,56 @@ _diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret) {
     recurse(0, root, []);
     return paths;
 }
+
+
+    // ---------------------------------------------------------
+    // Complémente un intervalle 
+    //   UP   : +i
+    //   DOWN : -(12 - abs(i))
+    // ---------------------------------------------------------
+    _complementInterval(i) {
+        if (i === 0) return 0;
+
+        const abs = Math.abs(i);
+        return -(12 - abs);  
+    }
+
+
+    // ---------------------------------------------------------
+    // Complémente un tableau d’intervalles
+    // ---------------------------------------------------------
+    _complementIntervals(arr) {
+        return arr.map(i => this._complementInterval(i));
+    }
+
+
+    // ---------------------------------------------------------
+    // Prépare les intervalles selon intervalWay :
+    //   1. trie les intervalles
+    //   2. applique le complément si DOWN
+    //   3. retrie dans le bon sens
+    // ---------------------------------------------------------
+_prepareIntervalsForWay(intervals, intervalWay) {
+
+    // 1. tri initial (UP = croissant)
+    let sorted = [...intervals].sort((a, b) => a - b);
+
+    // 2. si DOWN → complément
+    if (intervalWay === "down") {
+        sorted = this._complementIntervals(sorted);
+    }
+
+    // 3. tri final selon le sens
+    if (intervalWay === "up") {
+        sorted.sort((a, b) => a - b);
+    } else {
+        sorted.sort((a, b) => b - a);
+    }
+
+    return sorted;
+}
+
+
 
     // ------------------------------------------------------------
     // MARKER — SEGMENTS

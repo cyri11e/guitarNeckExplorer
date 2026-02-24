@@ -34,7 +34,7 @@ harmonyPanel: {
     toggleOnClick: true,
 
     children: [
-        "knobChordType",
+        "knob13457",
         "switchDeg1",
         "switchDeg2",
         "switchDeg3",
@@ -50,7 +50,7 @@ harmonyPanel: {
 
 
 // --- KNOB 2 : Type d’accord ---
-knobChordType: {
+knob13457: {
     type: "knob",
     xp: 50,
     yp: 25,
