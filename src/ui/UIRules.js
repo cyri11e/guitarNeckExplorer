@@ -454,5 +454,23 @@ guitar.invalidate();
     }
 },
 
+// KNOB OCTAVES → met à jour g.octaveShown
+(components, source, newState) => {
+
+    const knob = components.find(c => c.name === "knobOctaves");
+    if (source !== knob) return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // Récupère l’item sélectionné : "1", "2", "3", "T"
+    const item = knob.items[newState];
+    if (!item) return;
+
+    // Mise à jour directe dans guitar.js
+    guitar.octaveShown = item.symbol; // "1", "2", "3", "T"
+
+    guitar.invalidate();
+},
 
 ];

@@ -43,7 +43,8 @@ harmonyPanel: {
         "switchDeg6",
         "switchDeg7",
         "knobMultiCursor",
-        "metalWay"
+        "metalWay",
+        "knobOctaves"
     ]
 },
 
@@ -98,7 +99,20 @@ knobInlays: {
     ],
     shortcutKey: "i"
 },
-
+knobOctaves: {
+    type: "knob",
+    xp: 50,
+    yp: 25,
+    sp: 100,
+    hideBottom: true,
+    items: [
+        { symbol: "1", label: "1 Octave" },
+        { symbol: "2", label: "2 Octaves" },
+        { symbol: "3", label: "3 Octaves" },
+        { symbol: "T", label: "Tout" },
+    ],
+    shortcutKey: "o"
+},
 // --- SWITCHES (1 à 7) ---
 switchDeg1: {
     type: "switch",
