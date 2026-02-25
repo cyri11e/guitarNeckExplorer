@@ -1,11 +1,14 @@
 // ============================================================
-// GUITAR OVERLAYS — notes, hover, marker, animations, etc.
+// GUITAR OVERLAYS — CLEAN STEP 1
+// (rendu, pinned, selected, hover, marker, multicurseur)
 // ============================================================
 
 class GuitarOverlays {
     constructor(guitar, style) {
         this.g = guitar;
         this.style = style;
+        this.intervalDispatcher = new MultiNotes(this.g);
+
         this.intervalSelectorLabels = [
             "1",  // 0
             "b2", // 1
@@ -19,8 +22,7 @@ class GuitarOverlays {
             "6",  // 9
             "b7", // 10
             "7"   // 11
-        ]; // fallback par defaut
-
+        ];
     }
 
     // ------------------------------------------------------------
@@ -79,26 +81,37 @@ class GuitarOverlays {
         } else {
             stroke(0);
             circle(x - offset, y - offset, r);
-            stroke(255)
+            stroke(255);
             circle(x - offset, y - offset, r * 0.9);
-            //stroke(0)
-
         }
 
-        // Texte principal
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textStyle(BOLD);
+// Texte principal
+noStroke();
+textAlign(CENTER, CENTER);
+textStyle(BOLD);
 
-        textSize(r * (base.length === 3 ? 0.50 : 0.80));
+// taille initiale (comme avant)
+textSize(r * (base.length === 3 ? 0.50 : 0.65));
 
-        // ombre du texte
-        fill(shapeType === "square" ? "#00000076" : "#ffffff7d");
-        text(base, x - offset + 1, y - offset + 1);
+// --- 🔥 Correction largeur réelle ---
+let targetWidth = r * 0.65;   // largeur visuelle souhaitée
+let w = textWidth(base);
 
-        // texte principal
-        fill(shapeType === "square" ? 255 : strokeColor);
-        text(base, x - offset, y - offset);
+if (w > targetWidth) {
+    // réduire proportionnellement
+    let factor = targetWidth / w;
+    textSize((r * (base.length === 3 ? 0.50 : 0.65)) * factor);
+}
+// --- 🔥 Fin correction ---
+
+// ombre du texte
+fill(shapeType === "square" ? "#00000076" : "#ffffff7d");
+text(base, x - offset + 1, y - offset + 1);
+
+// texte principal
+fill(shapeType === "square" ? 255 : strokeColor);
+text(base, x - offset, y - offset);
+
 
         // Altération (#, b)
         if (alt) {
@@ -135,13 +148,13 @@ class GuitarOverlays {
             hasShadow = false
         } = opts;
 
-        for (let n of list) {
+        for (let n of (list || [])) {
 
             const inFretRange = n.fret >= 0 && n.fret <= g.fretCount;
             const inStringRange = n.string >= 1 && n.string <= g.strings.length;
 
             if (!inFretRange || !inStringRange) {
-                this.drawOutOfBoundsMarker(n);
+                this.drawOutOfBoundsMarker?.(n);
                 continue;
             }
 
@@ -149,6 +162,7 @@ class GuitarOverlays {
             if (!pos) continue;
 
             const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
+            if (!raw) continue;
 
             const label = app.theory.getNoteLabel(
                 raw.index,
@@ -174,7 +188,7 @@ class GuitarOverlays {
     // PINNED / SELECTED
     // ------------------------------------------------------------
     drawPinnedNotes() {
-        this.drawNoteList(this.g.pinnedNotes, {
+        this.drawNoteList(this.g.pinnedNotes || [], {
             fillColor: "#3494f3",
             strokeColor: "black",
             shapeType: "circle",
@@ -183,7 +197,7 @@ class GuitarOverlays {
     }
 
     drawSelectedNotes() {
-        this.drawNoteList(this.g.selectedNotes, {
+        this.drawNoteList(this.g.selectedNotes || [], {
             fillColor: "#fcb900",
             strokeColor: "black",
             shapeType: "square",
@@ -191,6 +205,9 @@ class GuitarOverlays {
         });
     }
 
+    // ------------------------------------------------------------
+    // LABEL D’INTERVAL RELATIF (pour mode degree)
+    // ------------------------------------------------------------
     getRelativeDegreeLabel(interval) {
 
         // normalisation modulo 12 pour supporter les intervalles négatifs
@@ -208,10 +225,8 @@ class GuitarOverlays {
         };
     }
 
-
-
     // ------------------------------------------------------------
-    // HOVER DOT NORMAL (désactivé en mode marker)
+    // HOVER DOT + MULTICURSEUR + MARKER
     // ------------------------------------------------------------
     drawHoverDot() {
         const g = this.g;
@@ -229,46 +244,52 @@ class GuitarOverlays {
         const baseIndex = baseRaw.index;
         const baseMidi = baseRaw.midi;
 
-        // ------------------------------------------------------------
-        // MODE MULTINOTE : dessiner les intervalles relatifs
-        // ------------------------------------------------------------
+        // MODE MULTINOTE (placeholder, externalisé plus tard)
         const mode = g.intervalMode;
-        const intervals = this._prepareIntervalsForWay(
-            g.intervals,
-            g.intervalWay
-        );
+const intervals = g.intervals || [];
 
 
-        const list = this.dispatchIntervals(mode, intervals);
+const list = this.intervalDispatcher
+    ? this.intervalDispatcher.dispatch(
+        mode,
+        intervals,
+        h,
+        g.intervalWay,
+        g.octaveShown
+      )
+    : [];
+
 
         for (let i = 0; i < list.length; i++) {
             const n = list[i];
-
 
             const pos = g.toScreen(n.fret, n.string);
             if (!pos) continue;
 
             const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
+            if (!raw) continue;
 
             let label;
 
-            // règle d'affichage globale
             switch (g.displayMode) {
 
                 case "note":
                     label = app.theory.getNoteLabel(raw.index, g.labelType);
                     break;
 
-                case "degree":
+                case "degree": {
                     const realInterval = (raw.midi - baseMidi + 120) % 12;
-label = this.getRelativeDegreeLabel(realInterval);
-
-
+                    label = this.getRelativeDegreeLabel(realInterval);
                     break;
-
+                }
 
                 case "index":
-                    label = raw.index.toString();
+                    label = {
+                        base: raw.index.toString(),
+                        alt: "",
+                        type: "index",
+                        chroma: null
+                    };
                     break;
 
                 default:
@@ -284,8 +305,6 @@ label = this.getRelativeDegreeLabel(realInterval);
                 label
             });
         }
-
-
 
         const isShift = g.shiftDown === true;
 
@@ -305,11 +324,11 @@ label = this.getRelativeDegreeLabel(realInterval);
 
         const style = isShift ? selectedStyle : hoverStyle;
 
-
         // MODE C : CURSOR → un seul dot sous la souris
         if (g.hoverMode === "cursor") {
 
             const pos = g.toScreen(h.fret, h.string);
+            if (!pos) return;
 
             let label;
 
@@ -325,7 +344,6 @@ label = this.getRelativeDegreeLabel(realInterval);
 
             } else {
 
-                // comportement normal (mononote ou mode note)
                 label = app.theory.getNoteLabel(
                     baseIndex,
                     g.displayMode === "note" ? g.labelType : g.displayMode
@@ -340,7 +358,6 @@ label = this.getRelativeDegreeLabel(realInterval);
             return;
         }
 
-
         // MODE N : NOTE → toutes les occurrences même MIDI
         if (g.hoverMode === "note") {
             for (let s = 1; s <= g.strings.length; s++) {
@@ -350,6 +367,8 @@ label = this.getRelativeDegreeLabel(realInterval);
                     if (!raw || raw.midi !== baseMidi) continue;
 
                     const pos = g.toScreen(f, s);
+                    if (!pos) continue;
+
                     const label = app.theory.getNoteLabel(
                         raw.index,
                         g.displayMode === "note" ? g.labelType : g.displayMode
@@ -373,6 +392,8 @@ label = this.getRelativeDegreeLabel(realInterval);
                     if (!raw || raw.index !== baseIndex) continue;
 
                     const pos = g.toScreen(f, s);
+                    if (!pos) continue;
+
                     const label = app.theory.getNoteLabel(
                         raw.index,
                         g.displayMode === "note" ? g.labelType : g.displayMode
@@ -387,525 +408,6 @@ label = this.getRelativeDegreeLabel(realInterval);
         }
     }
 
-    findInterval(interval, mode) {
-
-        const g = this.g;
-        const app = g.app;
-        const inst = app.instrument;
-
-        const h = g.hoveredNote;
-        if (!h) return null;
-
-        const baseRaw = inst.getNoteAt(h.string - 1, h.fret);
-        if (!baseRaw) return null;
-
-        const baseMidi = baseRaw.midi;
-        const targetMidi = baseMidi + interval;
-
-        const maxFret = g.fretCount;
-
-        // ------------------------------------------------------------
-        // MODE H : même corde
-        // ------------------------------------------------------------
-        if (mode === "H") {
-
-            const s = h.string - 1;
-
-            for (let f = 0; f <= maxFret; f++) {
-
-                const raw = inst.getNoteAt(s, f);
-                if (!raw) continue;
-
-                if (raw.midi === targetMidi) {
-                    return { string: s + 1, fret: f, midi: raw.midi };
-                }
-            }
-
-            return null;
-        }
-
-        // ------------------------------------------------------------
-        // MODE V : corde suivante
-        // ------------------------------------------------------------
-        if (mode === "V") {
-
-            const s = h.string; // corde suivante
-            if (s >= inst.tuning.length) return null;
-
-            for (let f = 0; f <= maxFret; f++) {
-
-                const raw = inst.getNoteAt(s, f);
-                if (!raw) continue;
-
-                if (raw.midi === targetMidi) {
-                    return { string: s + 1, fret: f, midi: raw.midi };
-                }
-            }
-
-            return null;
-        }
-
-        return null;
-    }
-
-
-    dispatchIntervals(mode, intervals) {
-
-        const g = this.g;
-        const app = g.app;
-        const inst = app.instrument;
-
-        const h = g.hoveredNote;
-        if (!h) return [];
-
-        const results = [];
-
-        const baseRaw = inst.getNoteAt(h.string - 1, h.fret);
-        if (!baseRaw) return [];
-
-        const baseMidi = baseRaw.midi;
-        const maxFret = g.fretCount;
-
-        // ------------------------------------------------------------
-        // MODE OneString : tout sur la même corde
-        // ------------------------------------------------------------
-        if (mode === "OneString") {
-
-            for (let i = 0; i < intervals.length; i++) {
-
-                const interval = intervals[i];
-                if (interval === 0) continue; // hover déjà affichée
-
-                const found = this.findInterval(interval, "H");
-                if (found) results.push(found);
-            }
-
-            return results;
-        }
-
-
-if (mode === "Chord") {
-
-    const { graves, aigus } = this.prepareChordIntervals(g.intervals, g.inversion);
-
-    // 1) notes graves
-    const graveResults = [];
-    this.chordDispatch(graves, -1, h, inst, baseMidi, maxFret, graveResults);
-
-    // 2) notes aigus
-    const aiguResults = [];
-    this.chordDispatch(aigus, +1, h, inst, baseMidi, maxFret, aiguResults);
-
-    // 3) fusion
-    return [...graveResults, ...aiguResults];
-}
-
-
-        // ------------------------------------------------------------
-        // MODE BoxR : fenêtre -1 → +4
-        // ------------------------------------------------------------
-        // ------------------------------------------------------------
-        // MODE BOXR — scan toutes cordes, frettes vers la droite
-        // ------------------------------------------------------------
-        if (mode === "BoxR") {
-
-            const minDf = 0;   // à partir de la frette actuelle
-            const maxDf = +4;  // jusqu'à 4 frettes à droite (comme BoxL mais inversé)
-
-            for (let i = 0; i < intervals.length; i++) {
-
-                const interval = intervals[i];
-                if (interval === 0) continue;
-
-                const targetMidi = baseMidi + interval;
-                let found = null;
-
-                for (let s = 0; s < inst.tuning.length; s++) {
-
-                    for (let df = minDf; df <= maxDf; df++) {
-
-                        const f = h.fret + df;
-                        if (f < 0 || f > maxFret) continue;
-
-                        const raw = inst.getNoteAt(s, f);
-                        if (!raw) continue;
-
-                        if (raw.midi === targetMidi) {
-                            found = { string: s + 1, fret: f, midi: raw.midi };
-                            break;
-                        }
-                    }
-
-                    if (found) break;
-                }
-
-                if (found) results.push(found);
-            }
-
-            return results;
-        }
-
-        // ------------------------------------------------------------
-        // MODE BoxL : fenêtre -4 → +1
-        // ------------------------------------------------------------
-        if (mode === "BoxL") {
-
-            const minDf = -4;
-            const maxDf = +1;
-
-            for (let i = 0; i < intervals.length; i++) {
-
-                const interval = intervals[i];
-                if (interval === 0) continue;
-
-                const targetMidi = baseMidi + interval;
-                let found = null;
-
-                for (let s = 0; s < inst.tuning.length; s++) {
-
-                    for (let df = minDf; df <= maxDf; df++) {
-
-                        const f = h.fret + df;
-                        if (f < 0 || f > maxFret) continue;
-
-                        const raw = inst.getNoteAt(s, f);
-                        if (!raw) continue;
-
-                        if (raw.midi === targetMidi) {
-                            found = { string: s + 1, fret: f, midi: raw.midi };
-                            break;
-                        }
-                    }
-
-                    if (found) break;
-                }
-
-                if (found) results.push(found);
-            }
-
-            return results;
-        }
-
-
-        // ------------------------------------------------------------
-        // MODE 3NPS : 3 notes max par corde, direction selon le signe
-        // ------------------------------------------------------------
-        if (mode === "3NPS") {
-
-            let s = h.string - 1;      // corde courante
-            let notesOnString = 1;     // hovered = 1 note sur la première corde
-
-            for (let i = 0; i < intervals.length; i++) {
-
-                const interval = intervals[i];
-                if (interval === 0) continue;
-
-                // direction géométrique selon le signe de l’intervalle
-                const direction = (interval > 0) ? +1 : -1;
-
-                // si on a atteint la limite sur cette corde → changer de corde
-                if (notesOnString >= 3) {
-                    s += direction;
-
-                    // hors limites → stop
-                    if (s < 0 || s >= inst.tuning.length) break;
-
-                    notesOnString = 0;
-                }
-
-                const targetMidi = baseMidi + interval;
-                let found = null;
-
-                // chercher la première occurrence sur la corde courante
-                for (let f = 0; f <= maxFret; f++) {
-
-                    const raw = inst.getNoteAt(s, f);
-                    if (!raw) continue;
-
-                    if (raw.midi === targetMidi) {
-                        found = { string: s + 1, fret: f, midi: raw.midi };
-                        break;
-                    }
-                }
-
-                if (found) {
-                    results.push(found);
-                    notesOnString++;
-                }
-            }
-
-            return results;
-        }
-
-
-
-        // ------------------------------------------------------------
-        // MODE "diagonal" : tout doit tenir dans le rectangle fondamentale–octave
-        // ------------------------------------------------------------
-        // ------------------------------------------------------------
-        // MODE "Diagonal" : toutes combinaisons valides, puis chemin le plus compact
-        // ------------------------------------------------------------
-        if (mode === "Diagonal") {
-
-            const inst = app.instrument;
-            const maxFret = g.fretCount;
-
-            const root = { string: h.string - 1, fret: h.fret };
-            const baseMidi = inst.getNoteAt(root.string, root.fret)?.midi;
-            if (baseMidi == null) return [];
-
-            // octave géométrique L : dépend du sens (up/down)
-            const octaveCandidates = [];
-            const way = g.intervalWay;
-
-            const sOct = root.string + (way === "up" ? 2 : -2);
-            const f2 = root.fret + (way === "up" ? 2 : -2);
-            const f3 = root.fret + (way === "up" ? 3 : -3);
-
-            //  IMPORTANT : on NE vérifie PAS les limites du manche
-            // C’est une octave VIRTUELLE, géométrique, hors manche si nécessaire
-            octaveCandidates.push({ string: sOct + 1, fret: f2 });
-            octaveCandidates.push({ string: sOct + 1, fret: f3 });
-
-
-            const paths = this._diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret);
-
-            if (!paths.length || !octaveCandidates.length) return [];
-
-            let bestPath = null;
-            let bestScore = Infinity;
-
-            for (const path of paths) {
-                for (const oct of octaveCandidates) {
-                    const score = this._diagonalScorePath(
-                        { string: root.string + 1, fret: root.fret },
-                        path,
-                        oct
-                    );
-                    if (score < bestScore) {
-                        bestScore = score;
-                        bestPath = path;
-                    }
-                }
-            }
-
-            return bestPath || [];
-        }
-
-        return results;
-    }
-
-
-chordDispatch(intervals, dirOverride, h, inst, baseMidi, maxFret, results) {
-
-    for (let i = 0; i < intervals.length; i++) {
-
-        const interval = intervals[i];
-        if (interval === 0) continue;
-
-        const index = results.length + 1;
-
-        // direction LOCALE, jamais globale
-        const dir = (dirOverride != null)
-            ? dirOverride
-            : (interval > 0 ? +1 : -1);
-
-        const s = (h.string - 1) + dir * index;
-        if (s < 0 || s >= inst.tuning.length) break;
-
-        const targetMidi = baseMidi + interval;
-        let found = null;
-
-        for (let f = 0; f <= maxFret; f++) {
-            const raw = inst.getNoteAt(s, f);
-            if (!raw) continue;
-            if (raw.midi === targetMidi) {
-                found = { string: s + 1, fret: f, midi: raw.midi };
-                break;
-            }
-        }
-
-        if (found) results.push(found);
-    }
-
-    return results;
-}
-prepareChordIntervals(intervals, inversion) {
-
-    // 1) rotation (inversion)
-    const rot = intervals.slice(inversion).concat(intervals.slice(0, inversion));
-
-    // 2) trouver la fondamentale
-    const rootIndex = rot.indexOf(0);
-    const root = rot[rootIndex];
-
-    // 3) intervalles relatifs signés autour de 0
-    const signed = rot.map((v, i) => {
-        const diff = v - root;          // ex: 4→4, 7→7, 0→0
-        const mod  = ((diff % 12) + 12) % 12;
-        if (i < rootIndex && mod !== 0) return mod - 12; // avant 0 → négatif
-        return mod;                                     // après 0 → positif
-    });
-
-    // 4) 0 + graves + aigus (dans le bon sens pour Chord)
-    const rootFirst   = 0;
-    const gravesOnly  = signed.filter(v => v < 0).sort((a, b) => b - a); // -5, -8, ...
-    const aigusOnly   = signed.filter(v => v > 0).sort((a, b) => a - b); // 4, 7, ...
-
-    const graves = [rootFirst, ...gravesOnly];
-    const aigus  = [rootFirst, ...aigusOnly];
-
-    return { graves, aigus };
-}
-
-
-
-    // ------------------------------------------------------------
-    // DIAGONAL — helpers internes
-    // ------------------------------------------------------------
-    _diagonalScorePath(root, path, octaveL) {
-
-        const full = [root, ...path, octaveL];
-
-        let minF = Infinity, maxF = -Infinity;
-        let minS = Infinity, maxS = -Infinity;
-
-        for (const p of full) {
-
-            // ⚠️ IGNORER les points virtuels ou hors manche
-            if (p.virtual) continue;
-            if (p.fret < 0 || p.fret > this.g.fretCount) continue;
-            if (p.string < 1 || p.string > this.g.app.instrument.tuning.length) continue;
-
-            minF = Math.min(minF, p.fret);
-            maxF = Math.max(maxF, p.fret);
-            minS = Math.min(minS, p.string);
-            maxS = Math.max(maxS, p.string);
-        }
-
-        // Si aucune note jouable → score très mauvais mais pas bloquant
-        if (minF === Infinity) return 9999;
-
-        const width = maxF - minF;
-        const height = maxS - minS;
-
-        return width + height * 3;
-    }
-
-
-    _diagonalFindCandidates(inst, targetMidi, prev, maxFret) {
-        const out = [];
-
-        for (let s = 0; s < inst.tuning.length; s++) {
-            for (let f = 0; f <= maxFret; f++) {
-
-                const raw = inst.getNoteAt(s, f);
-                if (!raw || raw.midi !== targetMidi) continue;
-
-                const dF = f - prev.fret;
-                if (Math.abs(dF) >= 5) continue;
-
-                out.push({ string: s + 1, fret: f, midi: raw.midi });
-            }
-        }
-
-        // ⚠️ IMPORTANT :
-        // Si aucune note jouable n'existe → on retourne un placeholder virtuel
-        // pour garder la continuité du chemin.
-        if (out.length === 0) {
-            out.push({
-                string: prev.string,   // même corde
-                fret: prev.fret,       // même frette
-                midi: targetMidi,      // mais note virtuelle
-                virtual: true          // marquage
-            });
-        }
-
-        return out;
-    }
-
-    _diagonalGeneratePaths(inst, intervals, root, baseMidi, maxFret) {
-
-        const paths = [];
-
-        const recurse = (i, prev, current) => {
-
-            if (i >= intervals.length) {
-                paths.push([...current]);
-                return;
-            }
-
-            const interval = intervals[i];
-            if (interval === 0) {
-                recurse(i + 1, prev, current);
-                return;
-            }
-
-            const targetMidi = baseMidi + interval;
-            const candidates = this._diagonalFindCandidates(inst, targetMidi, prev, maxFret);
-
-            for (const c of candidates) {
-                current.push(c);
-                recurse(i + 1, { string: c.string - 1, fret: c.fret }, current);
-                current.pop();
-            }
-        };
-
-        recurse(0, root, []);
-        return paths;
-    }
-
-
-
-    // ---------------------------------------------------------
-    // Complémente un intervalle 
-    //   UP   : +i
-    //   DOWN : -(12 - abs(i))
-    // ---------------------------------------------------------
-    _complementInterval(i) {
-        if (i === 0) return 0;
-
-        const abs = Math.abs(i);
-        return -(12 - abs);
-    }
-
-
-    // ---------------------------------------------------------
-    // Complémente un tableau d’intervalles
-    // ---------------------------------------------------------
-    _complementIntervals(arr) {
-        return arr.map(i => this._complementInterval(i));
-    }
-
-
-    // ---------------------------------------------------------
-    // Prépare les intervalles selon intervalWay :
-    //   1. trie les intervalles
-    //   2. applique le complément si DOWN
-    //   3. retrie dans le bon sens
-    // ---------------------------------------------------------
-    _prepareIntervalsForWay(intervals, intervalWay) {
-
-        // 1. tri initial (UP = croissant)
-        let sorted = [...intervals].sort((a, b) => a - b);
-
-        // 2. si DOWN → complément
-        if (intervalWay === "down") {
-            sorted = this._complementIntervals(sorted);
-        }
-
-        // 3. tri final selon le sens
-        if (intervalWay === "up") {
-            sorted.sort((a, b) => a - b);
-        } else {
-            sorted.sort((a, b) => b - a);
-        }
-
-        return sorted;
-    }
-
-
-
     // ------------------------------------------------------------
     // MARKER — SEGMENTS
     // ------------------------------------------------------------
@@ -916,7 +418,7 @@ prepareChordIntervals(intervals, inversion) {
         const thickness = g.getThickness() * 0.22;
         strokeWeight(thickness);
 
-        for (let s of g.markerSegments) {
+        for (let s of (g.markerSegments || [])) {
             const col = color(s.color);
             col.setAlpha(180);
             stroke(col);
@@ -936,6 +438,7 @@ prepareChordIntervals(intervals, inversion) {
         if (!g.markerMode || !g.hoveredNote) return;
 
         const p = g.toScreen(g.hoveredNote.fret, g.hoveredNote.string);
+        if (!p) return;
 
         const thickness = g.getThickness() * 0.1;
 
@@ -1134,15 +637,29 @@ prepareChordIntervals(intervals, inversion) {
     }
 
     // ------------------------------------------------------------
-    // DRAW GLOBAL
+    // ENTRY POINT
     // ------------------------------------------------------------
     draw() {
+        const g = this.g;
+
+        // 1) Marker (sous les notes)
         this.drawMarkedSegments();
+        this.drawMarkerHoverDot();
+
+        // 2) Notes utilisateur
         this.drawPinnedNotes();
         this.drawSelectedNotes();
-        this.drawHoverDot();
-        this.drawMarkerHoverDot();
+
+        // 3) Animations (bursts)
         this.drawInteractionBursts();
+
+        // 4) Highlight octave
         this.drawHighlightOctave();
+
+        // 5) Hover normal (désactivé automatiquement si markerMode = true)
+        this.drawHoverDot();
+
+        // ⚠️ plus de double appel out-of-bounds ici :
+        // drawNoteList() gère déjà les markers hors manche.
     }
 }
