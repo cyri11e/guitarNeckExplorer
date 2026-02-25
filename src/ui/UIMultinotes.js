@@ -239,31 +239,44 @@ dispatchBoxL(intervals, hovered, way, octaveShown) {
     return this.dispatchBox(intervals, hovered, way, octaveShown, -3, +1);
 }
 
-dispatchChord(intervals, hovered, way) {
+filterOneNotePerString(notes, hovered) {
 
-    const results = [];
+    const bestPerString = new Map();
 
-    // offsets de cordes selon le sens
-    const offsets = way === "up"
-        ? [ +1, +2, +3, +4, +5 ]
-        : [ -1, -2, -3, -4, -5 ];
+    for (const n of notes) {
 
-    let offsetIndex = 0;
+        const existing = bestPerString.get(n.string);
 
-    for (let interval of intervals) {
+        if (!existing) {
+            bestPerString.set(n.string, n);
+            continue;
+        }
 
-        // On ignore la root (interval 0)
-        if (interval === 0) continue;
+        // garder la note la plus proche de hovered
+        const dNew = Math.abs(n.fret - hovered.fret);
+        const dOld = Math.abs(existing.fret - hovered.fret);
 
-        const stringOffset = offsets[offsetIndex++];
-        if (stringOffset === undefined) break;
-
-        const note = this.findStringOccurrence(hovered, interval, stringOffset);
-
-        if (note) results.push(note);
+        if (dNew < dOld) {
+            bestPerString.set(n.string, n);
+        }
     }
 
-    return results;
+    return Array.from(bestPerString.values());
+}
+
+dispatchChord(intervals, hovered, way, octaveShown) {
+
+    let notes;
+
+    // hovered.string === 2 → corde B
+    if (hovered.string === 5) {
+        notes = this.dispatchBox(intervals, hovered, way, octaveShown, -2, +3);
+    } else {
+        // comportement normal (tu peux ajuster)
+        notes = this.dispatchBox(intervals, hovered, way, octaveShown, 0, +3);
+    }
+
+    return this.filterOneNotePerString(notes, hovered);
 }
 
 
