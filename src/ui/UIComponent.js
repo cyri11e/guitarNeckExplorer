@@ -12,7 +12,6 @@ class UIComponent {
         this.y = 0;
         this.w = 0;
         this.h = 0;
-
         this.parent = null;
 
         // Interaction
@@ -26,7 +25,6 @@ class UIComponent {
         this.isPressed = false;
         this.pressX = 0;
         this.pressY = 0;
-
 
         // Zoom
         this.zoomFactor = 1;
@@ -210,22 +208,23 @@ mouseWheel(evt) {
         if (!this.isHovered) return;
         if (!this.shortcutKey) return;
 
-        push();
+
         textAlign(LEFT, TOP);
-        textSize(this.h * 0.3);
+        textSize(windowHeight / 30);
         fill('#00ff049e');
         strokeWeight(1)
-
-
         noStroke();
-        text('['+this.shortcutKey+']', 10, 10);
-        pop();
+        text('['+this.shortcutKey+']', 1, 1);
+        text('"'+this.description+'"', windowHeight / 3, 1);
+
     }
 
     draw() {
+        push()
         this.drawDebugRect();
         this.drawDebugInfo();
         this.drawShortcutOverlay();
+        pop()
     }
 
     // ============================================================

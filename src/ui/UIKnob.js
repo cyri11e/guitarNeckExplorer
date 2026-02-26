@@ -19,6 +19,7 @@ class Knob extends UIComponent {
 
         this.shortcutKey  = cfg.shortcutKey  || null;
         this.shortcutCode = cfg.shortcutCode || null;
+        this.description = cfg.description || null;
 
         // --- ANGLES ---
         this.angles = this.computeAngles(this.items.length);
@@ -124,7 +125,7 @@ containsRect(evt) {
     // -----------------------------
     draw() {
 
-
+        push()
         const topP = 0.25;
         const circleP = 0.50;
         const labelP = 0.25;
@@ -194,7 +195,7 @@ containsRect(evt) {
             strokeWeight(2);
             ellipse(cx, cy, r * 2, r * 2);
         }
-
+        pop()
         super.draw();
     }
 

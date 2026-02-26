@@ -12,7 +12,8 @@ class MarkerSelector extends UIComponent {
         this.updateResponsive();
 
         this.shortcutKey = cfg.shortcutKey || null;
-
+        this.description = cfg.description || null;
+        
         this._state = -1; // OFF
         this.activeColorIndex = 0;
 

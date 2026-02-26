@@ -16,7 +16,8 @@ class Switch extends UIComponent {
         this.topLabel    = cfg.topLabel    || "";
         this.bottomLabel = cfg.bottomLabel || "";
         this.shortcutKey = cfg.shortcutKey || null;
-
+        this.description = cfg.description || null;
+        
         // --- ÉTAT ---
         this._state = 0; // 0 = neutre, 1 = top, 2 = bottom
         this.isPassive = (!this.topLabel && !this.bottomLabel);

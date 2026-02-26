@@ -17,7 +17,7 @@ class MetalSwitch extends UIComponent {
         this.topLabel    = cfg.topLabel    || "";
         this.bottomLabel = cfg.bottomLabel || "";
         this.shortcutKey = cfg.toggleShortcut || cfg.shortcutKey || null;
-
+        this.description = cfg.description || null;
         // --- ÉTAT ---
         this._state = cfg.defaultState ? 1 : 0;
 

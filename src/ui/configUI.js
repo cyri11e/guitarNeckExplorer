@@ -65,7 +65,8 @@ knob13457: {
         { symbol: "5", label: "Pentatonique" },
         { symbol: "7", label: "Diatonique" }
     ],
-    shortcutKey: "g"
+    shortcutKey: "g",
+    description: "Preselection de groupe"
 },
 
 // --- KNOB 2 : Type d’accord ---
@@ -84,7 +85,8 @@ knobMultiCursor: {
         { symbol: "/", label: "Diagonal" }
     ],
     shortcutKey: "x",
-    debug: true
+    debug: true,
+    description: "Evolution sur le manche"
 },
 
 knobInlays: {
@@ -99,7 +101,8 @@ knobInlays: {
         { symbol: "▬", label: "Les Paul" },
 
     ],
-    shortcutKey: "p"
+    shortcutKey: "p",
+    description: "Type de inlays"
 },
 
 knobOctaves: {
@@ -114,7 +117,8 @@ knobOctaves: {
         { symbol: "3", label: "3 Octaves" },
         { symbol: "T", label: "Tout" },
     ],
-    shortcutKey: "o"
+    shortcutKey: "o",
+    description: "etendue de la sélection"
 },
 knobInversions: {
     type: "knob",
@@ -153,7 +157,9 @@ switchDeg2: {
     title: "2",
     topLabel: "M",
     bottomLabel: "m",
-    shortcutKey: "2"
+    shortcutKey: "2",
+    description: "Commuter une seconde"
+
 },
 
 switchDeg3: {
@@ -165,7 +171,9 @@ switchDeg3: {
     title: "3",
     topLabel: "M",
     bottomLabel: "m",
-    shortcutKey: "3"
+    shortcutKey: "3",
+    description: "Commuter une tierce"
+
 },
 
 switchDeg4: {
@@ -177,7 +185,9 @@ switchDeg4: {
     title: "4",
     topLabel: "P",
     bottomLabel: "a",
-    shortcutKey: "4"
+    shortcutKey: "4",
+    description: "Commuter une quarte"
+
 },
 
 switchDeg5: {
@@ -189,7 +199,8 @@ switchDeg5: {
     title: "5",
     topLabel: "P",
     bottomLabel: "d",
-    shortcutKey: "5"
+    shortcutKey: "5",
+    description: "Commuter une quinte"
 },
 
 switchDeg6: {
@@ -201,7 +212,8 @@ switchDeg6: {
     title: "6",
     topLabel: "M",
     bottomLabel: "m",
-    shortcutKey: "6"
+    shortcutKey: "6",
+    description: "Commuter une sixte"
 },
 
 switchDeg7: {
@@ -213,7 +225,8 @@ switchDeg7: {
     title: "7",
     topLabel: "M",
     bottomLabel: "m",
-    shortcutKey: "7"
+    shortcutKey: "7",
+    description: "Commuter une septième"
     
 },
 
@@ -223,7 +236,9 @@ metalSwitch1: {
     sp: 100,     // % de la hauteur du panel
     topLabel: "♯",
     bottomLabel: "♭",
-    shortcutKey: "b"
+    shortcutKey: "b",
+    description: "Mode Diese ou Bemol"
+
 },
 
 metalSwitchENFR: {
@@ -231,7 +246,9 @@ metalSwitchENFR: {
     sp: 100,     // % de la hauteur du panel
     topLabel: "FR",
     bottomLabel: "EN",
-    shortcutKey: "f"
+    shortcutKey: "f",
+    description: "Langue des Notes"
+
 },
 
 metalWood: {
@@ -239,7 +256,9 @@ metalWood: {
     sp: 100,     // % de la hauteur du panel
     topLabel: "map",
     bottomLabel: "rose",
-    shortcutKey: "w"
+    shortcutKey: "w",
+    description: "Couleur de la table"
+
 },
 
 metalWay: {
@@ -250,7 +269,8 @@ metalWay: {
     bottomLabel: "↙",
     shortcutKey: "u",
     defaultState: 1,   // ← ON par défaut
-    shortcutKey: "u"
+    shortcutKey: "u",
+    description: "sens de progression"
 },
     panel2: {
         type: "panel",
@@ -300,7 +320,9 @@ knob1: {
         { symbol: "N", label: "Notes" },
         { symbol: "T", label: "Octaves" },
     ],
-    shortcutKey: 'c'
+    shortcutKey: 'c',
+    description: "Mode de curseur"
+
 },
 
 knob2: {
@@ -317,7 +339,8 @@ knob2: {
         { symbol: "D", label: "Degré" },
         { symbol: "P", label: "Pastille" },
     ],
-    shortcutKey: 'd'
+    shortcutKey: 'd',
+    description: "Type d'affichage des notes"
 },
 
 
@@ -325,7 +348,8 @@ cof1 : {
     type: "cof",
     xp: 50,
     yp: 50,
-    sp: 100
+    sp: 100,
+    description: "Cycle des quintes"
 },
 
 
@@ -335,7 +359,8 @@ markerSelector1: {
     xp: 50,
     yp: 50,
     sp: 100,
-    shortcutKey: "m"   // optionnel
+    shortcutKey: "m" ,  // optionnel
+    description: "Mode Marker, Dessinez sur le manche"
 },
 
 

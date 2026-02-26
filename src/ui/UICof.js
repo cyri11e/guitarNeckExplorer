@@ -171,6 +171,7 @@ class COFRenderer {
     }
 
 draw() {
+    push()
     const c = this.c;
 
     const cx = c.x + c.w/2;
@@ -262,6 +263,7 @@ draw() {
         textSize(c.w * 0.25);
         text(txt, cx, cy);
     }
+    pop()
 }
 
 }
