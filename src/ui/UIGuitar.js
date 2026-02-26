@@ -91,7 +91,7 @@ class Guitar extends UIComponent {
  onMarkerChange(evt) { 
     if (evt.type === "markerToggle") { 
         this.markerMode = (evt.state === 1); 
-        console.log("[MARKER] Mode =", this.markerMode ? "ON" : "OFF");
+        //console.log("[MARKER] Mode =", this.markerMode ? "ON" : "OFF");
 
         if (!this.markerMode) { 
             this.markerPendingPoint = null; 
@@ -100,7 +100,7 @@ class Guitar extends UIComponent {
 
     if (evt.type === "markerColor") { 
         this.markerColor = this.app.markerSelector.noteColors[evt.index];
-        console.log("[MARKER] Nouvelle couleur =", this.markerColor);
+        //console.log("[MARKER] Nouvelle couleur =", this.markerColor);
     } 
 }
 
@@ -298,7 +298,7 @@ setNextIntervalMode() {
     onNoteClicked(noteIndex) {
         if (!this.theory.hasRoot()) {
             this.theory.setRoot(noteIndex);
-            console.log("new tonic "+noteIndex)
+            //console.log("new tonic "+noteIndex)
             this.invalidate();
             return;
         }
@@ -479,18 +479,18 @@ setNextIntervalMode() {
 
     // --- MODE MARKER ---
     if (this.markerMode) {
-        console.log("[MARKER] mousePressed capturé");
+        //console.log("[MARKER] mousePressed capturé");
 
         const pos = this.fromScreen(evt.x, evt.y);
         if (!pos) {
-            console.log("[MARKER] Aucun point valide sous la souris");
+            //console.log("[MARKER] Aucun point valide sous la souris");
             return true;
         }
 
         // POINT A
         if (this.markerPendingPoint === null) {
             this.markerPendingPoint = pos;
-            console.log("[MARKER] Point A =", pos);
+            //console.log("[MARKER] Point A =", pos);
         }
 
         // POINT B
@@ -501,8 +501,8 @@ setNextIntervalMode() {
                 color: this.markerColor
             });
 
-            console.log("[MARKER] Point B =", pos);
-            console.log("[MARKER] Segment ajouté :", this.markerSegments[this.markerSegments.length - 1]);
+            //console.log("[MARKER] Point B =", pos);
+            //console.log("[MARKER] Segment ajouté :", this.markerSegments[this.markerSegments.length - 1]);
 
             this.markerPendingPoint = null;
         }
@@ -551,7 +551,7 @@ setNextIntervalMode() {
      
 
     if (this.markerMode) {
-        console.log("[MARKER] onClick ignoré (mode marker actif)");
+        //console.log("[MARKER] onClick ignoré (mode marker actif)");
         return false;
     }
 

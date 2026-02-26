@@ -138,12 +138,14 @@ class UIComponent {
     // ============================================================
 
     containsRect(evt) {
-        return (
+        const inside = (
             evt.x >= this.x &&
             evt.x <= this.x + this.w &&
             evt.y >= this.y &&
             evt.y <= this.y + this.h
-        );
+        )
+        this.isHovered = inside ;
+        return inside;
     }
 
     // ============================================================
@@ -204,23 +206,48 @@ mouseWheel(evt) {
         pop();
     }
 
+    drawShortcutOverlay() {
+        if (!this.isHovered) return;
+        if (!this.shortcutKey) return;
+
+        push();
+        textAlign(LEFT, TOP);
+        textSize(this.h * 0.3);
+        fill('#00ff049e');
+        strokeWeight(1)
+
+
+        noStroke();
+        text('['+this.shortcutKey+']', 10, 10);
+        pop();
+    }
+
     draw() {
         this.drawDebugRect();
         this.drawDebugInfo();
+        this.drawShortcutOverlay();
     }
 
     // ============================================================
     // EVENTS VIDES
     // ============================================================
 
-mouseMoved(evt) {
+updateHover(evt) {
     const inside = this.containsRect(evt);
+    this.isHovered = inside;
+}
 
-        this.isHovered = inside;
+// gestion dans mousemove pas censé etre surchargé
+// contraitement à containsRect
+mouseMoved(evt) {
+        // const inside = this.containsRect(evt);
+
+        // this.isHovered = inside;
+        this.updateHover(evt);
         this.invalidate();   // ← redessine le composant
 
 
-    return inside;
+    return this.hovered;
 }
 // ============================================================
 // TRIGGER DE CHANGEMENT D'ÉTAT (pour UI_RULES)

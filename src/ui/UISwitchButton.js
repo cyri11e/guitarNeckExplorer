@@ -58,6 +58,7 @@ class Switch extends UIComponent {
         }
         return true;
     }
+
 containsRect(evt) {
 
     const totalH = this.h;
@@ -194,7 +195,16 @@ containsRect(evt) {
             : color(220, 0, 0);
 
         fill(capColor);
-        rect(capX, capY, capW, innerH, capW * 0.1);
+        rect(capX, capY, capW, innerH, capW * 0.1);     
+
+        if (this.isHovered){
+            push();
+            stroke("#ee3713")
+            noFill()
+            rect(capX, capY, capW, innerH);
+            pop();
+        }
+
 
         // --- LABELS ---
         const topY    = this.y + labelH + capH * 0.3;
@@ -223,6 +233,7 @@ containsRect(evt) {
             text(this.topLabel, this.x + this.w / 2, topY);
             text(effectiveBottom, this.x + this.w / 2, bottomY);
         }
+        super.draw();
     }
 }
 

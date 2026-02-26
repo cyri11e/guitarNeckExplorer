@@ -97,23 +97,10 @@ onClick() {
         };
     }
 
-    // updateHover(evt) {
-    //     let extraW = this.w * (this.hitboxScale - 1);
-    //     let extraH = this.h * (this.hitboxScale - 1);
 
-    //     let x = this.x - extraW / 2;
-    //     let y = this.y - extraH / 2;
-    //     let w = this.w + extraW;
-    //     let h = this.h + extraH;
-
-    //     this.hoverDrag.hitZone = { x, y, w, h };
-
-    //     let inside = evt.x >= x && evt.x <= x + w && evt.y >= y && evt.y <= y + h;
-    //     this.hover = inside;
-    //     this.hoverDrag.isHovered = inside;
-    // }
 
 containsRect(evt) {
+
     // centre réel du knob (pas le centre du composant)
     const topP = 0.25;
     const circleP = 0.50;
@@ -136,8 +123,7 @@ containsRect(evt) {
     // RENDER
     // -----------------------------
     draw() {
-        this.drawDebugRect();
-        this.drawDebugInfo();
+
 
         const topP = 0.25;
         const circleP = 0.50;
@@ -202,12 +188,14 @@ containsRect(evt) {
         text(label, cx, ly);
 
         // --- HOVER OUTLINE ---
-        if (this.hover) {
+        if (this.isHovered) {
             noFill();
             stroke(0, 255, 0);
             strokeWeight(2);
             ellipse(cx, cy, r * 2, r * 2);
         }
+
+        super.draw();
     }
 
     drawSymbols(cx, cy, r) {

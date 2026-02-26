@@ -60,6 +60,15 @@ class MarkerSelector extends UIComponent {
         return true;
     }
 
+    onShortcut() {
+         this._state = (this._state === 1 ? -1 : 1);
+
+            this.onChange?.({
+                type: "markerToggle",
+                state: this._state
+            });
+    }
+
     mousePressed(evt) {
 
         this.rebuildHitZones();

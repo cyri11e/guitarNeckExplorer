@@ -83,7 +83,8 @@ knobMultiCursor: {
         { symbol: "3N", label: "3 Notes/c" },
         { symbol: "/", label: "Diagonal" }
     ],
-    shortcutKey: "x"
+    shortcutKey: "x",
+    debug: true
 },
 
 knobInlays: {
@@ -98,7 +99,7 @@ knobInlays: {
         { symbol: "▬", label: "Les Paul" },
 
     ],
-    shortcutKey: "i"
+    shortcutKey: "p"
 },
 
 knobOctaves: {
@@ -151,7 +152,8 @@ switchDeg2: {
     aspectRatio: 0.4,
     title: "2",
     topLabel: "M",
-    bottomLabel: "m"
+    bottomLabel: "m",
+    shortcutKey: "2"
 },
 
 switchDeg3: {
@@ -162,7 +164,8 @@ switchDeg3: {
     aspectRatio: 0.40,
     title: "3",
     topLabel: "M",
-    bottomLabel: "m"
+    bottomLabel: "m",
+    shortcutKey: "3"
 },
 
 switchDeg4: {
@@ -173,7 +176,8 @@ switchDeg4: {
     aspectRatio: 0.40,
     title: "4",
     topLabel: "P",
-    bottomLabel: "a"
+    bottomLabel: "a",
+    shortcutKey: "4"
 },
 
 switchDeg5: {
@@ -184,7 +188,8 @@ switchDeg5: {
     aspectRatio: 0.40,
     title: "5",
     topLabel: "P",
-    bottomLabel: "d"
+    bottomLabel: "d",
+    shortcutKey: "5"
 },
 
 switchDeg6: {
@@ -195,7 +200,8 @@ switchDeg6: {
     aspectRatio: 0.40,
     title: "6",
     topLabel: "M",
-    bottomLabel: "m"
+    bottomLabel: "m",
+    shortcutKey: "6"
 },
 
 switchDeg7: {
@@ -206,7 +212,9 @@ switchDeg7: {
     aspectRatio: 0.40,
     title: "7",
     topLabel: "M",
-    bottomLabel: "m"
+    bottomLabel: "m",
+    shortcutKey: "7"
+    
 },
 
 
@@ -235,6 +243,7 @@ metalWood: {
 },
 
 metalWay: {
+    name: "up",
     type: "metalSwitch",
     sp: 100,     // % de la hauteur du panel
     topLabel: "↗",
@@ -254,7 +263,7 @@ metalWay: {
         isDraggable: true,
         isZoomable: true,
         toggleOnClick: true,
-        toggleShortcut: "w",
+        //toggleShortcut: "w",
         children: ["cof1"]
     },
 
@@ -326,7 +335,7 @@ markerSelector1: {
     xp: 50,
     yp: 50,
     sp: 100,
-    shortcutKey: "k"   // optionnel
+    shortcutKey: "m"   // optionnel
 },
 
 

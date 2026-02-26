@@ -34,16 +34,16 @@ class MetalSwitch extends UIComponent {
     // -----------------------------
     get state() { return this._state; }
 
-set state(v) {
-    v = v ? 1 : 0;
-    if (this._state === v) return;
-    this._state = v;
+    set state(v) {
+        v = v ? 1 : 0;
+        if (this._state === v) return;
+        this._state = v;
 
-    this.invalidate();
+        this.invalidate();
 
-    //  indispensable pour déclencher les règles
-    this.onChange?.(v);
-}
+        //  indispensable pour déclencher les règles
+        this.onChange?.(v);
+    }
 
 
 
@@ -65,35 +65,35 @@ set state(v) {
         return true;
     }
 
-containsRect(evt) {
+    containsRect(evt) {
 
-    // centre du switch
-    const cx = this.x + this.w / 2;
+        // centre du switch
+        const cx = this.x + this.w / 2;
 
-    // zone centrale verticale (entre labels)
-    const topLabelH    = this.h * 0.22;
-    const bottomLabelH = this.h * 0.22;
+        // zone centrale verticale (entre labels)
+        const topLabelH    = this.h * 0.22;
+        const bottomLabelH = this.h * 0.22;
 
-    const midY = this.y + topLabelH;
-    const midH = this.h - topLabelH - bottomLabelH;
+        const midY = this.y + topLabelH;
+        const midH = this.h - topLabelH - bottomLabelH;
 
-    // rayon du hexagone (même que dans draw)
-    const baseR = this.w * 0.3;
-    const hexR  = baseR + this.w * 0.04;
+        // rayon du hexagone (même que dans draw)
+        const baseR = this.w * 0.3;
+        const hexR  = baseR + this.w * 0.04;
 
-    // hitbox = un carré autour du hexagone
-    const hitX = cx - hexR;
-    const hitY = midY + midH * 0.50 - hexR;
-    const hitW = hexR * 2;
-    const hitH = hexR * 2;
-
-    return (
-        evt.x >= hitX &&
-        evt.x <= hitX + hitW &&
-        evt.y >= hitY &&
-        evt.y <= hitY + hitH
-    );
-}
+        // hitbox = un carré autour du hexagone
+        const hitX = cx - hexR;
+        const hitY = midY + midH * 0.50 - hexR;
+        const hitW = hexR * 2;
+        const hitH = hexR * 2;
+        
+        return (
+            evt.x >= hitX &&
+            evt.x <= hitX + hitW &&
+            evt.y >= hitY &&
+            evt.y <= hitY + hitH
+        );
+    }
 
     // -----------------------------
     // RENDER (inchangé, sauf this.containsRect retiré)
@@ -201,7 +201,10 @@ containsRect(evt) {
 
 
         // anneau 4 : gris moyen, épais
-        fill('#605a50');
+        fill('#605a50');      
+        if (this.isHovered){
+            fill("#00d003")
+        }
         ellipse(cx, cyPlate, r4_outer * 2, r4_outer * 2);
         fill(50);
         ellipse(cx, cyPlate, r4_inner * 2, r4_inner * 2);
@@ -282,5 +285,6 @@ if (this._state === 1) {
             // switch en bas → reflet arrondi vers le bas
             arc(cx, cyLever + leverR * 0.25, arcR, arcR * 0.6, QUARTER_PI, PI - QUARTER_PI);
         }
+        super.draw();
     }
 }
