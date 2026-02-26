@@ -266,21 +266,36 @@ filterOneNotePerString(notes, hovered) {
 
 dispatchChord(intervals, hovered, way, octaveShown) {
 
-    let notes;
+    // Fenêtre standard
+    let min = 0;
+    let max = 3;
 
-    // hovered.string === 2 → corde B
-    if (hovered.string === 5) {
-        notes = this.dispatchBox(intervals, hovered, way, octaveShown, -2, +3);
-    } else {
-        // comportement normal (tu peux ajuster)
-        notes = this.dispatchBox(intervals, hovered, way, octaveShown, 0, +3);
+    // Ajustement spécifique corde B (string 5)
+    const isBString = hovered.string === 5;
+    const B_OFFSET_MIN = -1;
+    const B_OFFSET_MAX = 3;
+
+    if (isBString) {
+        min = B_OFFSET_MIN;
+        max = B_OFFSET_MAX;
     }
+
+    // Si on descend → on inverse la fenêtre
+    if (way === "down") {
+        [min, max] = [-max, isBString ? 0 : -min];
+    }
+
+    const notes = this.dispatchBox(
+        intervals,
+        hovered,
+        way,
+        octaveShown,
+        min,
+        max
+    );
 
     return this.filterOneNotePerString(notes, hovered);
 }
-
-
-
 
 
     // ------------------------------------------------------------
