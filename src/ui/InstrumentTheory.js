@@ -47,6 +47,7 @@ class InstrumentTheory {
     }
 
     getNoteAt(stringIndex, fret) {
+        if (stringIndex > 5 ||stringIndex < 0) return null;
         const open = this.tuning[stringIndex];
         const midi = open.midi + fret;
         const index = this.theory.midiToIndex(midi);

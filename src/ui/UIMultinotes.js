@@ -129,7 +129,7 @@ findAllOccurrences(hovered, interval, way, octaveShown) {
     // ----- MODE normal : note exacte ± octaves -----
     const directional = this.computeDirectionalInterval(interval, way);
 
-    // 🔥 ICI : on génère les shifts pour TOUS les intervalles, y compris 0
+    //  ICI : on génère les shifts pour TOUS les intervalles, y compris 0
     const shifts = [0];
     if (octaveShown === "2") shifts.push(1, -1);
     if (octaveShown === "3") shifts.push(1, 2, -1, -2);
@@ -279,7 +279,11 @@ dispatchChord(intervals, hovered, way, octaveShown) {
         min = B_OFFSET_MIN;
         max = B_OFFSET_MAX;
     }
-
+    //  élargissement spécial pour 1 octave
+    if (octaveShown === "1") {
+        min -= 3;   // capture tierce basse
+        max += 2;   // capture tierce haute
+    }
     // Si on descend → on inverse la fenêtre
     if (way === "down") {
         [min, max] = [-max, isBString ? 0 : -min];
@@ -297,13 +301,152 @@ dispatchChord(intervals, hovered, way, octaveShown) {
     return this.filterOneNotePerString(notes, hovered);
 }
 
+computeGeometricOctave(root, way) {
 
-    // ------------------------------------------------------------
-    // AUTRES MODES (VIDES)
-    // ------------------------------------------------------------
+    const inst = this.g.app.instrument;
+
+    // 1) déplacement de corde
+    const ds = (way === "up" ? +2 : -2);
+    const targetString = root.string + ds;
+
+    // 2) delta fret : 2 ou 3 selon couple
+    let df = ds;
+
+    const s1 = root.string;
+    const s2 = targetString;
+
+    const isSpecial =
+        (s1 === 3 && s2 === 5) || // G → B
+        (s1 === 5 && s2 === 3) || // B → G
+        (s1 === 4 && s2 === 6) || // D → E aigu
+        (s1 === 6 && s2 === 4);   // E aigu → D
+
+    if (isSpecial) df = ds+1;
+
+    // 3) signe selon le sens
+    if (way === "down") df = -df;
+
+    const targetFret = root.fret + df;
+
+    // 4) note réelle si possible
+    if (targetString >= 1 && targetString <= inst.tuning.length) {
+        const raw = inst.getNoteAt(targetString - 1, targetFret);
+        if (raw) {
+            return {
+                string: targetString,
+                fret: targetFret,
+                midi: raw.midi,
+                virtual: false
+            };
+        }
+    }
+
+    // 5) sinon → note virtuelle
+    return {
+        string: targetString,
+        fret: targetFret,
+        midi: root.midi + (way === "up" ? +12 : -12),
+        virtual: true
+    };
+}
 
 
-    dispatch3NPS(intervals, hovered, way, octaveShown) { return []; }
-    dispatchDiagonal(intervals, hovered, way, octaveShown) { return []; }
+dispatchDiagonal(intervals, hovered, way, octaveShown) {
+
+    let results = [];
+    let currentRoot = hovered;
+
+    for (let i = 0; i < octaveShown; i++) {
+
+        // 1. BoxR sur la root actuelle
+        const part = this.dispatchBox(intervals, currentRoot, way, true, way =='up' ? -1 : -4, way =='up' ? +3 : 0);
+        results = results.concat(part);
+
+        // 2. Calcul de l’octave géométrique
+        const nextRoot = this.computeGeometricOctave(currentRoot, way);
+
+        // si plus de diagonale possible → on arrête
+        if (!nextRoot) break;
+
+        currentRoot = nextRoot;
+    }
+
+    return results;
+}
+
+dispatch3NPS(intervals, hovered, way, octaveShown) {
+
+    const g = this.g;
+    const inst = g.app.instrument;
+
+    const baseRaw = inst.getNoteAt(hovered.string - 1, hovered.fret);
+    if (!baseRaw) return [];
+
+    const maxFret = g.fretCount;
+    const results = [];
+
+    const ds = (way === "up" ? +1 : -1);
+    let currentString = hovered.string - 1;
+
+    // 1) Construire la séquence linéaire de cibles (intervals × octaves)
+    let octaveCount = 1;
+    if (octaveShown === "2") octaveCount = 2;
+    if (octaveShown === "3") octaveCount = 3;
+
+    const targets = [];
+
+    for (let o = 0; o < octaveCount; o++) {
+
+        for (let interval of intervals) {
+
+            // intervalle directionnel + octave
+            const directional =
+                way === "up"
+                    ? interval + 12 * o
+                    : -(interval + 12 * o);
+
+            const targetMidi = baseRaw.midi + directional;
+            targets.push(targetMidi);
+        }
+    }
+
+    // 2) Dérouler la séquence sur le manche : 3 notes max par corde
+    let notesOnString = 0;
+
+    for (let targetMidi of targets) {
+
+        if (currentString < 0 || currentString >= inst.tuning.length)
+            break;
+
+        let found = null;
+
+        for (let f = 0; f <= maxFret; f++) {
+            const raw = inst.getNoteAt(currentString, f);
+            if (raw && raw.midi === targetMidi) {
+                found = {
+                    string: currentString + 1,
+                    fret: f,
+                    midi: raw.midi
+                };
+                break;
+            }
+        }
+
+        if (found) {
+            results.push(found);
+            notesOnString++;
+
+            if (notesOnString >= 3) {
+                currentString += ds;
+                notesOnString = 0;
+            }
+        }
+        // si non trouvée, on consomme quand même la cible et on continue
+    }
+
+    return results;
+}
+
+
 
 }
