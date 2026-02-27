@@ -236,7 +236,7 @@ dispatchBoxR(intervals, hovered, way, octaveShown) {
 
 
 dispatchBoxL(intervals, hovered, way, octaveShown) {
-    return this.dispatchBox(intervals, hovered, way, octaveShown, -3, +1);
+    return this.dispatchBox(intervals, hovered, way, octaveShown, -3, +0);
 }
 
 filterOneNotePerString(notes, hovered) {
@@ -376,17 +376,59 @@ dispatchDiagonal(intervals, hovered, way, octaveShown) {
 
 dispatch3NPS(intervals, hovered, way, octaveShown) {
 
+    if (octaveShown === "T") {
+
+        // UP indépendant
+        const up = this.dispatch3NPSCore(
+            intervals,
+            hovered,
+            "up",
+            "2",
+            0 // compteur initial
+        );
+
+        // DOWN indépendant, mais avec le compteur restant
+        const down = this.dispatch3NPSCore(
+            intervals,
+            hovered,
+            "down",
+            "2",
+            up.endCount // compteur restant de la corde de départ
+        );
+
+        return [...up.results, ...down.results];
+    }
+
+    // cas normal
+    return this.dispatch3NPSCore(
+        intervals,
+        hovered,
+        way,
+        octaveShown,
+        0
+    ).results;
+}
+
+
+
+dispatch3NPSCore(intervals, hovered, way, octaveShown, startCount) {
+
     const g = this.g;
     const inst = g.app.instrument;
 
     const baseRaw = inst.getNoteAt(hovered.string - 1, hovered.fret);
-    if (!baseRaw) return [];
+    if (!baseRaw) return { results: [], endCount: startCount };
 
     const maxFret = g.fretCount;
     const results = [];
 
     const ds = (way === "up" ? +1 : -1);
+
+    // corde de départ = hovered.string (0-based)
     let currentString = hovered.string - 1;
+
+    // compteur paramétré
+    let notesOnString = startCount;
 
     // 1) Construire la séquence linéaire de cibles (intervals × octaves)
     let octaveCount = 1;
@@ -396,10 +438,8 @@ dispatch3NPS(intervals, hovered, way, octaveShown) {
     const targets = [];
 
     for (let o = 0; o < octaveCount; o++) {
-
         for (let interval of intervals) {
 
-            // intervalle directionnel + octave
             const directional =
                 way === "up"
                     ? interval + 12 * o
@@ -411,8 +451,6 @@ dispatch3NPS(intervals, hovered, way, octaveShown) {
     }
 
     // 2) Dérouler la séquence sur le manche : 3 notes max par corde
-    let notesOnString = 0;
-
     for (let targetMidi of targets) {
 
         if (currentString < 0 || currentString >= inst.tuning.length)
@@ -441,10 +479,9 @@ dispatch3NPS(intervals, hovered, way, octaveShown) {
                 notesOnString = 0;
             }
         }
-        // si non trouvée, on consomme quand même la cible et on continue
     }
 
-    return results;
+    return { results, endCount: notesOnString };
 }
 
 

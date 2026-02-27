@@ -44,12 +44,12 @@ class Guitar extends UIComponent {
 
         this.openStringNames = ["E", "B", "G", "D", "A", "E"]; 
         this.pinnedNotes = [ 
-            { fret: 1, string: 6 }, 
-            { fret: 2, string: 4 } 
+            // { fret: 1, string: 6 }, 
+            // { fret: 2, string: 4 } 
         ]; // { fret, string }
 
         this.selectedNotes = [
-            { fret: 3, string: 3 }
+            // { fret: 3, string: 3 }
         ]; // { fret, string }
 
         //  Ajout : flag anti-clic-après-drag

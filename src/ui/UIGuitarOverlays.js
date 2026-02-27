@@ -35,7 +35,8 @@ class GuitarOverlays {
             strokeColor = "black",
             shapeType = "circle",
             hasShadow = false,
-            label = null
+            label = null,
+            cursor =null
         } = opts;
 
         if (!label) return;
@@ -72,17 +73,28 @@ class GuitarOverlays {
         stroke(strokeColor);
         strokeWeight(weight);
 
-        if (base === "") fill(0);
+        if (base === "") fill(this.g.woodColor == 'rosewood' ? 255 : 0); // pastille
 
         if (shapeType === "square") {
             rectMode(CENTER);
             stroke(255);
             rect(x - offset, y - offset, r, r, r * 0.2);
+            if (cursor){
+                stroke('red')
+                strokeWeight(weight*2);
+                rect(x - offset, y - offset, r*1.1, r, r * 0.2);
+            }
+
         } else {
             stroke(0);
             circle(x - offset, y - offset, r);
             stroke(255);
             circle(x - offset, y - offset, r * 0.9);
+            if (cursor){
+                stroke('red')
+                strokeWeight(weight*2);
+                circle(x - offset, y - offset, r * 1.1);
+            }
         }
 
 // Texte principal
@@ -280,43 +292,43 @@ const list = this.intervalDispatcher
                 case "degree": {
                     const realInterval = (raw.midi - baseMidi + 120) % 12;
                     label = this.getRelativeDegreeLabel(realInterval);
+                    label.root =  label.base =='1';
                     break;
                 }
 
-                case "index":
-                    label = {
-                        base: raw.index.toString(),
-                        alt: "",
-                        type: "index",
-                        chroma: null
-                    };
+                case "none":
+                    const realInterval = (raw.midi - baseMidi + 120) % 12;
+                    label = this.getRelativeDegreeLabel(realInterval);
+                    label.root =  label.base =='1';
+                    label.base ='';
                     break;
 
                 default:
-                    label = app.theory.getNoteLabel(raw.index, g.labelType);
+                    label = null;
                     break;
             }
 
             this.drawNote(pos.x, pos.y, {
-                fillColor: "#ff88008a",
+                fillColor: "#00ff666e",
                 strokeColor: "black",
                 hasShadow: true,
                 shapeType: "circle",
-                label
+                label,
+                cursor: (label.root)
             });
         }
 
         const isShift = g.shiftDown === true;
 
         const selectedStyle = {
-            fillColor: "#ffd00055",
-            strokeColor: "#ffd000",
+            fillColor: "#ff00ccb7",
+            strokeColor: "#00ff26",
             hasShadow: true,
             shapeType: "square"
         };
 
         const hoverStyle = {
-            fillColor: "#5156127d",
+            fillColor: "#fe00003f",
             strokeColor: "white",
             hasShadow: true,
             shapeType: "circle"
@@ -348,6 +360,7 @@ const list = this.intervalDispatcher
                     baseIndex,
                     g.displayMode === "note" ? g.labelType : g.displayMode
                 );
+                
             }
 
             this.drawNote(pos.x, pos.y, {
@@ -659,7 +672,6 @@ const list = this.intervalDispatcher
         // 5) Hover normal (désactivé automatiquement si markerMode = true)
         this.drawHoverDot();
 
-        // ⚠️ plus de double appel out-of-bounds ici :
-        // drawNoteList() gère déjà les markers hors manche.
+
     }
 }
