@@ -649,12 +649,51 @@ const list = this.intervalDispatcher
         text("+", x, y);
     }
 
+drawCAGEDOverlay() {
+    const g = this.g;
+    const h = g.hoveredNote;
+    if (!h) return;
+
+    // mapping corde → texte (1 = grave)
+    const map = {
+        1: "G E", // E grave
+        2: "C A", // A
+        3: "E D", // D
+        4: "A G", // G
+        5: "D C", // B
+        6: "G E"  // E aigu
+    };
+
+    const txt = map[h.string];
+    if (!txt) return;
+
+    // position horizontale = fret hover
+    const pos = g.toScreen(h.fret, h.string);
+    if (!pos) return;
+
+    // position verticale = centre du manche (fixe)
+    const centerY = g.y + g.h / 1.7;
+
+    push();
+    textAlign(CENTER, CENTER);
+    textStyle(BOLD);
+    fill(255, 0, 0, 60);
+    noStroke();
+
+    // taille proportionnelle au manche
+    textSize(g.getThickness() *1.3  );
+
+    text(txt, pos.x, centerY);
+    pop();
+}
+
+
     // ------------------------------------------------------------
     // ENTRY POINT
     // ------------------------------------------------------------
     draw() {
         const g = this.g;
-
+this.drawCAGEDOverlay();
         // 1) Marker (sous les notes)
         this.drawMarkedSegments();
         this.drawMarkerHoverDot();
