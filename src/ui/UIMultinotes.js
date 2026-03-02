@@ -1,5 +1,7 @@
 class MultiNotes {
-
+// TODO : un seul mode box en mode tout direct L et R selon up down
+// ajuster CAGED
+// regles automatique box = Tout , C = 1 octave + triade 
     constructor(guitar) {
         this.g = guitar;
     }
