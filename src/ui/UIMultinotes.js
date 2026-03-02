@@ -37,191 +37,174 @@ class MultiNotes {
         }
     }
 
-findOccurrence(hovered, interval, octaveShift) {
-    const g = this.g;
-    const inst = g.app.instrument;
 
-    const baseRaw = inst.getNoteAt(hovered.string - 1, hovered.fret);
-    if (!baseRaw) return [];
+dispatchOneString(intervals, hovered, way, octaveShown = 1) {
+    const T = this.g.app.instrument;
 
-    const baseMidi = baseRaw.midi;
-    const targetMidi = baseMidi + interval + 12 * octaveShift;
+    const base = T.getNoteAt(hovered.string - 1, hovered.fret);
+    if (!base) return [];
 
-    const results = [];
+    const startMidi = base.midi;
+    const octave = (octaveShown !== "T") ? octaveShown * ( way == 'up' ? 1 : -1 ) : 0;
 
-    for (let s = 0; s < g.strings.length; s++) {
-        for (let f = 0; f <= g.fretCount; f++) {
-            const raw = inst.getNoteAt(s, f);
-            if (raw && raw.midi === targetMidi) {
-                results.push({
-                    string: s + 1,
-                    fret: f,
-                    midi: raw.midi
-                });
-            }
-        }
-    }
+    // 1) interval → midi (NEUTRE)
+    const targetMidis = intervals.map(interval =>
+        T.intervalToMidi(startMidi, interval)
+    );
 
-    return results;
+    // 2) midi → octaves (NEUTRE)
+    const octaved = targetMidis.map(midi =>
+        T.findOctavedMidi(midi, octave)
+    );
+
+    // 4) aplatir
+    const allMidis = octaved.flat();
+
+    // 5) positions sur la corde
+    const positions = allMidis
+        .map(midi => T.findNoteOnStringByMidi(hovered.string - 1, midi))
+        .filter(Boolean);
+
+    return positions;
 }
 
+dispatchChord(intervals, hovered, way, octaveShown = 1) {
+    const T = this.g.app.instrument;
 
-findStringOccurrence(hovered, interval, stringOffset) {
+    const base = T.getNoteAt(hovered.string - 1, hovered.fret);
+    if (!base) return [];
 
-    const g = this.g;
-    const inst = g.app.instrument;
+    const startMidi = base.midi;
 
-    const targetString = hovered.string + stringOffset;
-    if (targetString < 1 || targetString > inst.tuning.length) return null;
+    // ------------------------------------------------------------
+    // MODE 1 OCTAVE → ton code EXACT
+    // ------------------------------------------------------------
+    if (Math.abs(octaveShown) === 1) {
 
-    const baseRaw = inst.getNoteAt(hovered.string - 1, hovered.fret);
-    if (!baseRaw) return null;
+        const octave = (octaveShown !== "T")
+            ? octaveShown * (way === 'up' ? 1 : -1)
+            : 0;
 
-    const targetMidi = baseRaw.midi + interval;
-    const maxFret = g.fretCount;
+        const enriched = intervals.map(interval => {
+            const midi = T.intervalToMidi(startMidi, interval);
+            const octaved = (interval == 0) ? [midi] : T.findOctavedMidi(midi, octave);
+            const finalMidi = octaved[0];
+            return {
+                interval,
+                finalMidi,
+                distance: Math.abs(finalMidi - startMidi)
+            };
+        });
 
-    // SCAN DE LA CORDE CIBLE (exactement comme ton ancien code)
-    for (let f = 0; f <= maxFret; f++) {
-        const raw = inst.getNoteAt(targetString - 1, f);
-        if (!raw) continue;
+        const sorted = (way === 'down')
+            ? enriched.sort((a, b) => a.distance - b.distance)
+            : enriched;
 
-        if (raw.midi === targetMidi) {
-            return { string: targetString, fret: f, midi: raw.midi };
-        }
-    }
+        const results = [];
 
-    return null;
-}
+        sorted.forEach((item, i) => {
+            const targetString = (way === 'up')
+                ? hovered.string + i
+                : hovered.string - i;
 
+            if (targetString < 1 || targetString > T.tuning.length) return;
 
-
-
-findAllOccurrences(hovered, interval, way, octaveShown) {
-    const g = this.g;
-    const inst = g.app.instrument;
-
-    const baseRaw = inst.getNoteAt(hovered.string - 1, hovered.fret);
-    if (!baseRaw) return [];
-
-    const baseIndex = baseRaw.index;
-    const results = [];
-
-    // ----- MODE T : pitch-class, ignorer le sens -----
-    if (octaveShown === "T") {
-        const targetIndex = ((baseIndex + interval) % 12 + 12) % 12;
-
-        for (let s = 0; s < g.strings.length; s++) {
-            for (let f = 0; f <= g.fretCount; f++) {
-                const raw = inst.getNoteAt(s, f);
-                if (raw && raw.index === targetIndex) {
-                    results.push({
-                        string: s + 1,
-                        fret: f,
-                        midi: raw.midi
-                    });
-                }
-            }
-        }
+            const pos = T.findNoteOnStringByMidi(targetString - 1, item.finalMidi);
+            if (pos) results.push(pos);
+        });
 
         return results;
     }
 
-    // ----- MODE normal : note exacte ± octaves -----
-    const directional = this.computeDirectionalInterval(interval, way);
-
-    //  ICI : on génère les shifts pour TOUS les intervalles, y compris 0
-    const shifts = [0];
-    if (octaveShown === "2") shifts.push(1, -1);
-    if (octaveShown === "3") shifts.push(1, 2, -1, -2);
-
-    for (let k of shifts) {
-        const occ = this.findOccurrence(hovered, directional, k);
-        results.push(...occ);
-    }
-
-    return results;
-}
-
-
-
-
-
-
-computeDirectionalInterval(interval, way) {
-    if (way === "up") return interval;
-    return interval - 12; // descendre = même note, octave plus bas
-}
-
-
-
     // ------------------------------------------------------------
-    // MODE 1 : OneString (COMPLET)
+    // MODE MULTI-OCTAVES (|octaveShown| ≠ 1)
+    // → way ignoré
+    // → octaveShown ignoré
+    // → root comprise
+    // → toutes les octaves
+    // → toutes les cordes sauf la corde de départ
+    // → ON PUSH DES POSITIONS BRUTES (comme ton exemple)
     // ------------------------------------------------------------
-dispatchOneString(intervals, hovered, way, octaveShown) {
 
     const results = [];
 
-    // 🔥 injecter la root si on est en mode multi-octave
-    let intervalsToUse = intervals;
-    const multiOctave = (octaveShown === "2" || octaveShown === "3" || octaveShown === "T");
+    for (let interval of intervals) {
 
-    if (multiOctave && !intervalsToUse.includes(0)) {
-        intervalsToUse = [0, ...intervalsToUse];
-    }
+        const midiNeutral = T.intervalToMidi(startMidi, interval);
 
-    for (let interval of intervalsToUse) {
+        // 0 = pitch-class complet → toutes les octaves
+        const allMidis = T.findOctavedMidi(midiNeutral, 0);
 
-        const all = this.findAllOccurrences(hovered, interval, way, octaveShown);
+        for (let m of allMidis) {
+            for (let s = 0; s < T.tuning.length; s++) {
 
-        const sameString = all.filter(n => n.string === hovered.string);
-
-        const final = (octaveShown === "T")
-            ? sameString
-            : sameString.filter(n =>
-                way === "up"
-                    ? n.fret >= hovered.fret
-                    : n.fret <= hovered.fret
-            );
-
-        results.push(...final);
+                const pos = T.findNoteOnStringByMidi(s, m);
+                if (pos) {
+                    results.push(pos);   // <-- EXACTEMENT CE QUE TU VEUX
+                }
+            }
+        }
     }
 
     return results;
 }
 
 
-dispatchBox(intervals, hovered, way, octaveShown, minDf, maxDf) {
 
+
+    // ------------------------------------------------------------
+    // BOX GENERIQUE
+    // ------------------------------------------------------------
+dispatchBox(intervals, hovered, way, octaveShown, minDf, maxDf) {
+    const T = this.g.app.instrument;
     const results = [];
 
     const minFret = hovered.fret + minDf;
     const maxFret = hovered.fret + maxDf;
 
+    const base = T.getNoteAt(hovered.string - 1, hovered.fret);
+    if (!base) return results;
+
+    const startMidi = base.midi;
+
+    // Toujours inclure la root
+    results.push({
+        string: hovered.string,
+        fret: hovered.fret,
+        note: base
+    });
+
+    // direction d’octave (même logique que OneString)
+    const octave =
+        octaveShown === "T"
+            ? 0
+            : octaveShown * (way === "up" ? 1 : -1);
+
     for (let interval of intervals) {
 
-        // 1. Toutes les occurrences
-        const all = this.findAllOccurrences(hovered, interval, way, octaveShown);
+        const midiNeutral = T.intervalToMidi(startMidi, interval);
 
-        // 2. Filtre des cordes selon le sens
-        let filtered;
 
-        if (octaveShown === "T") {
-            // Mode T → ignore le sens
-            filtered = all;
-        } else {
-            filtered = all.filter(n =>
-                way === "up"
-                    ? n.string >= hovered.string   // cordes aigües (ton système)
-                    : n.string <= hovered.string   // cordes graves
-            );
+        const octaved = T.findOctavedMidi(midiNeutral, octave);
+
+        for (let m of octaved) {
+            for (let s = 0; s < T.tuning.length; s++) {
+
+                const pos = T.findNoteOnStringByMidi(s, m);
+                if (!pos) continue;
+
+                // Filtre direction (sauf mode T)
+                if (octaveShown !== "T") {
+                    if (way === "up" && pos.string < hovered.string) continue;
+                    if (way === "down" && pos.string > hovered.string) continue;
+                }
+
+                // Filtre frettes
+                if (pos.fret < minFret || pos.fret > maxFret) continue;
+
+                results.push(pos);
+            }
         }
-
-        // 3. Filtre des frettes selon la fenêtre
-        filtered = filtered.filter(n =>
-            n.fret >= minFret && n.fret <= maxFret
-        );
-
-        results.push(...filtered);
     }
 
     return results;
@@ -230,78 +213,55 @@ dispatchBox(intervals, hovered, way, octaveShown, minDf, maxDf) {
 
 
 
-dispatchBoxR(intervals, hovered, way, octaveShown) {
-    return this.dispatchBox(intervals, hovered, way, octaveShown, -1, +3);
-}
+
+    dispatchBoxR(intervals, hovered, way, octaveShown) {
+        return this.dispatchBox(intervals, hovered, way, octaveShown, -1, +3);
+    }
+
+    dispatchBoxL(intervals, hovered, way, octaveShown) {
+        return this.dispatchBox(intervals, hovered, way, octaveShown, -3, +0);
+    }
 
 
-dispatchBoxL(intervals, hovered, way, octaveShown) {
-    return this.dispatchBox(intervals, hovered, way, octaveShown, -3, +0);
-}
 
-filterOneNotePerString(notes, hovered) {
 
-    const bestPerString = new Map();
 
-    for (const n of notes) {
 
-        const existing = bestPerString.get(n.string);
 
-        if (!existing) {
-            bestPerString.set(n.string, n);
-            continue;
+    // ------------------------------------------------------------
+    // DIAGONAL
+    // ------------------------------------------------------------
+    dispatchDiagonal(intervals, hovered, way, octaveShown) {
+        const T = this.g.app.instrument;
+
+        let results = [];
+        let currentRoot = hovered;
+
+        for (let i = 0; i < octaveShown; i++) {
+
+            // 1. Box locale
+            const part = this.dispatchBox(
+                intervals,
+                currentRoot,
+                way,
+                true,
+                way === 'up' ? -1 : -4,
+                way === 'up' ? +3 : 0
+            );
+
+            results = results.concat(part);
+
+            // 2. Octave géométrique
+            const nextRoot = T.computeGeometricOctave(currentRoot, way);
+            if (!nextRoot) break;
+
+            currentRoot = nextRoot;
         }
 
-        // garder la note la plus proche de hovered
-        const dNew = Math.abs(n.fret - hovered.fret);
-        const dOld = Math.abs(existing.fret - hovered.fret);
-
-        if (dNew < dOld) {
-            bestPerString.set(n.string, n);
-        }
+        return results;
     }
 
-    return Array.from(bestPerString.values());
-}
-
-dispatchChord(intervals, hovered, way, octaveShown) {
-
-    // Fenêtre standard
-    let min = 0;
-    let max = 3;
-
-    // Ajustement spécifique corde B (string 5)
-    const isBString = hovered.string === 5;
-    const B_OFFSET_MIN = -1;
-    const B_OFFSET_MAX = 3;
-
-    if (isBString) {
-        min = B_OFFSET_MIN;
-        max = B_OFFSET_MAX;
-    }
-    //  élargissement spécial pour 1 octave
-    if (octaveShown === "1") {
-        min -= 3;   // capture tierce basse
-        max += 2;   // capture tierce haute
-    }
-    // Si on descend → on inverse la fenêtre
-    if (way === "down") {
-        [min, max] = [-max, isBString ? 0 : -min];
-    }
-
-    const notes = this.dispatchBox(
-        intervals,
-        hovered,
-        way,
-        octaveShown,
-        min,
-        max
-    );
-
-    return this.filterOneNotePerString(notes, hovered);
-}
-
-computeGeometricOctave(root, way) {
+    computeGeometricOctave(root, way) {
 
     const inst = this.g.app.instrument;
 
@@ -351,138 +311,65 @@ computeGeometricOctave(root, way) {
 }
 
 
-dispatchDiagonal(intervals, hovered, way, octaveShown) {
+    // ------------------------------------------------------------
+    // 3NPS
+    // ------------------------------------------------------------
+dispatch3NPS(intervals, hovered, way, octaveShown = 1) {
+    const T = this.g.app.instrument;
+    const results = [];
 
-    let results = [];
-    let currentRoot = hovered;
+    const base = T.getNoteAt(hovered.string - 1, hovered.fret);
+    if (!base) return results;
 
-    for (let i = 0; i < octaveShown; i++) {
+    const startMidi = base.midi;
 
-        // 1. BoxR sur la root actuelle
-        const part = this.dispatchBox(intervals, currentRoot, way, true, way =='up' ? -1 : -4, way =='up' ? +3 : 0);
-        results = results.concat(part);
+    // octaveShown = bande d’octave, toujours positif ici
+    const octave =
+        octaveShown === "T"
+            ? 0
+            : octaveShown;
 
-        // 2. Calcul de l’octave géométrique
-        const nextRoot = this.computeGeometricOctave(currentRoot, way);
+    const step = way === "up" ? +1 : -1;
 
-        // si plus de diagonale possible → on arrête
-        if (!nextRoot) break;
+    // séquence neutre, toujours POSITIVE (0, 4, 7, 12, 16, 19, etc.)
+    const seq = [];
+    for (let o = 0; o < octaveShown; o++) {
+        for (let interval of intervals) {
+            seq.push(interval + 12 * o);
+        }
+    }
 
-        currentRoot = nextRoot;
+    let currentString = hovered.string;
+    let notesOnString = 0;
+
+    for (let interval of seq) {
+
+        if (currentString < 1 || currentString > T.tuning.length)
+            break;
+
+        //  ICI on met le SENS
+        const signedInterval = (way === "up" ? interval : -interval);
+
+        const midiNeutral = T.intervalToMidi(startMidi, signedInterval);
+        const octaved = T.findOctavedMidi(midiNeutral, octave);
+        const finalMidi = octaved[0];
+
+        const pos = T.findNoteOnStringByMidi(currentString - 1, finalMidi);
+        if (!pos) continue;
+
+        results.push(pos);
+        notesOnString++;
+
+        if (notesOnString === 3) {
+            currentString += step;
+            notesOnString = 0;
+        }
     }
 
     return results;
 }
 
-dispatch3NPS(intervals, hovered, way, octaveShown) {
 
-    if (octaveShown === "T") {
-
-        // UP indépendant
-        const up = this.dispatch3NPSCore(
-            intervals,
-            hovered,
-            "up",
-            "2",
-            0 // compteur initial
-        );
-
-        // DOWN indépendant, mais avec le compteur restant
-        const down = this.dispatch3NPSCore(
-            intervals,
-            hovered,
-            "down",
-            "2",
-            up.endCount // compteur restant de la corde de départ
-        );
-
-        return [...up.results, ...down.results];
-    }
-
-    // cas normal
-    return this.dispatch3NPSCore(
-        intervals,
-        hovered,
-        way,
-        octaveShown,
-        0
-    ).results;
-}
-
-
-
-dispatch3NPSCore(intervals, hovered, way, octaveShown, startCount) {
-
-    const g = this.g;
-    const inst = g.app.instrument;
-
-    const baseRaw = inst.getNoteAt(hovered.string - 1, hovered.fret);
-    if (!baseRaw) return { results: [], endCount: startCount };
-
-    const maxFret = g.fretCount;
-    const results = [];
-
-    const ds = (way === "up" ? +1 : -1);
-
-    // corde de départ = hovered.string (0-based)
-    let currentString = hovered.string - 1;
-
-    // compteur paramétré
-    let notesOnString = startCount;
-
-    // 1) Construire la séquence linéaire de cibles (intervals × octaves)
-    let octaveCount = 1;
-    if (octaveShown === "2") octaveCount = 2;
-    if (octaveShown === "3") octaveCount = 3;
-
-    const targets = [];
-
-    for (let o = 0; o < octaveCount; o++) {
-        for (let interval of intervals) {
-
-            const directional =
-                way === "up"
-                    ? interval + 12 * o
-                    : -(interval + 12 * o);
-
-            const targetMidi = baseRaw.midi + directional;
-            targets.push(targetMidi);
-        }
-    }
-
-    // 2) Dérouler la séquence sur le manche : 3 notes max par corde
-    for (let targetMidi of targets) {
-
-        if (currentString < 0 || currentString >= inst.tuning.length)
-            break;
-
-        let found = null;
-
-        for (let f = 0; f <= maxFret; f++) {
-            const raw = inst.getNoteAt(currentString, f);
-            if (raw && raw.midi === targetMidi) {
-                found = {
-                    string: currentString + 1,
-                    fret: f,
-                    midi: raw.midi
-                };
-                break;
-            }
-        }
-
-        if (found) {
-            results.push(found);
-            notesOnString++;
-
-            if (notesOnString >= 3) {
-                currentString += ds;
-                notesOnString = 0;
-            }
-        }
-    }
-
-    return { results, endCount: notesOnString };
-}
 
 
 
