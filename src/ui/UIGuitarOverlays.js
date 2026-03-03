@@ -649,43 +649,89 @@ const list = this.intervalDispatcher
         text("+", x, y);
     }
 
+    
 drawCAGEDOverlay() {
     const g = this.g;
     const h = g.hoveredNote;
     if (!h) return;
 
-    // mapping corde → texte (1 = grave)
+    // mapping corde → 2 lettres
     const map = {
-        1: "G E", // E grave
-        2: "C A", // A
-        3: "E D", // D
-        4: "A G", // G
-        5: "D C", // B
-        6: "G E"  // E aigu
+        1: ["G", "E"],
+        2: ["C", "A"],
+        3: ["E", "D"],
+        4: ["A", "G"],
+        5: ["D", "C"],
+        6: ["G", "E"]
     };
 
-    const txt = map[h.string];
-    if (!txt) return;
+    const pair = map[h.string];
+    if (!pair) return;
 
-    // position horizontale = fret hover
-    const pos = g.toScreen(h.fret, h.string);
-    if (!pos) return;
+    // géométrie de la case hover
+    const fretCase = g.cases[h.fret];
+    if (!fretCase) return;
 
-    // position verticale = centre du manche (fixe)
-    const centerY = g.y + g.h / 1.7;
+    const splitX = fretCase.xc;   // séparation FIXE au centre de la case
+    const fretW  = fretCase.width;
+
+    // position verticale (centre du manche)
+    const y = g.y + g.h / 2;
+
+    // largeur par lettre
+    const letterWidth = (L) =>
+        (L === "G" || L === "C" || L === "D")
+            ? fretW * 3
+            : fretW * 2;
+
+    const wLeft  = letterWidth(pair[0]);
+    const wRight = letterWidth(pair[1]);
+
+    // petit espace entre les deux blocs
+    const gap = fretW * 0.15;
+
+    // positions
+    const xLeft  = splitX - wLeft - gap / 2;
+    const xRight = splitX + gap / 2;
+
+    // limites du manche
+    const minX = g.x;
+    const maxX = g.x + g.w;
+
+    // tests de visibilité
+    const leftVisible  = (xLeft  >= minX) && (xLeft  + wLeft  <= maxX);
+    const rightVisible = (xRight >= minX) && (xRight + wRight <= maxX);
 
     push();
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
-    fill(255, 0, 0, 60);
     noStroke();
 
-    // taille proportionnelle au manche
-    textSize(g.getThickness() *1.3  );
+    if (leftVisible)  drawBlock(pair[0], xLeft,  y, wLeft);
+    if (rightVisible) drawBlock(pair[1], xRight, y, wRight);
 
-    text(txt, pos.x, centerY);
     pop();
+
+    // --- bloc rectangulaire + lettre ---
+    function drawBlock(letter, x, y, w) {
+        const hRect = g.getThickness();
+
+        // rectangle discret (gris clair translucide)
+        fill(255, 255, 255, 85);
+        rectMode(CORNER);
+        rect(x, y - hRect/2, w, hRect, hRect * 0.2);
+
+        // lettre assombrie (gris foncé)
+        noFill();
+        stroke(40, 40, 40, 200);
+        textSize(hRect * 0.8);
+        text(letter, x + w/2, y);
+        noStroke();
+    }
 }
+
+
+
 
 
     // ------------------------------------------------------------
@@ -693,7 +739,10 @@ drawCAGEDOverlay() {
     // ------------------------------------------------------------
     draw() {
         const g = this.g;
-this.drawCAGEDOverlay();
+
+        if (g.cagedOV)
+            this.drawCAGEDOverlay();
+
         // 1) Marker (sous les notes)
         this.drawMarkedSegments();
         this.drawMarkerHoverDot();

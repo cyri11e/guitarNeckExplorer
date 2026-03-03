@@ -491,5 +491,64 @@ guitar.invalidate();
     guitar.invalidate();
 },
 
+// ============================================================
+// KNOB MULTI CURSOR → presets automatiques
+// ============================================================
+(components, source, newState) => {
+
+    if (source.name !== "knobMultiCursor") return;
+
+    const guitar   = components.find(c => c.name === "guitar1");
+    const knobDeg  = components.find(c => c.name === "knob13457");
+    const knobOct  = components.find(c => c.name === "knobOctaves");
+    const metalWay = components.find(c => c.name === "metalWay");
+
+    if (!guitar || !knobDeg || !knobOct || !metalWay) return;
+
+    // --- ACCORD (index 1) ---
+    if (newState === 1) {
+        knobDeg.state = 1;  // Triade
+        knobOct.state = 1;  // 2 octaves
+        guitar.invalidate();
+        return;
+    }
+
+    // --- BOX (index 2 ou 3) ---
+    if (newState === 2 || newState === 3) {
+        knobDeg.state = 3;  // Pentatonique
+        knobOct.state = 1;  // 2 octaves
+        metalWay.state = 1; // ascendant
+        guitar.invalidate();
+        return;
+    }
+
+    // --- 3NPS (4) ou DIAGONAL (5) ---
+    if (newState === 4 || newState === 5) {
+        knobDeg.state = 4;  // Diatonique
+        knobOct.state = 1;  // 2 octaves
+        metalWay.state = 1; // ascendant
+        guitar.invalidate();
+        return;
+    }
+},
+
+// ============================================================
+// METALSWITCH CAGED → active/désactive le mode CAGED Overlay
+// ============================================================
+(components, source, newState) => {
+
+    const sw = components.find(c => c.name === "metalCAGED");
+    if (source !== sw) return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // newState = 1 → ON (topLabel)
+    // newState = 0 → OFF (bottomLabel)
+    guitar.cagedOV = (newState === 1);
+
+    guitar.invalidate();
+},
+
 
 ];

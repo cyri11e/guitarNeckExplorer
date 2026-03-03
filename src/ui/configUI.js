@@ -45,7 +45,8 @@ harmonyPanel: {
         "knobMultiCursor",
         "metalWay",
         "knobOctaves",
-        "knobInversions"
+        "knobInversions",
+        "metalCAGED"
     ]
 },
 
@@ -267,10 +268,21 @@ metalWay: {
     sp: 100,     // % de la hauteur du panel
     topLabel: "↗",
     bottomLabel: "↙",
-    shortcutKey: "u",
     defaultState: 1,   // ← ON par défaut
     shortcutKey: "u",
     description: "sens de progression"
+},
+
+metalCAGED: {
+    name: "CAGED",
+    type: "metalSwitch",
+    sp: 100,     // % de la hauteur du panel
+    topLabel: "caged",
+    bottomLabel: "off",
+    aspectRatio: 1,
+    defaultState: 1,   // ← ON par défaut
+    shortcutKey: "q",
+    description: "box caged"
 },
     panel2: {
         type: "panel",

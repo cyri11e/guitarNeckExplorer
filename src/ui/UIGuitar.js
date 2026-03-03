@@ -84,6 +84,9 @@ class Guitar extends UIComponent {
         this.markerSegments = [];
         this.markerPendingPoint = null;
         this.markerColor = color(255, 0, 0);
+
+        // --- overlays caged ----
+        this.cagedOV = false
     }
 
     // ------------------------------------------------------------
