@@ -280,7 +280,7 @@ metalCAGED: {
     topLabel: "caged",
     bottomLabel: "off",
     aspectRatio: 1,
-    defaultState: 1,   // ← ON par défaut
+    defaultState: 0,   // ← ON par défaut
     shortcutKey: "q",
     description: "box caged"
 },

@@ -503,6 +503,10 @@ guitar.invalidate();
     const knobOct  = components.find(c => c.name === "knobOctaves");
     const metalWay = components.find(c => c.name === "metalWay");
 
+    const swCAGED = components.find(c => c.name === "metalCAGED");
+    if (swCAGED) swCAGED.setState(1); // ACTIVE CAGED
+
+
     if (!guitar || !knobDeg || !knobOct || !metalWay) return;
 
     // --- ACCORD (index 1) ---
@@ -527,6 +531,7 @@ guitar.invalidate();
         knobDeg.state = 4;  // Diatonique
         knobOct.state = 1;  // 2 octaves
         metalWay.state = 1; // ascendant
+
         guitar.invalidate();
         return;
     }

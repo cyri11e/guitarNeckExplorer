@@ -14,7 +14,7 @@ class GuitarStyle {
             
             color("#0fde32"),  //P4 vert
             color("#42b5c7"),  // TT bleu vert
-            color("#1344e4"),   //P5 bleu
+            color("#3863f1"),   //P5 bleu
 
             color("#ae48da"),  // m6
             color("#860ce3"),  //M6

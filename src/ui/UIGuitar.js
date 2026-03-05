@@ -245,33 +245,41 @@ setNextIntervalMode() {
         };
     }
 
-    fromScreen(x, y) {
-        let fret = null;
-        let string = null;
+fromScreen(x, y) {
 
-        for (const c of this.cases) {
-            if (x >= c.x1 && x <= c.x2) {
-                fret = c.index;
-                break;
-            }
+    // 1) Vérifier que la souris est VRAIMENT dans le manche
+    const neck = this.getNeckRect();
+    if (x < neck.x || x > neck.x + neck.w) return null;
+    if (y < neck.y || y > neck.y + neck.h) return null;
+
+    // 2) Trouver la case
+    let fret = null;
+    for (const c of this.cases) {
+        if (x >= c.x1 && x <= c.x2) {
+            fret = c.index;
+            break;
         }
-
-        let bestDy = Infinity;
-        for (const s of this.strings) {
-            const dy = Math.abs(y - s.y);
-            if (dy < bestDy) {
-                bestDy = dy;
-                string = s.index;
-            }
-        }
-
-        if (fret == null || string == null) return null;
-
-        this.hoveredNote = { fret, string };
-        this.invalidate();
-
-        return this.hoveredNote;
     }
+
+    // 3) Trouver la corde
+    let string = null;
+    let bestDy = Infinity;
+    for (const s of this.strings) {
+        const dy = Math.abs(y - s.y);
+        if (dy < bestDy) {
+            bestDy = dy;
+            string = s.index;
+        }
+    }
+
+    if (fret == null || string == null) return null;
+
+    this.hoveredNote = { fret, string };
+    this.invalidate();
+
+    return this.hoveredNote;
+}
+
 
     highlightNote(pc) {
         this.highlighted = this.getPositionsForPitchClass(pc)

@@ -128,6 +128,7 @@ dispatchChord(intervals, hovered, way, octaveShown = 1) {
     // → ON PUSH DES POSITIONS BRUTES (comme ton exemple)
     // ------------------------------------------------------------
 
+
     const results = [];
 
     for (let interval of intervals) {
@@ -147,6 +148,40 @@ dispatchChord(intervals, hovered, way, octaveShown = 1) {
             }
         }
     }
+
+// ------------------------------------------------------------
+// MODE CHORD + 2 OCTAVES → limiter à la zone CAGED
+// ------------------------------------------------------------
+if (Math.abs(octaveShown) === 2) {
+
+    // 1) mapping corde → shapes
+    const map = {
+        1: ["G", "E"],
+        2: ["C", "A"],
+        3: ["E", "D"],
+        4: ["A", "G"],
+        5: ["D", "C"],
+        6: ["G", "E"]
+    };
+
+    const pair = map[hovered.string];
+    if (pair) {
+
+        // 2) largeur shape
+        const shapeWidth = L =>
+            (L === "G" || L === "C" || L === "D") ? 3 : 2;
+
+        const leftW  = shapeWidth(pair[0]);
+        const rightW = shapeWidth(pair[1]);
+
+        // 3) zone de frettes autorisée
+        const minFret = hovered.fret - leftW;
+        const maxFret = hovered.fret + rightW;
+
+        // 4) filtrage
+        return T.filterByFrets(results, minFret, maxFret);
+    }
+}  
 
     return results;
 }
