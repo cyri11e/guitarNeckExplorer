@@ -17,7 +17,8 @@ const UI_CONFIG = {
             "metalSwitch1",
             "metalSwitchENFR",
             "metalWood",
-            "knobInlays"
+            "knobInlays",
+            "metalCAGED"
         ]
     },
 
@@ -35,6 +36,7 @@ harmonyPanel: {
 
     children: [
         "knob13457",
+        "lcd1",
         "switchDeg1",
         "switchDeg2",
         "switchDeg3",
@@ -42,14 +44,42 @@ harmonyPanel: {
         "switchDeg5",
         "switchDeg6",
         "switchDeg7",
-        "knobMultiCursor",
-        "metalWay",
-        "knobOctaves",
-        "knobInversions",
-        "metalCAGED"
+
+        
     ]
 },
 
+// PANEL type de vue curseur
+cursorPanel: {
+    type: "panel",
+    xp: 50,
+    yp: 75,
+    sp: 20,
+    aspectRatio: 1.2,
+    visible: true,
+    isDraggable: true,
+    isZoomable: true,
+    toggleOnClick: true,
+
+    children: [
+        "knobMultiCursor",
+        "metalWay",
+        "knobOctaves",
+        "knobInversions"        
+    ]
+},
+
+lcd1: {
+    type: "lcdSelector",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    aspectRatio: 1.8,
+    items: ["A", "B", "C", "D", "E"],
+    isOn: false,
+    shortcutKey: "l",
+    description: "Sélecteur LCD"
+},
 
 
 // --- KNOB 2 : Type d’accord ---
@@ -286,7 +316,7 @@ metalCAGED: {
 },
     panel2: {
         type: "panel",
-        xp: 60,
+        xp: 80,
         yp: 55,
         sp: 40,
         aspectRatio: 1.2,

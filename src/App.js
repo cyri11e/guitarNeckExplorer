@@ -57,6 +57,11 @@ class App {
                     comp = new MarkerSelector(cfg); 
                     break;    
 
+                case "lcdSelector":
+                    comp = new LCDSelector(cfg); 
+                    break; 
+
+
                 case "switch":
                     comp = new Switch(cfg); 
                     break; 

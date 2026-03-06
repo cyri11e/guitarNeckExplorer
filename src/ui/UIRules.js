@@ -406,9 +406,8 @@ guitar.invalidate();
 
     if (source.name !== "knob13457") return;
 
-    // Récupérer tous les switchDeg1..7
     const switches = components.filter(c => c.name.startsWith("switchDeg"));
-    if (switches.length === 0) return;
+    const lcd = components.find(c => c.name === "lcd1");
 
     const set = (deg, state) => {
         const sw = switches.find(s => s.name === "switchDeg" + deg);
@@ -422,28 +421,33 @@ guitar.invalidate();
     switch (newState) {
 
         case 0: // "1" / Unique
-            // tout OFF → rien à faire
+            // Éteindre le LCD aussi
+            if (lcd) {
+                lcd.setOnOff(false);
+                lcd.setItems([]);
+                lcd.setIndex(0);
+            }
             break;
 
-        case 1: // "3" / Triade
+        case 1: // Triade
             set(3, 1);
             set(5, 1);
             break;
 
-        case 2: // "4" / Tetrade
+        case 2: // Tetrade
             set(3, 1);
             set(5, 1);
             set(7, 1);
             break;
 
-        case 3: // "5" / Pentatonique
+        case 3: // Pentatonique
             set(2, 1);
             set(3, 1);
             set(5, 1);
             set(6, 1);
             break;
 
-        case 4: // "7" / Diatonique
+        case 4: // Diatonique
             set(2, 1);
             set(3, 1);
             set(4, 1);
@@ -453,6 +457,7 @@ guitar.invalidate();
             break;
     }
 },
+
 
 // KNOB OCTAVES → met à jour g.octaveShown
 (components, source, newState) => {
@@ -555,5 +560,370 @@ guitar.invalidate();
     guitar.invalidate();
 },
 
+// ============================================================
+// KNOB13457 → met à jour LCD1 en mode Triade
+// ============================================================
+(components, source, newState) => {
+
+    // On ne réagit qu'au knob13457
+    if (source.name !== "knob13457") return;
+
+    // Triade = index 1
+    if (newState !== 1) return;
+
+    // Trouver le LCD
+    const lcd = components.find(c => c.name === "lcd1");
+    if (!lcd) return;
+
+    // Mise à jour du LCD
+    lcd.setItems(["Majeur", "Mineur", "Diminué", "Augmenté"]);
+    lcd.setOnOff(true);   // l’allumer si tu veux
+    lcd.setIndex(0);      // revenir au premier item
+
+    lcd.invalidate();
+},
+
+// ============================================================
+// LCD1 → synchronise tierce (switchDeg3) + quinte (switchDeg5)
+// ============================================================
+(components, source, newState) => {
+
+    if (source.name !== "lcd1") return;
+
+    const lcd = source;
+    const value = lcd.items[newState];
+
+    const sw3 = components.find(c => c.name === "switchDeg3");
+    const sw5 = components.find(c => c.name === "switchDeg5");
+    if (!sw3 || !sw5) return;
+
+    // --- MAJEUR ---
+    if (value === "Majeur") {
+        if (sw3.state !== 1) sw3.setState(1); // 3
+        if (sw5.state !== 1) sw5.setState(1); // 5
+        return;
+    }
+
+    // --- MINEUR ---
+    if (value === "Mineur") {
+        if (sw3.state !== 2) sw3.setState(2); // b3
+        if (sw5.state !== 1) sw5.setState(1); // 5
+        return;
+    }
+
+    // --- DIMINUÉ ---
+    if (value === "Diminué") {
+        if (sw3.state !== 2) sw3.setState(2); // b3
+        if (sw5.state !== 2) sw5.setState(2); // b5
+        return;
+    }
+
+    // --- AUGMENTÉ ---
+    if (value === "Augmenté") {
+        if (sw3.state !== 1) sw3.setState(1); // 3
+        if (sw5.state !== 3) sw5.setState(3); // #5
+        return;
+    }
+},
+
+
+// ============================================================
+// LCD1 (tétrades) → synchronise tierce, quinte, septième
+// ============================================================
+// ============================================================
+// KNOB13457 (Tétrade) + LCD1 (tétrades)
+// ============================================================
+(components, source, newState) => {
+
+    const lcd = components.find(c => c.name === "lcd1");
+    const sw3 = components.find(c => c.name === "switchDeg3");
+    const sw5 = components.find(c => c.name === "switchDeg5");
+    const sw7 = components.find(c => c.name === "switchDeg7");
+    if (!lcd || !sw3 || !sw5 || !sw7) return;
+
+    // ------------------------------------------------------------
+    // 1) Quand le KNOB passe en mode TÉTRADE → charger les items
+    // ------------------------------------------------------------
+    if (source.name === "knob13457" && newState === 2) {
+
+        lcd.setItems(["Maj7", "7(dom)", "m7", "m7b5", "dim7", "mMaj7"]);
+        lcd.setOnOff(true);
+        lcd.setIndex(0);
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // 2) Quand le LCD change → interpréter l’accord
+    // ------------------------------------------------------------
+    if (source.name !== "lcd1") return;
+
+    const value = lcd.items[newState];
+
+    // --- MAJ7 ---
+    if (value === "Maj7") {
+        sw3.setState(1); // 3
+        sw5.setState(1); // 5
+        sw7.setState(1); // 7M
+        return;
+    }
+
+    // --- 7 (dominante) ---
+    if (value === "7(dom)") {
+        sw3.setState(1); // 3
+        sw5.setState(1); // 5
+        sw7.setState(2); // 7m
+        return;
+    }
+
+    // --- m7 ---
+    if (value === "m7") {
+        sw3.setState(2); // b3
+        sw5.setState(1); // 5
+        sw7.setState(2); // 7m
+        return;
+    }
+
+    // --- m7b5 ---
+    if (value === "m7b5") {
+        sw3.setState(2); // b3
+        sw5.setState(2); // b5
+        sw7.setState(2); // 7m
+        return;
+    }
+
+    // --- dim7 ---
+    if (value === "dim7") {
+        sw3.setState(2); // b3
+        sw5.setState(2); // b5
+        sw7.setState(4); // bb7 
+        return;
+    }
+
+    // --- mMaj7 ---
+    if (value === "mMaj7") {
+        sw3.setState(2); // b3
+        sw5.setState(1); // 5
+        sw7.setState(1); // 7M
+        return;
+    }
+},
+
+// ============================================================
+// KNOB13457 (Pentatonique) + LCD1 (pentas)
+// ============================================================
+// ============================================================
+// KNOB13457 (Pentatonique) + LCD1 (pentas) avec RESET
+// ============================================================
+(components, source, newState) => {
+
+    const lcd = components.find(c => c.name === "lcd1");
+    const sw3 = components.find(c => c.name === "switchDeg3");
+    const sw5 = components.find(c => c.name === "switchDeg5");
+    const sw7 = components.find(c => c.name === "switchDeg7");
+    const sw2 = components.find(c => c.name === "switchDeg2");
+    const sw4 = components.find(c => c.name === "switchDeg4");
+    const sw6 = components.find(c => c.name === "switchDeg6");
+    if (!lcd || !sw3 || !sw5 || !sw7) return;
+
+    // ------------------------------------------------------------
+    // 1) Quand KNOB13457 passe en mode PENTATONIQUE
+    // ------------------------------------------------------------
+    if (source.name === "knob13457" && newState === 3) { // ← ton index corrigé
+
+        lcd.setItems(["Maj Penta", "Min Penta"]);
+        lcd.setOnOff(true);
+        lcd.setIndex(0);
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // 2) Quand le LCD change → interpréter la penta
+    // ------------------------------------------------------------
+    if (source.name !== "lcd1") return;
+
+    const value = lcd.items[newState];
+
+
+    
+    // --- PENTATONIQUE MAJEURE ---
+    if (value === "Maj Penta") {
+        sw2.setState(1); // 2
+        sw3.setState(1); // 3
+        sw4.setState(0);
+        sw5.setState(1); // 5
+        sw6.setState(1); // 6
+        sw7.setState(0);
+        return;
+    }
+    
+    // --- PENTATONIQUE MINEURE ---
+    if (value === "Min Penta") {
+        sw2.setState(0);
+        sw3.setState(2); // b3
+        sw4.setState(1);
+        sw5.setState(1); // 5
+        sw6.setState(0);
+        sw7.setState(2); // b7
+        return;
+    }
+},
+
+// ============================================================
+// KNOB13457 (Diatonique) + LCD1 (modes)
+// ============================================================
+(components, source, newState) => {
+
+    const lcd = components.find(c => c.name === "lcd1");
+    const sw2 = components.find(c => c.name === "switchDeg2");
+    const sw3 = components.find(c => c.name === "switchDeg3");
+    const sw4 = components.find(c => c.name === "switchDeg4");
+    const sw5 = components.find(c => c.name === "switchDeg5");
+    const sw6 = components.find(c => c.name === "switchDeg6");
+    const sw7 = components.find(c => c.name === "switchDeg7");
+    if (!lcd || !sw2 || !sw3 || !sw4 || !sw5 || !sw6 || !sw7) return;
+
+    // ------------------------------------------------------------
+    // 1) Quand KNOB13457 passe en mode DIATONIQUE
+    // ------------------------------------------------------------
+    if (source.name === "knob13457" && newState === 4) {
+
+        lcd.setItems([
+            "Ionien",
+            "Dorien",
+            "Phrygien",
+            "Lydien",
+            "Mixolydien",
+            "Eolien",
+            "Locrien"
+        ]);
+
+        lcd.setOnOff(true);
+        lcd.setIndex(0);
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // 2) Quand le LCD change → interpréter le mode
+    // ------------------------------------------------------------
+    if (source.name !== "lcd1") return;
+
+    const value = lcd.items[newState];
+
+    // --- RESET ---
+    sw2.setState(0);
+    sw3.setState(0);
+    sw4.setState(0);
+    sw5.setState(0);
+    sw6.setState(0);
+    sw7.setState(0);
+
+    // --- IONIEN ---
+    if (value === "Ionien") {
+        sw2.setState(1);
+        sw3.setState(1);
+        sw4.setState(1);
+        sw5.setState(1);
+        sw6.setState(1);
+        sw7.setState(1);
+        return;
+    }
+
+    // --- DORIEN ---
+    if (value === "Dorien") {
+        sw2.setState(1);
+        sw3.setState(2);
+        sw4.setState(1);
+        sw5.setState(1);
+        sw6.setState(1);
+        sw7.setState(2);
+        return;
+    }
+
+    // --- PHRYGIEN ---
+    if (value === "Phrygien") {
+        sw2.setState(2);
+        sw3.setState(2);
+        sw4.setState(1);
+        sw5.setState(1);
+        sw6.setState(2);
+        sw7.setState(2);
+        return;
+    }
+
+    // --- LYDIEN ---
+    if (value === "Lydien") {
+        sw2.setState(1);
+        sw3.setState(1);
+        sw4.setState(3); // #4
+        sw5.setState(1);
+        sw6.setState(1);
+        sw7.setState(1);
+        return;
+    }
+
+    // --- MIXOLYDIEN ---
+    if (value === "Mixolydien") {
+        sw2.setState(1);
+        sw3.setState(1);
+        sw4.setState(1);
+        sw5.setState(1);
+        sw6.setState(1);
+        sw7.setState(2);
+        return;
+    }
+
+    // --- EOLIEN ---
+    if (value === "Eolien") {
+        sw2.setState(1);
+        sw3.setState(2);
+        sw4.setState(1);
+        sw5.setState(1);
+        sw6.setState(2);
+        sw7.setState(2);
+        return;
+    }
+
+    // --- LOCRIEN ---
+    if (value === "Locrien") {
+        sw2.setState(2);
+        sw3.setState(2);
+        sw4.setState(1);
+        sw5.setState(2); // b5
+        sw6.setState(2);
+        sw7.setState(2);
+        return;
+    }
+},
+
+
+// ============================================================
+// KNOB MULTI CURSOR → Active/désactive automatiquement CAGED
+// ============================================================
+(components, source, newState) => {
+
+    if (source.name !== "knobMultiCursor") return;
+
+    const swCAGED = components.find(c => c.name === "metalCAGED");
+    if (!swCAGED) return;
+
+    // newState :
+    // 0 = OneString
+    // 1 = Chord
+    // 2 = Box
+    // 3 = 3NPS
+    // 4 = Diagonal
+
+    // Modes où CAGED doit être OFF
+    if (newState === 0 || newState === 3 || newState === 4) {
+        if (swCAGED.state !== 0) swCAGED.setState(0);
+        return;
+    }
+
+    // Modes où CAGED doit être ON
+    if (newState === 1 || newState === 2) {
+        if (swCAGED.state !== 1) swCAGED.setState(1);
+        return;
+    }
+},
 
 ];

@@ -19,6 +19,11 @@ class MultiNotes {
             case "OneString":
                 return this.dispatchOneString(intervals, hovered, way, octaveShown);
 
+    case "Box":
+        return (way === "up")
+            ? this.dispatchBoxR(intervals, hovered, way, octaveShown)
+            : this.dispatchBoxL(intervals, hovered, way, octaveShown);
+
             case "BoxR":
                 return this.dispatchBoxR(intervals, hovered, way, octaveShown);
 
