@@ -525,7 +525,7 @@ guitar.invalidate();
     // --- BOX (index 2 ou 3) ---
     if (newState === 2 || newState === 3) {
         knobDeg.state = 3;  // Pentatonique
-        knobOct.state = 1;  // 2 octaves
+        knobOct.state = 2;  // 2 octaves
         metalWay.state = 1; // ascendant
         guitar.invalidate();
         return;
@@ -536,7 +536,7 @@ guitar.invalidate();
         knobDeg.state = 4;  // Diatonique
         knobOct.state = 1;  // 2 octaves
         metalWay.state = 1; // ascendant
-
+        if (swCAGED) swCAGED.setState(0);
         guitar.invalidate();
         return;
     }
@@ -582,49 +582,164 @@ guitar.invalidate();
 
     lcd.invalidate();
 },
+// ============================================================
+// KNOB13457 → presets automatiques + LCD
+// ============================================================
+(components, source, newState) => {
+
+    if (source.name !== "knob13457") return;
+
+    const switches = components.filter(c => c.name.startsWith("switchDeg"));
+    const lcd = components.find(c => c.name === "lcd1");
+
+    const set = (deg, state) => {
+        const sw = switches.find(s => s.name === "switchDeg" + deg);
+        if (sw && sw.state !== state) sw.setState(state);
+    };
+
+    // RESET DEGRÉS
+    for (let i = 1; i <= 7; i++) set(i, 0);
+
+    // --- UNIQUE ---
+    if (newState === 0) {
+        if (lcd) {
+            lcd.setOnOff(false);
+            lcd.setItems([]);
+            lcd.setIndex(0);
+        }
+        return;
+    }
+
+    // --- TRIADE ---
+    if (newState === 1) {
+        set(1, 1);
+        set(3, 1);
+        set(5, 1);
+
+        if (lcd) {
+            lcd.setItems(["Majeur", "Mineur", "Diminué", "Augmenté"]);
+            lcd.setOnOff(true);
+            lcd.setIndex(0);
+        }
+        return;
+    }
+
+    // --- TETRADE ---
+    if (newState === 2) {
+        set(1, 1);
+        set(3, 1);
+        set(5, 1);
+        set(7, 1);
+
+        if (lcd) {
+            lcd.setItems(["Maj7", "7(dom)", "m7", "m7b5", "dim7", "mMaj7"]);
+            lcd.setOnOff(true);
+            lcd.setIndex(0);
+        }
+        return;
+    }
+
+    // --- PENTATONIQUE ---
+    if (newState === 3) {
+        set(1, 1);
+        set(2, 1);
+        set(3, 1);
+        set(5, 1);
+        set(6, 1);
+
+        if (lcd) {
+            lcd.setItems(["Maj Penta", "Min Penta"]);
+            lcd.setOnOff(true);
+            lcd.setIndex(0);
+        }
+        return;
+    }
+
+    // --- DIATONIQUE ---
+    if (newState === 4) {
+        set(1, 1);
+        set(2, 1);
+        set(3, 1);
+        set(4, 1);
+        set(5, 1);
+        set(6, 1);
+        set(7, 1);
+
+        if (lcd) {
+            lcd.setItems([
+                "Ionien",
+                "Dorien",
+                "Phrygien",
+                "Lydien",
+                "Mixolydien",
+                "Eolien",
+                "Locrien"
+            ]);
+            lcd.setOnOff(true);
+            lcd.setIndex(0);
+        }
+        return;
+    }
+},
 
 // ============================================================
-// LCD1 → synchronise tierce (switchDeg3) + quinte (switchDeg5)
+// LCD1 (Triade) → synchronise tierce + quinte
 // ============================================================
 (components, source, newState) => {
 
     if (source.name !== "lcd1") return;
 
+    // On ne doit agir QUE si knob13457 = Triade
+    const knobDeg = components.find(c => c.name === "knob13457");
+    if (!knobDeg || knobDeg.state !== 1) return; // 1 = Triade
+
     const lcd = source;
+    //     // Mise à jour du LCD
+    lcd.setItems(["Majeur", "Mineur", "Diminué", "Augmenté"]);
+    lcd.setOnOff(true);   // l’allumer si tu veux
+    lcd.setIndex(0);      // revenir au premier item
     const value = lcd.items[newState];
 
+    const sw1 = components.find(c => c.name === "switchDeg1");
     const sw3 = components.find(c => c.name === "switchDeg3");
     const sw5 = components.find(c => c.name === "switchDeg5");
-    if (!sw3 || !sw5) return;
+
+    if (!sw1 || !sw3 || !sw5) return;
+
+    // RESET propre
+    sw1.setState(1); // root toujours ON en triade
+    sw3.setState(0);
+    sw5.setState(0);
 
     // --- MAJEUR ---
     if (value === "Majeur") {
-        if (sw3.state !== 1) sw3.setState(1); // 3
-        if (sw5.state !== 1) sw5.setState(1); // 5
+        sw3.setState(1); // 3
+        sw5.setState(1); // 5
         return;
     }
 
     // --- MINEUR ---
     if (value === "Mineur") {
-        if (sw3.state !== 2) sw3.setState(2); // b3
-        if (sw5.state !== 1) sw5.setState(1); // 5
+        sw3.setState(2); // b3
+        sw5.setState(1); // 5
         return;
     }
 
     // --- DIMINUÉ ---
     if (value === "Diminué") {
-        if (sw3.state !== 2) sw3.setState(2); // b3
-        if (sw5.state !== 2) sw5.setState(2); // b5
+        sw3.setState(2); // b3
+        sw5.setState(2); // b5
         return;
     }
 
     // --- AUGMENTÉ ---
     if (value === "Augmenté") {
-        if (sw3.state !== 1) sw3.setState(1); // 3
-        if (sw5.state !== 3) sw5.setState(3); // #5
+        sw3.setState(1); // 3
+        sw5.setState(3); // #5
         return;
     }
 },
+
 
 
 // ============================================================
@@ -899,31 +1014,31 @@ guitar.invalidate();
 // ============================================================
 // KNOB MULTI CURSOR → Active/désactive automatiquement CAGED
 // ============================================================
-(components, source, newState) => {
+// (components, source, newState) => {
 
-    if (source.name !== "knobMultiCursor") return;
+//     if (source.name !== "knobMultiCursor") return;
 
-    const swCAGED = components.find(c => c.name === "metalCAGED");
-    if (!swCAGED) return;
+//     const swCAGED = components.find(c => c.name === "metalCAGED");
+//     if (!swCAGED) return;
 
-    // newState :
-    // 0 = OneString
-    // 1 = Chord
-    // 2 = Box
-    // 3 = 3NPS
-    // 4 = Diagonal
+//     // newState :
+//     // 0 = OneString
+//     // 1 = Chord
+//     // 2 = Box
+//     // 3 = 3NPS
+//     // 4 = Diagonal
 
-    // Modes où CAGED doit être OFF
-    if (newState === 0 || newState === 3 || newState === 4) {
-        if (swCAGED.state !== 0) swCAGED.setState(0);
-        return;
-    }
+//     // Modes où CAGED doit être OFF
+//     if (newState === 0 || newState === 3 || newState === 4) {
+//         if (swCAGED.state !== 0) swCAGED.setState(0);
+//         return;
+//     }
 
-    // Modes où CAGED doit être ON
-    if (newState === 1 || newState === 2) {
-        if (swCAGED.state !== 1) swCAGED.setState(1);
-        return;
-    }
-},
+//     // Modes où CAGED doit être ON
+//     if (newState === 1 || newState === 2) {
+//         if (swCAGED.state !== 1) swCAGED.setState(1);
+//         return;
+//     }
+// },
 
 ];
