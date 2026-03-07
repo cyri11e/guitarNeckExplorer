@@ -1010,6 +1010,141 @@ guitar.invalidate();
     }
 },
 
+(components, source, newState) => {
+
+    if (source.name !== "snapshotBtn") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    const hasPinned   = guitar.pinnedNotes.length > 0;
+    const hasSelected = guitar.selectedNotes.length > 0;
+
+    if (!hasPinned && !hasSelected) {
+        console.log("Snapshot ignoré : aucune note sélectionnée.");
+        return;
+    }
+
+    // -----------------------------
+    // ROOT OU NOTE DE SECOURS
+    // -----------------------------
+    let rootLabel = null;
+    const mode = guitar.displayMode;
+
+    if (guitar.theory.hasRoot()) {
+
+        const lbl = guitar.theory.getNoteLabel(guitar.theory.root, mode);
+        rootLabel = lbl.base + lbl.alt;
+
+    } else {
+
+        let fallback = null;
+
+        if (guitar.selectedNotes.length > 0) {
+            fallback = guitar.selectedNotes[0];
+        } else if (guitar.pinnedNotes.length > 0) {
+            fallback = guitar.pinnedNotes[0];
+        }
+
+        if (fallback) {
+            const note = guitar.instrument.getNoteAt(fallback.string - 1, fallback.fret);
+            if (note) {
+                const lbl = guitar.theory.getNoteLabel(note.index, mode);
+                rootLabel = lbl.base + lbl.alt;
+            }
+        }
+    }
+
+    // -----------------------------
+    // TITRE
+    // -----------------------------
+    const index = guitar.snapshots.length + 1;
+
+    // lcd1 item si existe
+    let lcdItem = null;
+    const lcd1 = components.find(c => c.name === "lcd1");
+    if (lcd1 && lcd1.items && lcd1.items.length > 0) {
+        lcdItem = lcd1.items[lcd1.state] || null;
+    }
+    let title = rootLabel ? `${index} - ${rootLabel}` : `snapshot ${index}`;
+
+    if (lcdItem)   title += ` - ${lcdItem}`;
+
+
+
+    // -----------------------------
+    // SNAPSHOT
+    // -----------------------------
+    const snap = {
+        title,
+        pinnedNotes: [...guitar.pinnedNotes],
+        selectedNotes: [...guitar.selectedNotes],
+        root: guitar.theory.hasRoot() ? guitar.theory.root : null,
+        markerSegments: [...guitar.markerSegments]
+    };
+
+    guitar.snapshots.push(snap);
+
+    console.log("Snapshot ajouté :", snap);
+
+    // ============================================================
+    // SYNC LCD2 AVEC LA LISTE DES SNAPSHOTS
+    // ============================================================
+
+    const lcd2 = components.find(c => c.name === "lcd2");
+    if (!lcd2) return;
+
+    // 1) mettre à jour la liste
+    lcd2.items = guitar.snapshots.map(s => s.title);
+
+    // 2) allumer le LCD si éteint
+    lcd2.isOn = true;
+
+    // 3) sélectionner le dernier snapshot
+    lcd2.state = lcd2.items.length - 1;
+
+    // 4) rafraîchir
+    lcd2.invalidate();
+},
+
+
+(components, source, newState) => {
+
+    if (source.name !== "lcd2") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    // newState = index sélectionné dans le LCD
+    const snap = guitar.snapshots[newState];
+    if (!snap) return;
+
+    // -----------------------------
+    // RESTAURATION DIRECTE
+    // -----------------------------
+
+    // 1) root
+    if (snap.root !== null) {
+        guitar.theory.setRoot(snap.root);
+    } else {
+        guitar.theory.root = null;
+    }
+
+    // 2) pinnedNotes (réaffectation directe)
+    guitar.pinnedNotes = snap.pinnedNotes;
+
+    // 3) selectedNotes (réaffectation directe)
+    guitar.selectedNotes = snap.selectedNotes;
+
+    guitar.markerSegments = snap.markerSegments;    // 4) refresh
+    guitar.invalidate();
+
+    console.log("Snapshot restauré :", snap.title);
+}
+
+
+
+
 
 // ============================================================
 // KNOB MULTI CURSOR → Active/désactive automatiquement CAGED

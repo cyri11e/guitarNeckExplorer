@@ -69,6 +69,8 @@ cursorPanel: {
     ]
 },
 
+
+
 lcd1: {
     type: "lcdSelector",
     xp: 50,
@@ -405,8 +407,33 @@ markerSelector1: {
     description: "Mode Marker, Dessinez sur le manche"
 },
 
-
-
+snapshotPanel: {
+    type: "panel",
+    xp: 50,
+    yp: 55,
+    sp: 20,
+    aspectRatio: 1,
+    children: ["snapshotBtn","lcd2"]
+},
+snapshotBtn: {
+    type: "snapshotButton",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    shortcutKey: "s",
+    description: "Capture snapshot"
+},
+lcd2: {
+    type: "lcdSelector",
+    xp: 50,
+    yp: 50,
+    sp: 100,
+    aspectRatio: 1.8,
+    items: ["A", "B", "C", "D", "E"],
+    isOn: false,
+    shortcutKey: "F1",
+    description: "liste Snapshots"
+},
 
     // // Exemple futur : un knob
     // Knob_freq: {

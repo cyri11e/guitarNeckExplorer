@@ -1,0 +1,85 @@
+class SnapshotButton extends UIComponent {
+
+    constructor(cfg = {}) {
+        super();
+
+        this.aspectRatio = 1.0;
+
+        const xp = cfg.xp ?? 0;
+        const yp = cfg.yp ?? 0;
+        const sp = cfg.sp ?? 10;
+
+        this.setResponsive(xp, yp, sp);
+        this.updateResponsive();
+
+        // shortcut
+        this.shortcutKey  = cfg.shortcutKey  || " ";
+        this.shortcutCode = cfg.shortcutCode || 32;
+        this.description = cfg.description || null;
+
+        this._state = 0; // inutile mais harmonisé
+    }
+
+    // -----------------------------
+    // ÉTAT HARMONISÉ
+    // -----------------------------
+    get state() { return this._state; }
+    set state(v) {
+        this._state = v;
+        this.onChange?.(this._state);
+    }
+
+    // -----------------------------
+    // INTERACTION
+    // -----------------------------
+    onShortcut() {
+        this.trigger();
+    }
+
+    onClick() {
+        this.trigger();
+        return true;
+    }
+
+    trigger() {
+        // on émet juste un événement
+        this.state = this.state + 1; // incrément inutile mais harmonisé
+    }
+
+    containsRect(evt) {
+        return (
+            evt.x >= this.x &&
+            evt.x <= this.x + this.w &&
+            evt.y >= this.y &&
+            evt.y <= this.y + this.h
+        );
+    }
+
+    // -----------------------------
+    // RENDER
+    // -----------------------------
+    draw() {
+        super.draw();
+
+        // fond
+        fill(60);
+        stroke(200);
+        strokeWeight(2 * this.zoomFactor);
+        rect(this.x, this.y, this.w, this.h, this.h * 0.15);
+
+        // icône appareil photo
+        const cx = this.x + this.w * 0.5;
+        const cy = this.y + this.h * 0.5;
+        const r  = this.w * 0.25;
+
+        noStroke();
+        fill(230);
+        rect(cx - r, cy - r * 0.6, r * 2, r * 1.2, r * 0.2);
+
+        fill(80);
+        circle(cx, cy, r * 1.2);
+
+        fill(200);
+        circle(cx, cy, r * 0.6);
+    }
+}

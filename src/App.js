@@ -65,6 +65,10 @@ class App {
                 case "switch":
                     comp = new Switch(cfg); 
                     break; 
+
+                case "snapshotButton":
+                    comp = new SnapshotButton(cfg); 
+                    break;     
                     
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);

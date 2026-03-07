@@ -52,6 +52,7 @@ class Guitar extends UIComponent {
             // { fret: 3, string: 3 }
         ]; // { fret, string }
 
+        this.snapshots =[]
         //  Ajout : flag anti-clic-après-drag
         this.wasDragged = false;
 
