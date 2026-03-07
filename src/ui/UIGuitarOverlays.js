@@ -8,7 +8,7 @@ class GuitarOverlays {
         this.g = guitar;
         this.style = style;
         this.intervalDispatcher = new MultiNotes(this.g);
-
+        this.intervalOverlayNotes =[];
         this.intervalSelectorLabels = [
             "1",  // 0
             "b2", // 1
@@ -270,6 +270,13 @@ const list = this.intervalDispatcher
         g.octaveShown
       )
     : [];
+
+    //  Stockage global dans l’overlay
+    this.intervalOverlayNotes = list.map(n => ({
+        string: n.string,
+        fret: n.fret
+    }));
+
 
 
         for (let i = 0; i < list.length; i++) {

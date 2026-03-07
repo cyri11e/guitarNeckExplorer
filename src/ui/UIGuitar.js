@@ -621,71 +621,128 @@ fromScreen(x, y) {
         return false;
     }
 
-    keyPressed(k, kc) {
+keyPressed(k, kc) {
 
-        // --- PRIORITÉ : MODE MARKER → BACKSPACE = SLICE ---
-        if (this.markerMode) {
-            if (kc === BACKSPACE || kc === DELETE) {
-                if (this.markerSegments.length > 0) {
-                    this.markerSegments.pop();
-                    this.invalidate();
-                }
-                return true;
+    // --- PRIORITÉ : MODE MARKER ---
+    if (this.markerMode) {
+
+        if (kc === BACKSPACE) {
+            // efface le dernier segment
+            if (this.markerSegments.length > 0) {
+                this.markerSegments.pop();
+                this.invalidate();
             }
-            // pas d'autres shortcuts pour l’instant
-        }
-
-        // SHIFT : change l’aspect du hover
-        if (kc === SHIFT) {
-            this.shiftDown = true;
-            this.invalidate();
             return true;
         }
 
-        const usePinned = keyIsDown(SHIFT);
-
-        // --- BACKSPACE / DELETE (pinned / selected) ---
-        if (kc === BACKSPACE || kc === DELETE) {
-
-            if (usePinned) {
-                if (this.selectedNotes.length > 0) {
-                    this.selectedNotes.pop();
-                    this.invalidate();
-                }
-            } else {
-                if (this.pinnedNotes.length > 0) {
-                    this.pinnedNotes.pop();
-                    this.invalidate();
-                }
+        if (kc === DELETE) {
+            // efface tous les segments
+            if (this.markerSegments.length > 0) {
+                this.markerSegments = [];
+                this.invalidate();
             }
-
             return true;
         }
 
-        // --- ARROWS ---
-        switch (kc) {
-            case LEFT_ARROW:
-                if (usePinned) this.movePinnedFrets(-1);
-                else this.moveSelectedFrets(-1);
-                return true;
-
-            case RIGHT_ARROW:
-                if (usePinned) this.movePinnedFrets(+1);
-                else this.moveSelectedFrets(+1);
-                return true;
-
-            case UP_ARROW:
-                if (usePinned) this.movePinnedStrings(+1);
-                else this.moveSelectedStrings(+1);
-                return true;
-
-            case DOWN_ARROW:
-                if (usePinned) this.movePinnedStrings(-1);
-                else this.moveSelectedStrings(-1);
-                return true;
-        }
-
-        return false;
+        // pas d'autres shortcuts pour l’instant
     }
+
+    // SHIFT : change l’aspect du hover
+    if (kc === SHIFT) {
+        this.shiftDown = true;
+        this.invalidate();
+        return true;
+    }
+
+    const usePinned = keyIsDown(SHIFT);
+
+    // --- BACKSPACE / DELETE (pinned / selected) ---
+    if (kc === BACKSPACE) {
+
+        if (usePinned) {
+            // efface la dernière selected
+            if (this.selectedNotes.length > 0) {
+                this.selectedNotes.pop();
+                this.invalidate();
+            }
+        } else {
+            // efface la dernière pinned
+            if (this.pinnedNotes.length > 0) {
+                this.pinnedNotes.pop();
+                this.invalidate();
+            }
+        }
+
+        return true;
+    }
+
+    if (kc === DELETE) {
+
+        if (usePinned) {
+            // efface toutes les selected
+            if (this.selectedNotes.length > 0) {
+                this.selectedNotes = [];
+                this.invalidate();
+            }
+        } else {
+            // efface toutes les pinned
+            if (this.pinnedNotes.length > 0) {
+                this.pinnedNotes = [];
+                this.invalidate();
+            }
+        }
+
+        return true;
+    }
+
+    // --- ARROWS ---
+    switch (kc) {
+        case LEFT_ARROW:
+            if (!usePinned) this.movePinnedFrets(-1);
+            else this.moveSelectedFrets(-1);
+            return true;
+
+        case RIGHT_ARROW:
+            if (!usePinned) this.movePinnedFrets(+1);
+            else this.moveSelectedFrets(+1);
+            return true;
+
+        case UP_ARROW:
+            if (!usePinned) this.movePinnedStrings(+1);
+            else this.moveSelectedStrings(+1);
+            return true;
+
+        case DOWN_ARROW:
+            if (!usePinned) this.movePinnedStrings(-1);
+            else this.moveSelectedStrings(-1);
+            return true;
+    }
+
+if (kc === ENTER) {
+
+    const notes = this.overlays.intervalOverlayNotes || [];
+    if (notes.length === 0) return true;
+
+    const usePinned = !keyIsDown(SHIFT);
+
+    if (usePinned) {
+        for (const n of notes) {
+            this.pinnedNotes.push({ string: n.string, fret: n.fret });
+        }
+    } else {
+        for (const n of notes) {
+            this.selectedNotes.push({ string: n.string, fret: n.fret });
+        }
+    }
+
+    this.invalidate();
+    return true;
+}
+
+
+
+    return false;
+}
+
 
 }

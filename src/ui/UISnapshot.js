@@ -17,7 +17,10 @@ class SnapshotButton extends UIComponent {
         this.shortcutCode = cfg.shortcutCode || 32;
         this.description = cfg.description || null;
 
-        this._state = 0; // inutile mais harmonisé
+        // NOUVEAU : label optionnel
+        this.label = cfg.label || null;
+
+        this._state = 0;
     }
 
     // -----------------------------
@@ -42,8 +45,7 @@ class SnapshotButton extends UIComponent {
     }
 
     trigger() {
-        // on émet juste un événement
-        this.state = this.state + 1; // incrément inutile mais harmonisé
+        this.state = this.state + 1;
     }
 
     containsRect(evt) {
@@ -67,7 +69,21 @@ class SnapshotButton extends UIComponent {
         strokeWeight(2 * this.zoomFactor);
         rect(this.x, this.y, this.w, this.h, this.h * 0.15);
 
-        // icône appareil photo
+        // -----------------------------------------
+        // NOUVEAU : si label → on affiche le label
+        // -----------------------------------------
+        if (this.label) {
+            noStroke();
+            fill(230);
+            textAlign(CENTER, CENTER);
+            textSize(this.h * 0.55);
+            text(this.label, this.x + this.w * 0.5, this.y + this.h * 0.5);
+            return;
+        }
+
+        // -----------------------------------------
+        // Sinon → icône appareil photo (par défaut)
+        // -----------------------------------------
         const cx = this.x + this.w * 0.5;
         const cy = this.y + this.h * 0.5;
         const r  = this.w * 0.25;

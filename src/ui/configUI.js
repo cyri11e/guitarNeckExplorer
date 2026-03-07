@@ -413,7 +413,7 @@ snapshotPanel: {
     yp: 55,
     sp: 20,
     aspectRatio: 1,
-    children: ["snapshotBtn","lcd2"]
+    children: ["snapshotBtn","lcd2","playBtn","trashBtn"]
 },
 snapshotBtn: {
     type: "snapshotButton",
@@ -423,6 +423,23 @@ snapshotBtn: {
     shortcutKey: "s",
     description: "Capture snapshot"
 },
+trashBtn: {
+    type: "snapshotButton",
+    xp: 50,
+    yp: 50,
+    sp: 50,
+    label: '🗑️',
+    description: "delete snapshot"
+},
+playBtn: {
+    type: "snapshotButton",
+    xp: 50,
+    yp: 50,
+    sp: 50,
+    label:'▶',
+    shortcutKey: "p",
+    description: "play snapshot"
+},
 lcd2: {
     type: "lcdSelector",
     xp: 50,
@@ -431,7 +448,7 @@ lcd2: {
     aspectRatio: 1.8,
     items: ["A", "B", "C", "D", "E"],
     isOn: false,
-    shortcutKey: "F1",
+    shortcutKey: "",
     description: "liste Snapshots"
 },
 
