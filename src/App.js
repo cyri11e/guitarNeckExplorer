@@ -69,6 +69,10 @@ class App {
                 case "snapshotButton":
                     comp = new SnapshotButton(cfg); 
                     break;     
+        
+                case "bpmCtrl":
+                    comp = new BPMControl(cfg); 
+                    break;     
                     
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);

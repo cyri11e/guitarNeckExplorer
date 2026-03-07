@@ -413,7 +413,7 @@ snapshotPanel: {
     yp: 55,
     sp: 20,
     aspectRatio: 1,
-    children: ["snapshotBtn","lcd2","playBtn","trashBtn"]
+    children: ["snapshotBtn","lcd2","playBtn","loopBtn","trashBtn","bpmCtrl"]
 },
 snapshotBtn: {
     type: "snapshotButton",
@@ -437,7 +437,18 @@ playBtn: {
     yp: 50,
     sp: 50,
     label:'▶',
+    led: true,
     shortcutKey: "p",
+    description: "play snapshot"
+},
+loopBtn: {
+    type: "snapshotButton",
+    xp: 50,
+    yp: 50,
+    sp: 50,
+    label:'↺',
+    shortcutKey: "l",
+    led: true,
     description: "play snapshot"
 },
 lcd2: {
@@ -451,6 +462,19 @@ lcd2: {
     shortcutKey: "",
     description: "liste Snapshots"
 },
+bpmCtrl: {
+    type: "bpmCtrl",
+    xp: 10,
+    yp: 80,
+    sp: 50,
+    value: 80,
+    min: 20,
+    max: 300,
+    onChange: (bpm) => {
+        // à jour ton moteur ici ?
+    }
+},
+
 
     // // Exemple futur : un knob
     // Knob_freq: {

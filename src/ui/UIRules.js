@@ -523,13 +523,13 @@ guitar.invalidate();
     }
 
     // --- BOX (index 2 ou 3) ---
-    if (newState === 2 || newState === 3) {
-        knobDeg.state = 3;  // Pentatonique
-        knobOct.state = 2;  // 2 octaves
-        metalWay.state = 1; // ascendant
-        guitar.invalidate();
-        return;
-    }
+    // if (newState === 2 || newState === 3) {
+    //     knobDeg.state = 3;  // Pentatonique
+    //     knobOct.state = 2;  // 2 octaves
+    //     metalWay.state = 1; // ascendant
+    //     guitar.invalidate();
+    //     return;
+    // }
 
     // --- 3NPS (4) ou DIAGONAL (5) ---
     if (newState === 4 || newState === 5) {
@@ -952,7 +952,75 @@ guitar.invalidate();
     guitar.invalidate();
 
     console.log("Snapshot supprimé :", idx);
+},
+
+(components, source, evt) => {
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const lcd2   = components.find(c => c.name === "lcd2");
+    const playBtn = components.find(c => c.name === "playBtn");
+    const loopBtn = components.find(c => c.name === "loopBtn");
+
+    if (!guitar || !lcd2 || !playBtn || !loopBtn) return;
+
+    // --- PLAY BUTTON ---
+    if (source.name === "playBtn") {
+
+        if (source.state === 1) {
+            guitar.startPlayback(lcd2);
+        } else {
+            guitar.stopPlayback();
+        }
+        return;
+    }
+
+    // --- LOOP BUTTON ---
+    if (source.name === "loopBtn") {
+        // rien à faire ici, juste un toggle visuel
+        return;
+    }
+
+    // --- AVANCEMENT DE LA SÉQUENCE ---
+    // evt.state existe quand lcd2.setIndex() est appelé
+    if (source.name === "lcd2" && evt ) {
+
+        const lastIndex = lcd2.items.length - 1;
+
+        // si loop OFF et on arrive à la fin
+        if (loopBtn.state === 0 && evt === lastIndex) {
+
+            // stop lecture
+            guitar.stopPlayback();
+
+            // remettre playBtn à OFF
+            playBtn.state = 0;
+            playBtn.invalidate();
+        }
+
+        return;
+    }
+},
+
+(components, source, evt) => {
+
+    // si ce n'est pas le composant BPM → on ignore
+    if (source.name !== "bpmCtrl") return;
+
+    // on récupère la guitare
+    const lcd2   = components.find(c => c.name === "lcd2");
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    guitar.lcd2 = lcd2;      // <-- OBLIGATOIRE
+
+    // on met à jour le BPM de la guitare
+    guitar.setBPM(source.value);
 }
+
+
+
+
+
 
 
 // ============================================================

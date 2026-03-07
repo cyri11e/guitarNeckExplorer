@@ -88,7 +88,67 @@ class Guitar extends UIComponent {
 
         // --- overlays caged ----
         this.cagedOV = false
+
+        this.playTimer = null;
+        this.playing = false;
+        this.bpm = 80;
     }
+
+    setBPM(bpm) {
+        this.bpm = bpm;
+
+       // si on joue → on recalcule immédiatement
+        if (this.playing) {
+            this.restartTimer();
+        }
+    }
+
+    restartTimer() {
+    clearInterval(this.playTimer);
+
+    const interval = 60000 / this.bpm;
+
+    // TICK IMMÉDIAT
+    //this.advanceSequence(this.lcd2);
+     this.lcd2.invalidate();
+
+    // PUIS timer normal
+    this.playTimer = setInterval(() => {
+        this.advanceSequence(this.lcd2);
+    }, interval);
+}
+
+
+startPlayback(lcd2) {
+    if (this.playing) return;
+    this.playing = true;
+
+    const interval = 60000 /this.bpm; 
+
+    this.playTimer = setInterval(() => {
+        this.advanceSequence(lcd2);
+    }, interval);
+}
+
+stopPlayback() {
+    if (!this.playing) return;
+    this.playing = false;
+
+    clearInterval(this.playTimer);
+    this.playTimer = null;
+}
+
+advanceSequence(lcd2) {
+    if (!lcd2 || !lcd2.items) return;
+
+    let idx = lcd2.state + 1;
+    if (idx >= lcd2.items.length) idx = 0;
+
+    lcd2.setIndex(idx);
+    lcd2.invalidate();
+}
+
+
 
     // ------------------------------------------------------------
     // MARKER SELECTOR

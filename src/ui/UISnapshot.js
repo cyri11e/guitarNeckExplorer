@@ -19,6 +19,7 @@ class SnapshotButton extends UIComponent {
 
         // NOUVEAU : label optionnel
         this.label = cfg.label || null;
+        this.led = cfg.led ?? false;
 
         this._state = 0;
     }
@@ -44,9 +45,10 @@ class SnapshotButton extends UIComponent {
         return true;
     }
 
-    trigger() {
-        this.state = this.state + 1;
-    }
+trigger() {
+    this.state = this.state ? 0 : 1;
+}
+
 
     containsRect(evt) {
         return (
@@ -60,30 +62,45 @@ class SnapshotButton extends UIComponent {
     // -----------------------------
     // RENDER
     // -----------------------------
-    draw() {
-        super.draw();
+draw() {
+    super.draw();
 
-        // fond
-        fill(60);
-        stroke(200);
-        strokeWeight(2 * this.zoomFactor);
-        rect(this.x, this.y, this.w, this.h, this.h * 0.15);
+    // fond
+    fill(60);
+    stroke(200);
+    strokeWeight(2 * this.zoomFactor);
+    rect(this.x, this.y, this.w, this.h, this.h * 0.15);
 
-        // -----------------------------------------
-        // NOUVEAU : si label → on affiche le label
-        // -----------------------------------------
-        if (this.label) {
-            noStroke();
-            fill(230);
-            textAlign(CENTER, CENTER);
-            textSize(this.h * 0.55);
-            text(this.label, this.x + this.w * 0.5, this.y + this.h * 0.5);
-            return;
-        }
+    // -----------------------------------------
+    // LABEL (toujours affiché)
+    // -----------------------------------------
+    if (this.label) {
+        noStroke();
+        fill(230);
+        textAlign(CENTER, CENTER);
+        textSize(this.h * 0.55);
+        text(this.label, this.x + this.w * 0.5, this.y + this.h * 0.5);
+    }
 
-        // -----------------------------------------
-        // Sinon → icône appareil photo (par défaut)
-        // -----------------------------------------
+// -----------------------------------------
+// LED OPTIONNELLE
+// -----------------------------------------
+if (this.led) {
+    const ledR = this.w * 0.18;
+    const ledX = this.x + this.w - ledR * 1.2;
+    const ledY = this.y + ledR * 1.2;
+
+    noStroke();
+    fill(this._state === 1 ? color(255, 20, 20) : color(80, 80, 80));
+    circle(ledX, ledY, ledR);
+}
+
+
+    // -----------------------------------------
+    // Si pas de label → icône appareil photo
+    // (comportement d’origine)
+    // -----------------------------------------
+    if (!this.label) {
         const cx = this.x + this.w * 0.5;
         const cy = this.y + this.h * 0.5;
         const r  = this.w * 0.25;
@@ -98,4 +115,6 @@ class SnapshotButton extends UIComponent {
         fill(200);
         circle(cx, cy, r * 0.6);
     }
+}
+
 }
