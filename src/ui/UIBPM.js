@@ -72,7 +72,7 @@ mouseReleased(evt) {
         }
 
         // fade out LED
-        this.ledPhase *= 0.85;
+        this.ledPhase *= 0.9;
     }
 
     // -----------------------------------------
@@ -108,7 +108,7 @@ mouseReleased(evt) {
         const ledX = this.x + this.w * 0.5;
         const ledY = this.y + this.h * 0.85;
 
-        fill(255, 60, 60, 255 * this.ledPhase);
+        fill(255, 20, 20, 255 * this.ledPhase);
         circle(ledX, ledY, ledR);
     }
 }
