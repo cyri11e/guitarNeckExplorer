@@ -7,13 +7,12 @@ function setup() {
 }
 
 function draw() {
-   // clear(); // ou background(0)
-
+    app.update();          // tourne à chaque frame
     if (app.needsRedraw) {
-        app.update();
-        app.display();
+        app.display();     // ne dessine que si nécessaire
     }
 }
+
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);

@@ -92,6 +92,7 @@ class Guitar extends UIComponent {
         this.playTimer = null;
         this.playing = false;
         this.bpm = 80;
+        this.sequence = [];
     }
 
     setBPM(bpm) {
@@ -112,10 +113,11 @@ class Guitar extends UIComponent {
     //this.advanceSequence(this.lcd2);
      this.lcd2.invalidate();
 
-    // PUIS timer normal
     this.playTimer = setInterval(() => {
         this.advanceSequence(this.lcd2);
+        this.lcd2.invalidateNow(); //  LCD2 avance même sans souris
     }, interval);
+
 }
 
 

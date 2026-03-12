@@ -793,6 +793,205 @@ guitar.invalidate();
 
 
 //   snapshot sauvegarde
+// (components, source, newState) => {
+
+//     if (source.name !== "snapshotBtn") return;
+
+//     const guitar = components.find(c => c.name === "guitar1");
+//     if (!guitar) return;
+
+//     // -----------------------------------------
+//     // 0) Vérifier si on doit créer un snapshot
+//     // -----------------------------------------
+//     const hasPinned   = guitar.pinnedNotes.length > 0;
+//     const hasSelected = guitar.selectedNotes.length > 0;
+//     const hasRoot     = guitar.theory.hasRoot();
+//     const hasMarkers  = guitar.markerSegments.length > 0;
+
+//     if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) {
+//         console.log("Snapshot ignoré : rien à sauvegarder.");
+//         return;
+//     }
+
+//     // -----------------------------------------
+//     // 1) Construire le titre
+//     // -----------------------------------------
+//     const index = guitar.snapshots.length + 1;
+//     let title = `${index}`;
+
+//     // priorité : dernière pinned → dernière selected → root
+//     let mainLabel = null;
+
+//     const getLabel = (n) => {
+//         const note = guitar.instrument.getNoteAt(n.string - 1, n.fret);
+//         if (!note) return null;
+//         const lbl = guitar.theory.getNoteLabel(note.index, guitar.displayMode);
+//         return lbl.base + lbl.alt;
+//     };
+
+//     if (hasPinned) {
+//         mainLabel = getLabel(guitar.pinnedNotes[guitar.pinnedNotes.length - 1]);
+//     }
+//     if (!mainLabel && hasSelected) {
+//         mainLabel = getLabel(guitar.selectedNotes[guitar.selectedNotes.length - 1]);
+//     }
+//     if (!mainLabel && hasRoot) {
+//         const lbl = guitar.theory.getNoteLabel(guitar.theory.root, guitar.displayMode);
+//         mainLabel = lbl.base + lbl.alt;
+//     }
+
+//     if (mainLabel) title += `-${mainLabel}`;
+
+//     // LCD1 : uniquement si actif
+//     const lcd1 = components.find(c => c.name === "lcd1");
+//     if (lcd1 && lcd1.isOn && lcd1.items && lcd1.items.length > 0) {
+//         const lcdItem = lcd1.items[lcd1.state];
+//         if (lcdItem) title += `-${lcdItem}`;
+//     }
+//     else if (!mainLabel && hasMarkers) {
+//         // aucun label, lcd1 inactif → markers → "marked"
+//         title += ` - marked`;
+//     }
+
+//     // -----------------------------------------
+//     // 2) Création du snapshot
+//     // -----------------------------------------
+//     const snap = {
+//         title,
+//         pinnedNotes: [...guitar.pinnedNotes],
+//         selectedNotes: [...guitar.selectedNotes],
+//         root: hasRoot ? guitar.theory.root : null,
+//         markerSegments: [...guitar.markerSegments]
+//     };
+
+//     guitar.snapshots.push(snap);
+
+//     // -----------------------------------------
+//     // 3) Sync LCD2
+//     // -----------------------------------------
+//     const lcd2 = components.find(c => c.name === "lcd2");
+//     if (lcd2) {
+//         lcd2.items = guitar.snapshots.map(s => s.title);
+//         lcd2.isOn = true;
+//         lcd2.state = lcd2.items.length - 1;
+//         lcd2.invalidate();
+//     }
+
+//     console.log("Snapshot ajouté :", snap.title);
+// },
+
+
+// -------------------------------------------------------------
+// NAVIGATION TRREC
+// -------------------------------------------------------------
+(components, source, evt) => {
+
+    if (source.name !== "trRecPads") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const trRec  = source;
+    if (!guitar) return;
+
+    // Séquence vide → afficher OFF
+    if (guitar.sequence.length === 0) {
+        trRec.states = [
+            { etat:0, item:null },
+            { etat:0, item:null },
+            { etat:0, item:null },
+            { etat:0, item:null }
+        ];
+        trRec.measureIndex = 0;
+        trRec.invalidate();
+        return;
+    }
+
+    if (evt.type === "prev")
+        guitar.currentMeasure = Math.max(0, guitar.currentMeasure - 1);
+
+    if (evt.type === "next")
+        guitar.currentMeasure = Math.min(guitar.sequence.length - 1, guitar.currentMeasure + 1);
+
+    const measure = guitar.sequence[guitar.currentMeasure];
+
+    trRec.states = measure;
+    trRec.measureIndex = guitar.currentMeasure;
+    trRec.invalidate();
+},
+
+
+// -------------------------------------------------------------
+// AJOUT D’UNE MESURE (+)
+// -------------------------------------------------------------
+(components, source, evt) => {
+
+    if (source.name !== "trRecPads") return;
+    if (evt.type !== "add") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const trRec  = source;
+    if (!guitar) return;
+
+    const empty = [
+        { etat:0, item:null },
+        { etat:0, item:null },
+        { etat:0, item:null },
+        { etat:0, item:null }
+    ];
+
+    // Séquence vide
+    if (guitar.sequence.length === 0) {
+        guitar.sequence.push(empty);
+        guitar.currentMeasure = 0;
+
+        trRec.states = empty;
+        trRec.measureIndex = 0;
+        trRec.invalidate();
+        return;
+    }
+
+    // Insertion après la mesure courante
+    const cur = guitar.currentMeasure;
+    guitar.sequence.splice(cur + 1, 0, empty);
+    guitar.currentMeasure = cur + 1;
+
+    trRec.states = empty;
+    trRec.measureIndex = guitar.currentMeasure;
+    trRec.invalidate();
+},
+
+
+// -------------------------------------------------------------
+// ASSIGN ITEM ↔ PAD
+// -------------------------------------------------------------
+(components, source, evt) => {
+
+    if (source.name !== "trRecPads") return;
+    if (evt.type !== "assign") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const lcd2   = components.find(c => c.name === "lcd2");
+    const trRec  = source;
+
+    if (!guitar || !lcd2) return;
+
+    const measure = guitar.sequence[guitar.currentMeasure];
+    const step = measure[evt.index];
+
+    // Affectation item
+    step.item = lcd2.state;
+
+    // Affectation durée (ON)
+    step.etat = trRec.initDur;
+
+    // Mise à jour TRRec
+    trRec.states = measure;
+    trRec.invalidate();
+},
+
+
+// -------------------------------------------------------------
+// SNAPSHOT → CRÉATION D’UNE MESURE TRREC
+// -------------------------------------------------------------
 (components, source, newState) => {
 
     if (source.name !== "snapshotBtn") return;
@@ -800,26 +999,18 @@ guitar.invalidate();
     const guitar = components.find(c => c.name === "guitar1");
     if (!guitar) return;
 
-    // -----------------------------------------
-    // 0) Vérifier si on doit créer un snapshot
-    // -----------------------------------------
+    // Vérification snapshot
     const hasPinned   = guitar.pinnedNotes.length > 0;
     const hasSelected = guitar.selectedNotes.length > 0;
     const hasRoot     = guitar.theory.hasRoot();
     const hasMarkers  = guitar.markerSegments.length > 0;
 
-    if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) {
-        console.log("Snapshot ignoré : rien à sauvegarder.");
-        return;
-    }
+    if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) return;
 
-    // -----------------------------------------
-    // 1) Construire le titre
-    // -----------------------------------------
-    const index = guitar.snapshots.length + 1;
+    // Construction du titre
+    let index = guitar.snapshots.length + 1;
     let title = `${index}`;
 
-    // priorité : dernière pinned → dernière selected → root
     let mainLabel = null;
 
     const getLabel = (n) => {
@@ -829,12 +1020,12 @@ guitar.invalidate();
         return lbl.base + lbl.alt;
     };
 
-    if (hasPinned) {
-        mainLabel = getLabel(guitar.pinnedNotes[guitar.pinnedNotes.length - 1]);
-    }
-    if (!mainLabel && hasSelected) {
-        mainLabel = getLabel(guitar.selectedNotes[guitar.selectedNotes.length - 1]);
-    }
+    if (hasPinned)
+        mainLabel = getLabel(guitar.pinnedNotes.at(-1));
+
+    if (!mainLabel && hasSelected)
+        mainLabel = getLabel(guitar.selectedNotes.at(-1));
+
     if (!mainLabel && hasRoot) {
         const lbl = guitar.theory.getNoteLabel(guitar.theory.root, guitar.displayMode);
         mainLabel = lbl.base + lbl.alt;
@@ -842,33 +1033,48 @@ guitar.invalidate();
 
     if (mainLabel) title += `-${mainLabel}`;
 
-    // LCD1 : uniquement si actif
     const lcd1 = components.find(c => c.name === "lcd1");
-    if (lcd1 && lcd1.isOn && lcd1.items && lcd1.items.length > 0) {
+    if (lcd1 && lcd1.isOn && lcd1.items?.length > 0) {
         const lcdItem = lcd1.items[lcd1.state];
         if (lcdItem) title += `-${lcdItem}`;
     }
-    else if (!mainLabel && hasMarkers) {
-        // aucun label, lcd1 inactif → markers → "marked"
-        title += ` - marked`;
-    }
 
-    // -----------------------------------------
-    // 2) Création du snapshot
-    // -----------------------------------------
+    // Création snapshot
     const snap = {
         title,
         pinnedNotes: [...guitar.pinnedNotes],
         selectedNotes: [...guitar.selectedNotes],
         root: hasRoot ? guitar.theory.root : null,
-        markerSegments: [...guitar.markerSegments]
+        markerSegments: [...guitar.markerSegments],
     };
 
     guitar.snapshots.push(snap);
 
-    // -----------------------------------------
-    // 3) Sync LCD2
-    // -----------------------------------------
+    // Création mesure TRRec
+    const trRec = components.find(c => c.name === "trRecPads");
+    if (trRec) {
+
+        const itemIndex = guitar.snapshots.length - 1;
+        const dur = trRec.initDur;
+
+        const measure = [
+            { item: itemIndex, etat: dur },
+            { item: null, etat: 0 },
+            { item: null, etat: 0 },
+            { item: null, etat: 0 }
+        ];
+
+        guitar.sequence.push(measure);
+
+        const mIndex = guitar.sequence.length - 1;
+        guitar.currentMeasure = mIndex;
+
+        trRec.measureIndex = mIndex;
+        trRec.states = measure;
+        trRec.invalidate();
+    }
+
+    // Sync LCD2
     const lcd2 = components.find(c => c.name === "lcd2");
     if (lcd2) {
         lcd2.items = guitar.snapshots.map(s => s.title);
@@ -876,181 +1082,7 @@ guitar.invalidate();
         lcd2.state = lcd2.items.length - 1;
         lcd2.invalidate();
     }
-
-    console.log("Snapshot ajouté :", snap.title);
-},
-
-
-
-
-(components, source, newState) => {
-
-    if (source.name !== "lcd2") return;
-
-    const guitar = components.find(c => c.name === "guitar1");
-    if (!guitar) return;
-
-    // newState = index sélectionné dans le LCD
-    const snap = guitar.snapshots[newState];
-    if (!snap) return;
-
-    // -----------------------------
-    // RESTAURATION DIRECTE
-    // -----------------------------
-
-    // 1) root
-    if (snap.root !== null) {
-        guitar.theory.setRoot(snap.root);
-    } else {
-        guitar.theory.root = null;
-    }
-
-    // 2) pinnedNotes (réaffectation directe)
-    guitar.pinnedNotes = snap.pinnedNotes;
-
-    // 3) selectedNotes (réaffectation directe)
-    guitar.selectedNotes = snap.selectedNotes;
-
-    guitar.markerSegments = snap.markerSegments;    // 4) refresh
-    guitar.invalidate();
-
-    console.log("Snapshot restauré :", snap.title);
-},
-
-
-
-(components, source, newState) => {
-
-    if (source.name !== "trashBtn") return;
-    
-
-    const guitar = components.find(c => c.name === "guitar1");
-    const lcd2   = components.find(c => c.name === "lcd2");
-
-    if (!guitar || !lcd2) return;
-
-    const idx = lcd2.state;
-
-    // rien à supprimer
-    if (idx < 0 || idx >= guitar.snapshots.length) return;
-
-    // -----------------------------------------
-    // SUPPRESSION DU SNAPSHOT COURANT
-    // -----------------------------------------
-    guitar.snapshots.splice(idx, 1);
-
-    // mise à jour du LCD
-    lcd2.items = guitar.snapshots.map(s => s.title);
-
-    if (lcd2.items.length === 0) {
-        lcd2.setOnOff(false);
-    } else {
-        lcd2.state = Math.min(idx, lcd2.items.length - 1);
-    }
-
-    lcd2.invalidate();
-    guitar.invalidate();
-
-    console.log("Snapshot supprimé :", idx);
-},
-
-(components, source, evt) => {
-
-    const guitar = components.find(c => c.name === "guitar1");
-    const lcd2   = components.find(c => c.name === "lcd2");
-    const playBtn = components.find(c => c.name === "playBtn");
-    const loopBtn = components.find(c => c.name === "loopBtn");
-
-    if (!guitar || !lcd2 || !playBtn || !loopBtn) return;
-
-    // --- PLAY BUTTON ---
-    if (source.name === "playBtn") {
-
-        if (source.state === 1) {
-            guitar.startPlayback(lcd2);
-        } else {
-            guitar.stopPlayback();
-        }
-        return;
-    }
-
-    // --- LOOP BUTTON ---
-    if (source.name === "loopBtn") {
-        // rien à faire ici, juste un toggle visuel
-        return;
-    }
-
-    // --- AVANCEMENT DE LA SÉQUENCE ---
-    // evt.state existe quand lcd2.setIndex() est appelé
-    if (source.name === "lcd2" && evt ) {
-
-        const lastIndex = lcd2.items.length - 1;
-
-        // si loop OFF et on arrive à la fin
-        if (loopBtn.state === 0 && evt === lastIndex) {
-
-            // stop lecture
-            guitar.stopPlayback();
-
-            // remettre playBtn à OFF
-            playBtn.state = 0;
-            playBtn.invalidate();
-        }
-
-        return;
-    }
-},
-
-(components, source, evt) => {
-
-    // si ce n'est pas le composant BPM → on ignore
-    if (source.name !== "bpmCtrl") return;
-
-    // on récupère la guitare
-    const lcd2   = components.find(c => c.name === "lcd2");
-    const guitar = components.find(c => c.name === "guitar1");
-    if (!guitar) return;
-
-    guitar.lcd2 = lcd2;      // <-- OBLIGATOIRE
-
-    // on met à jour le BPM de la guitare
-    guitar.setBPM(source.value);
 }
 
-
-
-
-
-
-
-// ============================================================
-// KNOB MULTI CURSOR → Active/désactive automatiquement CAGED
-// ============================================================
-// (components, source, newState) => {
-
-//     if (source.name !== "knobMultiCursor") return;
-
-//     const swCAGED = components.find(c => c.name === "metalCAGED");
-//     if (!swCAGED) return;
-
-//     // newState :
-//     // 0 = OneString
-//     // 1 = Chord
-//     // 2 = Box
-//     // 3 = 3NPS
-//     // 4 = Diagonal
-
-//     // Modes où CAGED doit être OFF
-//     if (newState === 0 || newState === 3 || newState === 4) {
-//         if (swCAGED.state !== 0) swCAGED.setState(0);
-//         return;
-//     }
-
-//     // Modes où CAGED doit être ON
-//     if (newState === 1 || newState === 2) {
-//         if (swCAGED.state !== 1) swCAGED.setState(1);
-//         return;
-//     }
-// },
 
 ];

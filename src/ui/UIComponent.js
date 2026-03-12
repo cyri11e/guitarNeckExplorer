@@ -171,11 +171,19 @@ mouseWheel(evt) {
     invalidate() {
         this.needsRedraw = true;
 
-        // ⭐ AJOUT : prévenir App
+        //  AJOUT : prévenir App
         if (this.app) {
             this.app.invalidate();
         }
     }
+
+invalidateNow() {
+    this.invalidate();      // marque le composant
+    this.app.update();      // exécute la logique
+    this.app.display();     // dessine immédiatement
+}
+
+
 
     // ============================================================
     // DEBUG

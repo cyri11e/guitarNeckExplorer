@@ -74,6 +74,10 @@ class App {
                     comp = new BPMControl(cfg); 
                     break;     
                     
+                case "trRecPads":
+                    comp = new TRRecPads(cfg); 
+                    break;
+
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;
@@ -140,7 +144,7 @@ for (const comp of this.components) {
         // ============================================================
 
         this.needsRedraw = true;
-        this.debug = false;
+        this.debug = true;
         this.redrawCount = 0;
         this.lastFPS = 0;
         this._lastTime = millis();
@@ -152,8 +156,14 @@ for (const comp of this.components) {
     // ============================================================
 
     update() {
-        if (!this.needsRedraw) return;
-        this.needsRedraw = false;
+       // if (!this.needsRedraw) return;
+
+        for (const c of this.components) {
+            if (typeof c.update === "function") {
+                c.update();
+            }
+        }
+
         this.redrawCount++;
     }
 
@@ -171,7 +181,7 @@ for (const comp of this.components) {
 
         // dessin bottom → top
         for (const c of this.components) {
-            c.draw();   // ⭐ Panels dessinent leurs enfants
+            c.draw();   //  Panels dessinent leurs enfants
         }
 
         if (this.debug) this.drawDebugHUD();
@@ -195,25 +205,32 @@ for (const comp of this.components) {
     // RESPONSIVE
     // ============================================================
 
-resize() {
-    // 1) recalculer les panels
-    for (const c of this.components) {
-        c.updateResponsive();
-    }
-
-    // 2) recalculer les enfants APRÈS que les panels soient stables
-    for (const c of this.components) {
-        if (c instanceof Panel) {
-            c.updateChildrenLayout();
+    resize() {
+        // 1) recalculer les panels
+        for (const c of this.components) {
+            c.updateResponsive();
         }
+
+        // 2) recalculer les enfants APRÈS que les panels soient stables
+        for (const c of this.components) {
+            if (c instanceof Panel) {
+                c.updateChildrenLayout();
+            }
+        }
+
+        this.invalidate();
     }
 
-    this.invalidate();
+
+invalidate() {
+    this.needsRedraw = true;
 }
 
 
-    invalidate() {
+    forceRedraw() {
         this.needsRedraw = true;
+        this.update();
+        this.display();
     }
 
     // ============================================================
@@ -226,10 +243,6 @@ resize() {
     mouseDragged(x, y)  { this.ui.mouseDragged(x, y); }
     mouseWheel(e)       { return this.ui.mouseWheel(e); }
 
-    // mouseClicked(x, y)  {
-    //     this.ui.mouseClicked(x, y);
-    //     this.invalidate();
-    // }
 
     keyPressed(k, kc) {
         this.ui.handleShortcut(k, kc);

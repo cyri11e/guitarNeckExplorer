@@ -415,6 +415,7 @@ snapshotPanel: {
     aspectRatio: 1,
     children: ["snapshotBtn","lcd2","playBtn","loopBtn","trashBtn","bpmCtrl"]
 },
+
 snapshotBtn: {
     type: "snapshotButton",
     xp: 50,
@@ -451,6 +452,7 @@ loopBtn: {
     led: true,
     description: "play snapshot"
 },
+
 lcd2: {
     type: "lcdSelector",
     xp: 50,
@@ -464,15 +466,37 @@ lcd2: {
 },
 bpmCtrl: {
     type: "bpmCtrl",
-    xp: 10,
-    yp: 80,
+    xp: -150,
+    yp: 50,
     sp: 50,
     value: 80,
+    aspectRatio: 3.2,
     min: 20,
     max: 300,
-    onChange: (bpm) => {
-        // à jour ton moteur ici ?
-    }
+    stayOnX : true,
+    // onChange: (bpm) => {
+        //     // à jour ton moteur ici ?
+        // }
+    },
+
+trRecPanel: {
+        type: "panel",
+        xp: 5,
+        yp: 35,
+        sp: 20,
+        aspectRatio: 1,
+        children: ["trRecPads"]
+    },
+
+trRecPads: {
+    type: "trRecPads",
+    xp: 0,
+    yp: 150,
+    sp: 80,
+    aspectRatio: 2.5,   // largeur = 4 × hauteur
+    padCount: 4,      // nombre de pads
+    description: "TR-REC Pads",
+    shortcutKey: "T"
 },
 
 

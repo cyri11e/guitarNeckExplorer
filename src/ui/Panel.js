@@ -25,11 +25,12 @@ class Panel extends UIComponent {
     // AJOUT D’UN ENFANT
     // -------------------------------------------------------
     add(child) {
-        child.parent = this;          // ⭐ hiérarchie UIComponent
-        child.isDraggable = false;    // ⭐ le panel gère le drag global
-        child.isZoomable  = false;    // ⭐ idem
+        child.parent = this;          //  hiérarchie UIComponent
+        child.isDraggable = false;    //  le panel gère le drag global
+        child.isZoomable  = false;    //  idem
+        
         this.children.push(child);
-        child.updateResponsive();     // ⭐ recalcul dans le panel
+        child.updateResponsive();     //  recalcul dans le panel
     }
 
     // -------------------------------------------------------
@@ -44,25 +45,41 @@ updateChildrenLayout() {
     if (this.children.length === 0) return;
 
     const padding = this.h * 0.05;
+    const gap = padding;
+
     let xCursor = this.x + padding;
 
     for (let c of this.children) {
 
         const ratio = c.aspectRatio ?? 1;
 
+        // taille "normale"
         c.h = (this.h - padding * 2) * (c.sp / 100);
         c.w = c.h * ratio;
 
-        c.x = xCursor;
-        c.y = this.y + padding;
+        // position "de base" (comme aujourd'hui, sans flag)
+        const baseX = xCursor;
+        const baseY = this.y + padding;
 
-        xCursor += c.w + padding;
+        if (!c.stayOnX) {
+            // comportement actuel : séquentiel horizontal
+            c.x = baseX;
+            c.y = baseY;
+
+            xCursor += c.w + gap;
+        } else {
+            // on reste sur la même "colonne" (même baseX),
+            // mais on applique un delta relatif au panel
+            const dx = (c.xp ?? 0) / 100 * this.w;
+            const dy = (c.yp ?? 0) / 100 * this.h;
+
+            c.x = baseX + dx;
+            c.y = baseY + dy;
+            // xCursor ne bouge pas : on reste sur cette colonne
+        }
     }
 
-    // ⭐ largeur dynamique
     this.w = xCursor - this.x;
-
-    // ⭐ ratio dynamique
     this.aspectRatio = this.w / this.h;
 }
 
@@ -109,6 +126,7 @@ updateChildrenLayout() {
         return super.mousePressed(evt);
     }
 
+    
     mouseDragged(evt) {
         // Drag du panel
         if (super.mouseDragged(evt)) {
