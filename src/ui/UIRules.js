@@ -1218,17 +1218,18 @@ guitar.invalidate();
 },
 
 
-// TRREC → GUITAR : restauration snapshot par index
+// TRREC → GUITAR : restauration snapshot
 (components, source, evt) => {
 
     if (source.name !== "trRecPads") return;
     if (!evt || evt.type !== "padChange") return;
 
     const guitar = components.find(c => c.name === "guitar1");
-    if (!guitar) return;
+    const lcd2   = components.find(c => c.name === "lcd2");
+    if (!guitar || !lcd2) return;
 
-    //  snapshotIndex = index du pad
-    const snapshotIndex = evt.index;
+    const snapshotIndex = evt.snapshotIndex;
+    if (snapshotIndex == null) return;
 
     const snap = guitar.snapshots[snapshotIndex];
     if (!snap) return;
@@ -1243,8 +1244,12 @@ guitar.invalidate();
 
     guitar.invalidate();
 
-
+    // --- LCD2 ---
+    lcd2.state = snapshotIndex;
+    lcd2.invalidate();
 }
+
+
 
 
 

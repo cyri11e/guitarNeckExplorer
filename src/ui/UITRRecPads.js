@@ -35,52 +35,56 @@ this.states = Array.from({ length: this.padCount }, () => ({
     // appelé par le moteur global (tick BPM)
 advancePlayhead() {
 
-    const hasAny = this.states.some(s => s.etat !== 0);
-    if (!hasAny) {
-        for (const s of this.states) {
-            s.highlight = false;
-            s.flash = 0;
-        }
-        this.invalidate();
-        return;
-    }
+    // 1) index courant
+    const idx = this.playIndex;
+
+    // sécurité
+    if (!this.states || this.states.length === 0) return;
 
     // clear highlight
-    for (const s of this.states) s.highlight = false;
+    for (const s of this.states) {
+        s.highlight = false;
+    }
 
-    // highlight du pad courant
-    const s = this.states[this.playIndex];
-    if (s) s.highlight = true;
+    const s = this.states[idx];
+    if (s) {
+        s.highlight = true;
 
-    // ⭐ FLASH INTERNE : groupe de 4 pads
-    if (this.playIndex % 4 === 0) {
-        const group = Math.floor(this.playIndex / 4); // 0..3
-        const start = group * 4;
-
-        for (let i = 0; i < 4; i++) {
-            const pad = this.states[start + i];
-            if (pad) pad.flash = 1;   // flash blanc
+        // flash accent si note
+        if (s.etat === 1) {
+            s.flash = 1.5;
         }
     }
 
-    // avancer
-    this.playIndex = (this.playIndex + 1) % this.padCount;
-    // après this.playIndex = ...
-const pad = this.states[this.playIndex];
+    // flash groupe de 4
+    if (idx % 4 === 0) {
+        const group = Math.floor(idx / 4);
+        const start = group * 4;
+        for (let i = 0; i < 4; i++) {
+            const pad = this.states[start + i];
+            if (pad) pad.flash = 1;
+        }
+    }
 
-// snapshotIndex = pad.item (ou playIndex si mapping direct)
-const snapshotIndex = pad.item;  // ou this.playIndex selon ton choix
+    //  notifier les règles UI avec l’index COURANT
 
-// notifier les règles UI
+const pad = this.states[idx];
+
+
 this.onChange?.({
     type: "padChange",
-    index: this.playIndex,
-    snapshot: snapshotIndex
+    padIndex: idx,
+    snapshotIndex: pad ? pad.itemIndex : null
 });
 
 
+
+    // 3) seulement maintenant on avance
+    this.playIndex = (this.playIndex + 1) % this.padCount;
+
     this.invalidate();
 }
+
 
 
     get measure() {
