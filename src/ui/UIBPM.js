@@ -18,44 +18,50 @@ class BPMControl extends UIComponent {
 
         this.onChange = cfg.onChange || null;
         this.stayOnX = cfg.stayOnX ?? false;
-        // LED tempo
-this.steps = cfg.steps ?? 4;      // nombre de rectangles
-this.currentStep = 0;             // step actif
-this.lastStepTime = millis();     // horloge
-this.pulsePhase = 0;     // 0 → 1 → 0
-this.pulseSpeed = 0.15;  // vitesse du pulse
 
+        // LED unique
+        this.ledPhase = 0;      // 0 → éteint, 1 → plein rouge
+        this.ledDecay = 0.85;   // vitesse d’extinction
 
+        // horloge
+        this.lastTickTime = millis();
+
+        // tick index (double‑croches)
+        this.tickIndex = 0;
+
+        // état PLAY externe
+        this.isPlaying = false;
     }
 
-mouseReleased(evt) {
-    if (!evt) return; // sécurité
-    if (!this.containsRect(evt)) return false;
-    const mx = evt.x;
+    // -----------------------------------------
+    // INTERACTION
+    // -----------------------------------------
+    mouseReleased(evt) {
+        if (!evt) return;
+        if (!this.containsRect(evt)) return false;
 
-    // zone bouton -
-    if (mx < this.x + this.w * 0.25) {
-        this.setValue(this.value - 1);
+        const mx = evt.x;
+
+        // bouton -
+        if (mx < this.x + this.w * 0.25) {
+            this.setValue(this.value - 1);
+            return true;
+        }
+
+        // bouton +
+        if (mx > this.x + this.w * 0.75) {
+            this.setValue(this.value + 1);
+            return true;
+        }
+
+        // zone centrale → édition manuelle
+        const newVal = prompt("BPM:", this.value);
+        if (newVal !== null) {
+            this.setValue(parseInt(newVal));
+        }
+
         return true;
     }
-
-    // zone bouton +
-    if (mx > this.x + this.w * 0.75) {
-        this.setValue(this.value + 1);
-        return true;
-    }
-
-    // zone centrale → édition manuelle
-    const newVal = prompt("BPM:", this.value);
-    if (newVal !== null) {
-        this.setValue(parseInt(newVal));
-    }
-
-    return true;
-}
-
-
-
 
     setValue(v) {
         v = constrain(v, this.min, this.max);
@@ -65,33 +71,49 @@ mouseReleased(evt) {
     }
 
     // -----------------------------------------
-    // TEMPO LED
+    // UPDATE (tick = double‑croche)
     // -----------------------------------------
-update() {
-const interval = (60000 / this.value) / this.steps;
+    update() {
 
-    const now = millis();
+        if (!this.isPlaying) {
+            // extinction progressive de la LED
+            if (this.ledPhase > 0.01) {
+                this.ledPhase *= this.ledDecay;
+                this.invalidate();
+            }
+            return;
+        }
 
-    let changed = false;
+        // 1 double‑croche = 1/4 de temps
+        const interval = (60000 / this.value) / 4;
+        const now = millis();
 
-    // avance du chenillard
-    if (now - this.lastStepTime >= interval) {
-        this.lastStepTime = now;
-        this.currentStep = (this.currentStep + 1) % this.steps;
-        changed = true;
+        if (now - this.lastTickTime >= interval) {
+            this.lastTickTime = now;
+
+            // tick index (0 → 15)
+            this.tickIndex = (this.tickIndex + 1) % 16;
+
+            // ⭐ LED : clignote uniquement sur le temps fort (tick 0,4,8,12)
+            if (this.tickIndex % 4 === 0) {
+                this.ledPhase = 1;
+            }
+
+            // ⭐ ÉMISSION D’UN ÉVÉNEMENT UI STANDARD
+            this.onChange?.({
+                type: "tick",
+                tick: this.tickIndex
+            });
+
+            this.invalidate();
+        }
+
+        // extinction progressive
+        if (this.ledPhase > 0.01) {
+            this.ledPhase *= this.ledDecay;
+            this.invalidate();
+        }
     }
-
-    // fade LED (si tu veux garder ton effet BPM)
-    const oldPhase = this.ledPhase;
-    this.ledPhase *= 0.9;
-    if (Math.abs(this.ledPhase - oldPhase) > 0.001) changed = true;
-
-    if (changed) this.invalidate();
-}
-
-
-
-
 
     // -----------------------------------------
     // RENDER
@@ -120,39 +142,16 @@ const interval = (60000 / this.value) / this.steps;
         // bouton +
         text("+", this.x + this.w * 0.85, this.y + this.h * 0.5);
 
-        
-const barH = this.h * 0.15;
-const barY = this.y + this.h * 0.75;
-const barW = this.w / this.steps;
+        // -----------------------------------------
+        // LED UNIQUE (rouge)
+        // -----------------------------------------
+        const ledR = this.h * 0.18;
+        const ledX = this.x + this.w * 0.5;
+        const ledY = this.y + this.h * 0.85;
 
-for (let i = 0; i < this.steps; i++) {
-    const x = this.x + i * barW;
-    push();
-    if (this.currentStep === 0) {
-        // ⭐ TEMPS FORT : tous pleins rouge vif
+        const intensity = constrain(this.ledPhase, 0, 1);
+        fill(255 * intensity, 40 * intensity, 40 * intensity);
         noStroke();
-        fill(255, 60, 60);
-        rect(x, barY, barW * 0.9, barH, barH * 0.2);
-    }
-    else {
-        if (i === this.currentStep) {
-            // ⭐ TEMPS FAIBLE ACTIF : plein rouge vif
-            noFill();
-            stroke(255, 30, 30);
-            rect(x, barY, barW * 0.9, barH, barH * 0.2);
-        } else {
-            // ⭐ TEMPS FAIBLE INACTIF : rectangle évidé rouge foncé
-            noFill();
-            stroke(120, 30, 30);
-            strokeWeight(2 * this.zoomFactor);
-            rect(x, barY, barW * 0.9, barH, barH * 0.2);
-        }
-    }
-    pop();
-}
-
-
-
-
+        circle(ledX, ledY, ledR);
     }
 }

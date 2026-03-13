@@ -459,7 +459,7 @@ lcd2: {
     yp: 50,
     sp: 100,
     aspectRatio: 1.8,
-    items: ["A", "B", "C", "D", "E"],
+    items: [],
     isOn: false,
     shortcutKey: "",
     description: "liste Snapshots"
@@ -493,8 +493,8 @@ trRecPads: {
     xp: 0,
     yp: 150,
     sp: 80,
-    aspectRatio: 2.5,   // largeur = 4 × hauteur
-    padCount: 4,      // nombre de pads
+    padCount: 16,      // nombre de pads
+   //  aspectRatio: padCount / 4,   // dynamique
     description: "TR-REC Pads",
     shortcutKey: "T"
 },

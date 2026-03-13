@@ -793,205 +793,6 @@ guitar.invalidate();
 
 
 //   snapshot sauvegarde
-// (components, source, newState) => {
-
-//     if (source.name !== "snapshotBtn") return;
-
-//     const guitar = components.find(c => c.name === "guitar1");
-//     if (!guitar) return;
-
-//     // -----------------------------------------
-//     // 0) Vérifier si on doit créer un snapshot
-//     // -----------------------------------------
-//     const hasPinned   = guitar.pinnedNotes.length > 0;
-//     const hasSelected = guitar.selectedNotes.length > 0;
-//     const hasRoot     = guitar.theory.hasRoot();
-//     const hasMarkers  = guitar.markerSegments.length > 0;
-
-//     if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) {
-//         console.log("Snapshot ignoré : rien à sauvegarder.");
-//         return;
-//     }
-
-//     // -----------------------------------------
-//     // 1) Construire le titre
-//     // -----------------------------------------
-//     const index = guitar.snapshots.length + 1;
-//     let title = `${index}`;
-
-//     // priorité : dernière pinned → dernière selected → root
-//     let mainLabel = null;
-
-//     const getLabel = (n) => {
-//         const note = guitar.instrument.getNoteAt(n.string - 1, n.fret);
-//         if (!note) return null;
-//         const lbl = guitar.theory.getNoteLabel(note.index, guitar.displayMode);
-//         return lbl.base + lbl.alt;
-//     };
-
-//     if (hasPinned) {
-//         mainLabel = getLabel(guitar.pinnedNotes[guitar.pinnedNotes.length - 1]);
-//     }
-//     if (!mainLabel && hasSelected) {
-//         mainLabel = getLabel(guitar.selectedNotes[guitar.selectedNotes.length - 1]);
-//     }
-//     if (!mainLabel && hasRoot) {
-//         const lbl = guitar.theory.getNoteLabel(guitar.theory.root, guitar.displayMode);
-//         mainLabel = lbl.base + lbl.alt;
-//     }
-
-//     if (mainLabel) title += `-${mainLabel}`;
-
-//     // LCD1 : uniquement si actif
-//     const lcd1 = components.find(c => c.name === "lcd1");
-//     if (lcd1 && lcd1.isOn && lcd1.items && lcd1.items.length > 0) {
-//         const lcdItem = lcd1.items[lcd1.state];
-//         if (lcdItem) title += `-${lcdItem}`;
-//     }
-//     else if (!mainLabel && hasMarkers) {
-//         // aucun label, lcd1 inactif → markers → "marked"
-//         title += ` - marked`;
-//     }
-
-//     // -----------------------------------------
-//     // 2) Création du snapshot
-//     // -----------------------------------------
-//     const snap = {
-//         title,
-//         pinnedNotes: [...guitar.pinnedNotes],
-//         selectedNotes: [...guitar.selectedNotes],
-//         root: hasRoot ? guitar.theory.root : null,
-//         markerSegments: [...guitar.markerSegments]
-//     };
-
-//     guitar.snapshots.push(snap);
-
-//     // -----------------------------------------
-//     // 3) Sync LCD2
-//     // -----------------------------------------
-//     const lcd2 = components.find(c => c.name === "lcd2");
-//     if (lcd2) {
-//         lcd2.items = guitar.snapshots.map(s => s.title);
-//         lcd2.isOn = true;
-//         lcd2.state = lcd2.items.length - 1;
-//         lcd2.invalidate();
-//     }
-
-//     console.log("Snapshot ajouté :", snap.title);
-// },
-
-
-// -------------------------------------------------------------
-// NAVIGATION TRREC
-// -------------------------------------------------------------
-(components, source, evt) => {
-
-    if (source.name !== "trRecPads") return;
-
-    const guitar = components.find(c => c.name === "guitar1");
-    const trRec  = source;
-    if (!guitar) return;
-
-    // Séquence vide → afficher OFF
-    if (guitar.sequence.length === 0) {
-        trRec.states = [
-            { etat:0, item:null },
-            { etat:0, item:null },
-            { etat:0, item:null },
-            { etat:0, item:null }
-        ];
-        trRec.measureIndex = 0;
-        trRec.invalidate();
-        return;
-    }
-
-    if (evt.type === "prev")
-        guitar.currentMeasure = Math.max(0, guitar.currentMeasure - 1);
-
-    if (evt.type === "next")
-        guitar.currentMeasure = Math.min(guitar.sequence.length - 1, guitar.currentMeasure + 1);
-
-    const measure = guitar.sequence[guitar.currentMeasure];
-
-    trRec.states = measure;
-    trRec.measureIndex = guitar.currentMeasure;
-    trRec.invalidate();
-},
-
-
-// -------------------------------------------------------------
-// AJOUT D’UNE MESURE (+)
-// -------------------------------------------------------------
-(components, source, evt) => {
-
-    if (source.name !== "trRecPads") return;
-    if (evt.type !== "add") return;
-
-    const guitar = components.find(c => c.name === "guitar1");
-    const trRec  = source;
-    if (!guitar) return;
-
-    const empty = [
-        { etat:0, item:null },
-        { etat:0, item:null },
-        { etat:0, item:null },
-        { etat:0, item:null }
-    ];
-
-    // Séquence vide
-    if (guitar.sequence.length === 0) {
-        guitar.sequence.push(empty);
-        guitar.currentMeasure = 0;
-
-        trRec.states = empty;
-        trRec.measureIndex = 0;
-        trRec.invalidate();
-        return;
-    }
-
-    // Insertion après la mesure courante
-    const cur = guitar.currentMeasure;
-    guitar.sequence.splice(cur + 1, 0, empty);
-    guitar.currentMeasure = cur + 1;
-
-    trRec.states = empty;
-    trRec.measureIndex = guitar.currentMeasure;
-    trRec.invalidate();
-},
-
-
-// -------------------------------------------------------------
-// ASSIGN ITEM ↔ PAD
-// -------------------------------------------------------------
-(components, source, evt) => {
-
-    if (source.name !== "trRecPads") return;
-    if (evt.type !== "assign") return;
-
-    const guitar = components.find(c => c.name === "guitar1");
-    const lcd2   = components.find(c => c.name === "lcd2");
-    const trRec  = source;
-
-    if (!guitar || !lcd2) return;
-
-    const measure = guitar.sequence[guitar.currentMeasure];
-    const step = measure[evt.index];
-
-    // Affectation item
-    step.item = lcd2.state;
-
-    // Affectation durée (ON)
-    step.etat = trRec.initDur;
-
-    // Mise à jour TRRec
-    trRec.states = measure;
-    trRec.invalidate();
-},
-
-
-// -------------------------------------------------------------
-// SNAPSHOT → CRÉATION D’UNE MESURE TRREC
-// -------------------------------------------------------------
 (components, source, newState) => {
 
     if (source.name !== "snapshotBtn") return;
@@ -999,18 +800,26 @@ guitar.invalidate();
     const guitar = components.find(c => c.name === "guitar1");
     if (!guitar) return;
 
-    // Vérification snapshot
+    // -----------------------------------------
+    // 0) Vérifier si on doit créer un snapshot
+    // -----------------------------------------
     const hasPinned   = guitar.pinnedNotes.length > 0;
     const hasSelected = guitar.selectedNotes.length > 0;
     const hasRoot     = guitar.theory.hasRoot();
     const hasMarkers  = guitar.markerSegments.length > 0;
 
-    if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) return;
+    if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) {
+        console.log("Snapshot ignoré : rien à sauvegarder.");
+        return;
+    }
 
-    // Construction du titre
-    let index = guitar.snapshots.length + 1;
+    // -----------------------------------------
+    // 1) Construire le titre
+    // -----------------------------------------
+    const index = guitar.snapshots.length + 1;
     let title = `${index}`;
 
+    // priorité : dernière pinned → dernière selected → root
     let mainLabel = null;
 
     const getLabel = (n) => {
@@ -1020,12 +829,12 @@ guitar.invalidate();
         return lbl.base + lbl.alt;
     };
 
-    if (hasPinned)
-        mainLabel = getLabel(guitar.pinnedNotes.at(-1));
-
-    if (!mainLabel && hasSelected)
-        mainLabel = getLabel(guitar.selectedNotes.at(-1));
-
+    if (hasPinned) {
+        mainLabel = getLabel(guitar.pinnedNotes[guitar.pinnedNotes.length - 1]);
+    }
+    if (!mainLabel && hasSelected) {
+        mainLabel = getLabel(guitar.selectedNotes[guitar.selectedNotes.length - 1]);
+    }
     if (!mainLabel && hasRoot) {
         const lbl = guitar.theory.getNoteLabel(guitar.theory.root, guitar.displayMode);
         mainLabel = lbl.base + lbl.alt;
@@ -1033,48 +842,33 @@ guitar.invalidate();
 
     if (mainLabel) title += `-${mainLabel}`;
 
+    // LCD1 : uniquement si actif
     const lcd1 = components.find(c => c.name === "lcd1");
-    if (lcd1 && lcd1.isOn && lcd1.items?.length > 0) {
+    if (lcd1 && lcd1.isOn && lcd1.items && lcd1.items.length > 0) {
         const lcdItem = lcd1.items[lcd1.state];
         if (lcdItem) title += `-${lcdItem}`;
     }
+    else if (!mainLabel && hasMarkers) {
+        // aucun label, lcd1 inactif → markers → "marked"
+        title += ` - marked`;
+    }
 
-    // Création snapshot
+    // -----------------------------------------
+    // 2) Création du snapshot
+    // -----------------------------------------
     const snap = {
         title,
         pinnedNotes: [...guitar.pinnedNotes],
         selectedNotes: [...guitar.selectedNotes],
         root: hasRoot ? guitar.theory.root : null,
-        markerSegments: [...guitar.markerSegments],
+        markerSegments: [...guitar.markerSegments]
     };
 
     guitar.snapshots.push(snap);
 
-    // Création mesure TRRec
-    const trRec = components.find(c => c.name === "trRecPads");
-    if (trRec) {
-
-        const itemIndex = guitar.snapshots.length - 1;
-        const dur = trRec.initDur;
-
-        const measure = [
-            { item: itemIndex, etat: dur },
-            { item: null, etat: 0 },
-            { item: null, etat: 0 },
-            { item: null, etat: 0 }
-        ];
-
-        guitar.sequence.push(measure);
-
-        const mIndex = guitar.sequence.length - 1;
-        guitar.currentMeasure = mIndex;
-
-        trRec.measureIndex = mIndex;
-        trRec.states = measure;
-        trRec.invalidate();
-    }
-
-    // Sync LCD2
+    // -----------------------------------------
+    // 3) Sync LCD2
+    // -----------------------------------------
     const lcd2 = components.find(c => c.name === "lcd2");
     if (lcd2) {
         lcd2.items = guitar.snapshots.map(s => s.title);
@@ -1082,7 +876,378 @@ guitar.invalidate();
         lcd2.state = lcd2.items.length - 1;
         lcd2.invalidate();
     }
+
+    console.log("Snapshot ajouté :", snap.title);
+},
+
+
+// -------------------------------------------------------------
+// NAVIGATION TRREC
+// -------------------------------------------------------------
+// (components, source, evt) => {
+
+//     if (source.name !== "trRecPads") return;
+
+//     const guitar = components.find(c => c.name === "guitar1");
+//     const trRec  = source;
+//     if (!guitar) return;
+
+//     // Séquence vide → afficher OFF
+//     if (guitar.sequence.length === 0) {
+//         trRec.states = [
+//             { etat:0, item:null },
+//             { etat:0, item:null },
+//             { etat:0, item:null },
+//             { etat:0, item:null }
+//         ];
+//         trRec.measureIndex = 0;
+//         trRec.invalidate();
+//         return;
+//     }
+
+//     if (evt.type === "prev")
+//         guitar.currentMeasure = Math.max(0, guitar.currentMeasure - 1);
+
+//     if (evt.type === "next")
+//         guitar.currentMeasure = Math.min(guitar.sequence.length - 1, guitar.currentMeasure + 1);
+
+//     const measure = guitar.sequence[guitar.currentMeasure];
+
+//     trRec.states = measure;
+//     trRec.measureIndex = guitar.currentMeasure;
+//     trRec.invalidate();
+// },
+
+
+// -------------------------------------------------------------
+// AJOUT D’UNE MESURE (+)
+// -------------------------------------------------------------
+// (components, source, evt) => {
+
+//     if (source.name !== "trRecPads") return;
+//     if (evt.type !== "add") return;
+
+//     const guitar = components.find(c => c.name === "guitar1");
+//     const trRec  = source;
+//     if (!guitar) return;
+
+//     const empty = [
+//         { etat:0, item:null },
+//         { etat:0, item:null },
+//         { etat:0, item:null },
+//         { etat:0, item:null }
+//     ];
+
+//     // Séquence vide
+//     if (guitar.sequence.length === 0) {
+//         guitar.sequence.push(empty);
+//         guitar.currentMeasure = 0;
+
+//         trRec.states = empty;
+//         trRec.measureIndex = 0;
+//         trRec.invalidate();
+//         return;
+//     }
+
+//     // Insertion après la mesure courante
+//     const cur = guitar.currentMeasure;
+//     guitar.sequence.splice(cur + 1, 0, empty);
+//     guitar.currentMeasure = cur + 1;
+
+//     trRec.states = empty;
+//     trRec.measureIndex = guitar.currentMeasure;
+//     trRec.invalidate();
+// },
+
+
+// // -------------------------------------------------------------
+// // ASSIGN ITEM ↔ PAD
+// // -------------------------------------------------------------
+// (components, source, evt) => {
+
+//     if (source.name !== "trRecPads") return;
+//     if (evt.type !== "assign") return;
+
+//     const guitar = components.find(c => c.name === "guitar1");
+//     const lcd2   = components.find(c => c.name === "lcd2");
+//     const trRec  = source;
+
+//     if (!guitar || !lcd2) return;
+
+//     const measure = guitar.sequence[guitar.currentMeasure];
+//     const step = measure[evt.index];
+
+//     // Affectation item
+//     step.item = lcd2.state;
+
+//     // Affectation durée (ON)
+//     step.etat = trRec.initDur;
+
+//     // Mise à jour TRRec
+//     trRec.states = measure;
+//     trRec.invalidate();
+// },
+
+
+// // -------------------------------------------------------------
+// // SNAPSHOT → CRÉATION D’UNE MESURE TRREC
+// // -------------------------------------------------------------
+// (components, source, newState) => {
+
+//     if (source.name !== "snapshotBtn") return;
+
+//     const guitar = components.find(c => c.name === "guitar1");
+//     if (!guitar) return;
+
+//     // Vérification snapshot
+//     const hasPinned   = guitar.pinnedNotes.length > 0;
+//     const hasSelected = guitar.selectedNotes.length > 0;
+//     const hasRoot     = guitar.theory.hasRoot();
+//     const hasMarkers  = guitar.markerSegments.length > 0;
+
+//     if (!hasPinned && !hasSelected && !hasRoot && !hasMarkers) return;
+
+//     // Construction du titre
+//     let index = guitar.snapshots.length + 1;
+//     let title = `${index}`;
+
+//     let mainLabel = null;
+
+//     const getLabel = (n) => {
+//         const note = guitar.instrument.getNoteAt(n.string - 1, n.fret);
+//         if (!note) return null;
+//         const lbl = guitar.theory.getNoteLabel(note.index, guitar.displayMode);
+//         return lbl.base + lbl.alt;
+//     };
+
+//     if (hasPinned)
+//         mainLabel = getLabel(guitar.pinnedNotes.at(-1));
+
+//     if (!mainLabel && hasSelected)
+//         mainLabel = getLabel(guitar.selectedNotes.at(-1));
+
+//     if (!mainLabel && hasRoot) {
+//         const lbl = guitar.theory.getNoteLabel(guitar.theory.root, guitar.displayMode);
+//         mainLabel = lbl.base + lbl.alt;
+//     }
+
+//     if (mainLabel) title += `-${mainLabel}`;
+
+//     const lcd1 = components.find(c => c.name === "lcd1");
+//     if (lcd1 && lcd1.isOn && lcd1.items?.length > 0) {
+//         const lcdItem = lcd1.items[lcd1.state];
+//         if (lcdItem) title += `-${lcdItem}`;
+//     }
+
+//     // Création snapshot
+//     const snap = {
+//         title,
+//         pinnedNotes: [...guitar.pinnedNotes],
+//         selectedNotes: [...guitar.selectedNotes],
+//         root: hasRoot ? guitar.theory.root : null,
+//         markerSegments: [...guitar.markerSegments],
+//     };
+
+//     guitar.snapshots.push(snap);
+
+//     // Création mesure TRRec
+//     const trRec = components.find(c => c.name === "trRecPads");
+//     if (trRec) {
+
+//         const itemIndex = guitar.snapshots.length - 1;
+//         const dur = trRec.initDur;
+
+//         const measure = [
+//             { item: itemIndex, etat: dur },
+//             { item: null, etat: 0 },
+//             { item: null, etat: 0 },
+//             { item: null, etat: 0 }
+//         ];
+
+//         guitar.sequence.push(measure);
+
+//         const mIndex = guitar.sequence.length - 1;
+//         guitar.currentMeasure = mIndex;
+
+//         trRec.measureIndex = mIndex;
+//         trRec.states = measure;
+//         trRec.invalidate();
+//     }
+
+//     // Sync LCD2
+//     const lcd2 = components.find(c => c.name === "lcd2");
+//     if (lcd2) {
+//         lcd2.items = guitar.snapshots.map(s => s.title);
+//         lcd2.isOn = true;
+//         lcd2.state = lcd2.items.length - 1;
+//         lcd2.invalidate();
+//     }
+// }
+
+(components, source, evt) => {
+
+    if (source.name !== "trRecPads") return;
+    if (evt.type !== "request-add") return;
+
+    const lcd2 = components.find(c => c.name === "lcd2");
+    if (!lcd2) return;
+
+    // LCD vide → pas d’ajout possible
+    if (!lcd2.items || lcd2.items.length === 0) return;
+
+    const itemIndex = lcd2.state;
+    const itemObj   = lcd2.items[itemIndex];
+
+    if (!itemObj) return;
+
+    const index = evt.index;
+
+    // Ajout externe : état = 1 + objet complet du LCD
+    source.states[index] = {
+        etat: 1,
+        item: itemObj,      // l’objet complet
+        itemIndex: itemIndex
+    };
+
+    source.invalidate();
+
+    source.onChange?.({
+        type: "add",
+        index,
+        etat: 1,
+        item: itemObj,
+        itemIndex
+    });
+},
+
+(components, source, evt) => {
+
+    // On ne réagit qu’au BPMControl
+    if (source.name !== "bpmCtrl") return;
+    if (!evt || evt.type !== "tick") return;
+
+    // Trouver le TRRecPads
+    const tr = components.find(c => c.name === "trRecPads");
+    if (!tr) return;
+
+    // Avancer le playhead
+    tr.advancePlayhead();
+},
+
+// PLAY BUTTON → active/désactive le BPM
+(components, source, newState) => {
+
+    const playBtn = components.find(c => c.name === "playBtn");
+    if (source !== playBtn) return;
+
+    const bpm = components.find(c => c.name === "bpmCtrl");
+    if (!bpm) return;
+
+    bpm.isPlaying = (newState === 1);
+
+    if (bpm.isPlaying) {
+        bpm.lastStepTime = millis();
+        bpm.ledPhase = 1;
+    }
+
+    bpm.invalidate();
 }
+,
+
+// RESTAURATION D’UN SNAPSHOT (LCD2 → Guitar)
+(components, source, newState) => {
+
+    if (source.name !== "lcd2") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    const snap = guitar.snapshots[newState];
+    if (!snap) return;
+
+    // --- ROOT ---
+    if (snap.root !== null) {
+        guitar.theory.setRoot(snap.root);
+    } else {
+        guitar.theory.root = null;
+    }
+
+    // --- PINNED NOTES ---
+    guitar.pinnedNotes = [...snap.pinnedNotes];
+
+    // --- SELECTED NOTES ---
+    guitar.selectedNotes = [...snap.selectedNotes];
+
+    // --- MARKERS ---
+    guitar.markerSegments = [...snap.markerSegments];
+
+    guitar.invalidate();
+
+    console.log("Snapshot restauré :", snap.title);
+},
+// SUPPRESSION D’UN SNAPSHOT (trashBtn)
+(components, source, newState) => {
+
+    if (source.name !== "trashBtn") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const lcd2   = components.find(c => c.name === "lcd2");
+
+    if (!guitar || !lcd2) return;
+
+    const idx = lcd2.state;
+
+    if (idx < 0 || idx >= guitar.snapshots.length) return;
+
+    // suppression
+    guitar.snapshots.splice(idx, 1);
+
+    // mise à jour LCD2
+    lcd2.items = guitar.snapshots.map(s => s.title);
+
+    if (lcd2.items.length === 0) {
+        lcd2.setOnOff(false);
+    } else {
+        lcd2.state = Math.min(idx, lcd2.items.length - 1);
+    }
+
+    lcd2.invalidate();
+    guitar.invalidate();
+
+    console.log("Snapshot supprimé :", idx);
+},
+
+
+// TRREC → GUITAR : restauration snapshot par index
+(components, source, evt) => {
+
+    if (source.name !== "trRecPads") return;
+    if (!evt || evt.type !== "padChange") return;
+
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar) return;
+
+    //  snapshotIndex = index du pad
+    const snapshotIndex = evt.index;
+
+    const snap = guitar.snapshots[snapshotIndex];
+    if (!snap) return;
+
+    // --- RESTAURATION ---
+    if (snap.root !== null) guitar.theory.setRoot(snap.root);
+    else guitar.theory.root = null;
+
+    guitar.pinnedNotes    = [...snap.pinnedNotes];
+    guitar.selectedNotes  = [...snap.selectedNotes];
+    guitar.markerSegments = [...snap.markerSegments];
+
+    guitar.invalidate();
+
+
+}
+
+
+
 
 
 ];
