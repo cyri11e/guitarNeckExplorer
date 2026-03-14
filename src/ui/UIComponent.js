@@ -313,6 +313,7 @@ triggerChange(newState) {
 
     mouseDragged(evt) {
         if (!this.isPressed) return false;
+        if (!evt.altKey) return false; // pas de drag sans ALT
 
         const dx = evt.x - this.pressX;
         const dy = evt.y - this.pressY;

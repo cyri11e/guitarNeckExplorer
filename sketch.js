@@ -1,5 +1,24 @@
 let app;
 
+window.addEventListener("keydown", (e) => {
+    if (e.key === "Alt") {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+window.addEventListener("keydown", (e) => {
+    if (e.key === "Alt") {
+        document.body.style.cursor = "move";
+    }
+}, { passive: false });
+
+window.addEventListener("keyup", (e) => {
+    if (e.key === "Alt") {
+        document.body.style.cursor = "default";
+    }
+});
+
+
 function setup() {
     createCanvas(windowWidth, windowHeight);
 
