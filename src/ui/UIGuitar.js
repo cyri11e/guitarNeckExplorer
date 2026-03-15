@@ -414,8 +414,8 @@ fromScreen(x, y) {
         return true;
     }
 
-    _emitPopOut(note, type) {
-        this.overlays?.enqueuePopOut(note, type);
+    _emitPopOut(note, type, opts = {}) {
+        this.overlays?.enqueuePopOut(note, type, opts);
     }
 
     _removeWithPopOut(list, fret, string, type) {
@@ -432,6 +432,130 @@ fromScreen(x, y) {
             this._emitPopOut(n, type);
         }
         list.length = 0;
+    }
+
+    _normalizeSnapshotNotes(list) {
+        const out = [];
+        const seen = new Set();
+
+        for (const n of (list || [])) {
+            if (!n) continue;
+            const fret = n.fret;
+            const string = n.string;
+            if (fret == null || string == null) continue;
+
+            const key = `${string}:${fret}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push({ fret, string });
+        }
+
+        return out;
+    }
+
+    _transitionNoteList(
+        currentList,
+        targetList,
+        type,
+        popInDuration = 220,
+        replayExisting = false,
+        popInAnimType = "pop",
+        popOutAnimType = "popOut",
+        popOutDuration = 380
+    ) {
+        const now = millis();
+        const currentMap = new Map(currentList.map(n => [`${n.string}:${n.fret}`, n]));
+        const targetMap = new Map(targetList.map(n => [`${n.string}:${n.fret}`, n]));
+
+        // 1) Sorties: tout ce qui n'existe plus -> pop-out.
+        for (const n of currentList) {
+            const key = `${n.string}:${n.fret}`;
+            if (!targetMap.has(key)) {
+                this._emitPopOut(n, type, {
+                    animType: popOutAnimType,
+                    duration: popOutDuration
+                });
+            }
+        }
+
+        // 2) Entrées: nouvelles notes -> pop-in rapide.
+        const next = [];
+        for (const n of targetList) {
+            const key = `${n.string}:${n.fret}`;
+            const existing = currentMap.get(key);
+
+            if (existing) {
+                if (replayExisting) {
+                    existing.animStart = now;
+                    existing.animDuration = popInDuration;
+                    existing.animType = popInAnimType;
+                }
+                next.push(existing);
+            } else {
+                next.push({
+                    fret: n.fret,
+                    string: n.string,
+                    animStart: now,
+                    animDuration: popInDuration,
+                    animType: popInAnimType
+                });
+            }
+        }
+
+        return next;
+    }
+
+    applySnapshotAnimated(snap, opts = {}) {
+        if (!snap) return;
+
+        const {
+            popInDuration = 220,
+            includeMarkers = true,
+            replayExisting = false,
+            animProfile = "default"
+        } = opts;
+
+        const isSequenceProfile = animProfile === "sequence";
+        const popInAnimType = isSequenceProfile ? "popSeq" : "pop";
+        const popOutAnimType = isSequenceProfile ? "popOutSeq" : "popOut";
+        const popOutDuration = isSequenceProfile ? 260 : 380;
+
+        if (snap.root !== null && snap.root !== undefined) {
+            this.theory.setRoot(snap.root);
+        } else {
+            this.theory.root = null;
+        }
+
+        const targetPinned = this._normalizeSnapshotNotes(snap.pinnedNotes);
+        const targetSelected = this._normalizeSnapshotNotes(snap.selectedNotes);
+
+        this.pinnedNotes = this._transitionNoteList(
+            this.pinnedNotes,
+            targetPinned,
+            "pinned",
+            popInDuration,
+            replayExisting,
+            popInAnimType,
+            popOutAnimType,
+            popOutDuration
+        );
+
+        this.selectedNotes = this._transitionNoteList(
+            this.selectedNotes,
+            targetSelected,
+            "selected",
+            popInDuration,
+            replayExisting,
+            popInAnimType,
+            popOutAnimType,
+            popOutDuration
+        );
+
+        if (includeMarkers) {
+            this.markerSegments = [...(snap.markerSegments || [])];
+        }
+
+        this.invalidate();
     }
 
     togglePinnedNote(fret, string) {

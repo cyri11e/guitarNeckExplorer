@@ -200,6 +200,26 @@ if (opts.anim && opts.anim.type === "pop") {
     fillColor = popColor;
 }
 
+if (opts.anim && opts.anim.type === "popSeq") {
+    const t = constrain(opts.anim.t, 0, 1);
+
+    // Sequence replay: pop plus court et plus compact
+    const s = 1.3;
+    const u = t - 1;
+    const backOut = 1 + (s + 1) * u * u * u + s * u * u;
+
+    const startScale = 0.55;
+    const popScale = lerp(startScale, 1, backOut);
+    R *= popScale;
+
+    y -= R * 0.10 * (1 - t);
+
+    const popAlpha = lerp(170, 255, t);
+    const popColor = color(fillColor);
+    popColor.setAlpha(popAlpha);
+    fillColor = popColor;
+}
+
 if (opts.anim && opts.anim.type === "popOut") {
     const t = constrain(opts.anim.t, 0, 1);
     const easeOut = 1 - Math.pow(1 - t, 3);
@@ -216,6 +236,31 @@ if (opts.anim && opts.anim.type === "popOut") {
 
     // Fade-out global
     const outAlpha = lerp(255, 0, easeOut);
+    const outColor = color(fillColor);
+    outColor.setAlpha(outAlpha);
+    fillColor = outColor;
+
+    if (effectiveOverlayAlpha == null) {
+        effectiveOverlayAlpha = outAlpha;
+    } else {
+        effectiveOverlayAlpha = min(effectiveOverlayAlpha, outAlpha);
+    }
+}
+
+if (opts.anim && opts.anim.type === "popOutSeq") {
+    const t = constrain(opts.anim.t, 0, 1);
+    const easeOut = 1 - Math.pow(1 - t, 2.2);
+
+    // Sequence fade-out: plus sobre qu'une suppression manuelle
+    const growPhase = min(t / 0.22, 1);
+    const shrinkPhase = max((t - 0.20) / 0.80, 0);
+    const growScale = lerp(1.0, 1.08, growPhase);
+    const shrinkScale = lerp(1.0, 0.22, shrinkPhase);
+    R *= growScale * shrinkScale;
+
+    y -= this.g.getThickness() * 0.025 * easeOut;
+
+    const outAlpha = lerp(230, 0, easeOut);
     const outColor = color(fillColor);
     outColor.setAlpha(outAlpha);
     fillColor = outColor;

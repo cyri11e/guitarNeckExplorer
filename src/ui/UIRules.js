@@ -1,4 +1,46 @@
 // ui_rules.js
+const LOOP_MODES = {
+    OFF: 0,
+    ONE_SHOT: 1,
+    ALL_SHOT: 2,
+    ONE_LOOP: 3,
+    ALL_LOOP: 4
+};
+
+function stopTRRecPlayback(components) {
+    const bpm = components.find(c => c.name === "bpmCtrl");
+    const playBtn = components.find(c => c.name === "playBtn");
+
+    if (bpm) {
+        bpm.isPlaying = false;
+        bpm.ledPhase = 0;
+        bpm.invalidate();
+    }
+
+    if (playBtn && playBtn.state !== 0) {
+        playBtn.state = 0;
+        playBtn.invalidate();
+    }
+}
+
+function resetTRRecPosition(trRec, loopMode) {
+    if (!trRec) return;
+
+    if (loopMode === LOOP_MODES.ALL_SHOT || loopMode === LOOP_MODES.ALL_LOOP) {
+        trRec.setMeasureIndex(0);
+    }
+
+    trRec.playIndex = 0;
+
+    if (Array.isArray(trRec.states)) {
+        for (const step of trRec.states) {
+            if (step) step.highlight = false;
+        }
+    }
+
+    trRec.invalidate();
+}
+
 const UI_RULES = [
 
     // RÈGLE : MetalSwitch (♯/♭) synchronise avec guitar.flatMode
@@ -211,14 +253,10 @@ guitar.invalidate();
     const guitar = components.find(c => c.name === "guitar1");
     if (!guitar) return;
 
-    console.log("[RULE:MARKER] Reçu :", evt);
-
     // 4) Toggle ON/OFF
     if (evt.type === "markerToggle") {
         guitar.markerMode = (evt.state === 1);
         guitar.markerPendingPoint = null;
-
-        console.log("[MARKER] Mode =", guitar.markerMode ? "ON" : "OFF");
 
         guitar.invalidate();
         return;
@@ -227,8 +265,6 @@ guitar.invalidate();
     // 5) Changement de couleur
     if (evt.type === "markerColor") {
         guitar.markerColor = marker.noteColors[evt.index];
-
-        console.log("[MARKER] Nouvelle couleur =", guitar.markerColor);
 
         guitar.invalidate();
         return;
@@ -1127,11 +1163,68 @@ guitar.invalidate();
     if (!evt || evt.type !== "tick") return;
 
     // Trouver le TRRecPads
-    const tr = components.find(c => c.name === "trRecPads");
+    const tr      = components.find(c => c.name === "trRecPads");
+    const loopBtn = components.find(c => c.name === "loopBtn");
     if (!tr) return;
 
-    // Avancer le playhead
-    tr.advancePlayhead();
+    const loopMode = loopBtn?.state ?? LOOP_MODES.ONE_LOOP;
+    if (loopMode === LOOP_MODES.OFF) return;
+
+    const previousMeasure = tr.measureIndex;
+    const stepResult = tr.advancePlayhead() || {};
+
+    if (!stepResult.wrapped) return;
+
+    const measureCount = Array.isArray(tr.measures) ? tr.measures.length : 1;
+    const lastMeasureIndex = Math.max(0, measureCount - 1);
+    const atLastMeasure = previousMeasure >= lastMeasureIndex;
+
+    if (loopMode === LOOP_MODES.ONE_SHOT) {
+        stopTRRecPlayback(components);
+        return;
+    }
+
+    if (loopMode === LOOP_MODES.ONE_LOOP) {
+        return;
+    }
+
+    if (loopMode === LOOP_MODES.ALL_SHOT) {
+        if (atLastMeasure) {
+            stopTRRecPlayback(components);
+            return;
+        }
+
+        tr.setMeasureIndex(previousMeasure + 1);
+        return;
+    }
+
+    if (loopMode === LOOP_MODES.ALL_LOOP) {
+        if (atLastMeasure) {
+            tr.setMeasureIndex(0);
+            return;
+        }
+
+        tr.setMeasureIndex(previousMeasure + 1);
+    }
+},
+
+// LOOP BUTTON → mode de lecture TRREC (off/1shot/allshot/1loop/allloop)
+(components, source, newState) => {
+
+    if (source.name !== "loopBtn") return;
+
+    const tr  = components.find(c => c.name === "trRecPads");
+    const bpm = components.find(c => c.name === "bpmCtrl");
+    if (!tr) return;
+
+    if (newState === LOOP_MODES.OFF) {
+        stopTRRecPlayback(components);
+        return;
+    }
+
+    if (bpm?.isPlaying) {
+        resetTRRecPosition(tr, newState);
+    }
 },
 
 // PLAY BUTTON → active/désactive le BPM
@@ -1141,13 +1234,36 @@ guitar.invalidate();
     if (source !== playBtn) return;
 
     const bpm = components.find(c => c.name === "bpmCtrl");
+    const tr = components.find(c => c.name === "trRecPads");
+    const loopBtn = components.find(c => c.name === "loopBtn");
     if (!bpm) return;
+
+    const loopMode = loopBtn?.state ?? LOOP_MODES.ONE_LOOP;
+
+    if (newState === 1 && loopMode === LOOP_MODES.OFF) {
+        playBtn.state = 0;
+        playBtn.invalidate();
+        bpm.isPlaying = false;
+        bpm.invalidate();
+        return;
+    }
 
     bpm.isPlaying = (newState === 1);
 
     if (bpm.isPlaying) {
         bpm.lastStepTime = millis();
         bpm.ledPhase = 1;
+        resetTRRecPosition(tr, loopMode);
+    } else if (tr) {
+        tr.playIndex = 0;
+
+        if (Array.isArray(tr.states)) {
+            for (const step of tr.states) {
+                if (step) step.highlight = false;
+            }
+        }
+
+        tr.invalidate();
     }
 
     bpm.invalidate();
@@ -1165,25 +1281,12 @@ guitar.invalidate();
     const snap = guitar.snapshots[newState];
     if (!snap) return;
 
-    // --- ROOT ---
-    if (snap.root !== null) {
-        guitar.theory.setRoot(snap.root);
-    } else {
-        guitar.theory.root = null;
-    }
+    guitar.applySnapshotAnimated(snap, {
+        popInDuration: 260,
+        includeMarkers: true
+    });
 
-    // --- PINNED NOTES ---
-    guitar.pinnedNotes = [...snap.pinnedNotes];
-
-    // --- SELECTED NOTES ---
-    guitar.selectedNotes = [...snap.selectedNotes];
-
-    // --- MARKERS ---
-    guitar.markerSegments = [...snap.markerSegments];
-
-    guitar.invalidate();
-
-    console.log("Snapshot restauré :", snap.title);
+   // console.log("Snapshot restauré :", snap.title);
 },
 // SUPPRESSION D’UN SNAPSHOT (trashBtn)
 (components, source, newState) => {
@@ -1234,15 +1337,13 @@ guitar.invalidate();
     const snap = guitar.snapshots[snapshotIndex];
     if (!snap) return;
 
-    // --- RESTAURATION ---
-    if (snap.root !== null) guitar.theory.setRoot(snap.root);
-    else guitar.theory.root = null;
-
-    guitar.pinnedNotes    = [...snap.pinnedNotes];
-    guitar.selectedNotes  = [...snap.selectedNotes];
-    guitar.markerSegments = [...snap.markerSegments];
-
-    guitar.invalidate();
+    // Transition sequence TRREC: pop-in plus rapide + fade-out via pop-out.
+    guitar.applySnapshotAnimated(snap, {
+        popInDuration: 170,
+        includeMarkers: true,
+        replayExisting: true,
+        animProfile: "sequence"
+    });
 
     // --- LCD2 ---
     lcd2.state = snapshotIndex;

@@ -4,8 +4,10 @@ class TRRecPads extends UIComponent {
         super();
 
         this.padCount = cfg.padCount ?? 16;
+        this.gridCols = cfg.gridCols ?? 4;
+        this.gridRows = Math.max(1, Math.ceil(this.padCount / this.gridCols));
 
-        this.aspectRatio = this.padCount / 1.2;
+        this.aspectRatio = cfg.aspectRatio ?? 1;
 
         const xp = cfg.xp ?? 0;
         const yp = cfg.yp ?? 0;
@@ -14,12 +16,10 @@ class TRRecPads extends UIComponent {
         this.setResponsive(xp, yp, sp);
         this.updateResponsive();
 
-        // ajout du flag highlight
-this.states = Array.from({ length: this.padCount }, () => ({
-    etat: 0,
-    highlight: false,
-    flash: 0
-}));
+        // Mesures TRREC
+        this.measures = [this.createEmptyMeasure()];
+        this.measureIndex = 0;
+        this.states = this.measures[this.measureIndex];
 
 
         this.shortcutKey = cfg.shortcutKey || null;
@@ -30,6 +30,87 @@ this.states = Array.from({ length: this.padCount }, () => ({
 
         // playhead externe
         this.playIndex = 0;
+    }
+
+    createEmptyStep() {
+        return {
+            etat: 0,
+            highlight: false,
+            flash: 0,
+            item: null,
+            itemIndex: null
+        };
+    }
+
+    createEmptyMeasure() {
+        return Array.from({ length: this.padCount }, () => this.createEmptyStep());
+    }
+
+    setMeasureIndex(index) {
+        if (!Number.isFinite(index)) return;
+        if (!this.measures || this.measures.length === 0) {
+            this.measures = [this.createEmptyMeasure()];
+        }
+
+        const clamped = constrain(index, 0, this.measures.length - 1);
+        this.measureIndex = clamped;
+        this.states = this.measures[this.measureIndex];
+        this.playIndex = 0;
+        this.invalidate();
+    }
+
+    addMeasureAfterCurrent() {
+        const insertAt = this.measureIndex + 1;
+        this.measures.splice(insertAt, 0, this.createEmptyMeasure());
+        this.setMeasureIndex(insertAt);
+
+        this.onChange?.({
+            type: "measure-add",
+            measureIndex: this.measureIndex,
+            measureCount: this.measures.length
+        });
+    }
+
+    cloneMeasureAfterCurrent() {
+        const src = this.measures[this.measureIndex] || this.createEmptyMeasure();
+
+        const cloned = Array.from({ length: this.padCount }, (_, i) => ({
+            ...this.createEmptyStep(),
+            etat: src[i]?.etat === 1 ? 1 : 0,
+            item: src[i]?.item ?? null,
+            itemIndex: src[i]?.itemIndex ?? null
+        }));
+
+        const insertAt = this.measureIndex + 1;
+        this.measures.splice(insertAt, 0, cloned);
+        this.setMeasureIndex(insertAt);
+
+        this.onChange?.({
+            type: "measure-clone",
+            measureIndex: this.measureIndex,
+            measureCount: this.measures.length
+        });
+    }
+
+    removeCurrentMeasure() {
+        if (!this.measures || this.measures.length === 0) {
+            this.measures = [this.createEmptyMeasure()];
+        }
+
+        if (this.measures.length === 1) {
+            this.measures[0] = this.createEmptyMeasure();
+            this.setMeasureIndex(0);
+        } else {
+            this.measures.splice(this.measureIndex, 1);
+            const nextIndex = min(this.measureIndex, this.measures.length - 1);
+            this.setMeasureIndex(nextIndex);
+        }
+
+        this.onChange?.({
+            type: "measure-remove",
+            measureIndex: this.measureIndex,
+            measureCount: this.measures.length
+        });
     }
 
     // appelé par le moteur global (tick BPM)
@@ -80,9 +161,16 @@ this.onChange?.({
 
 
     // 3) seulement maintenant on avance
-    this.playIndex = (this.playIndex + 1) % this.padCount;
+    const wrapped = (idx + 1) >= this.padCount;
+    this.playIndex = wrapped ? 0 : (idx + 1);
 
     this.invalidate();
+
+    return {
+        stepIndex: idx,
+        wrapped,
+        measureIndex: this.measureIndex
+    };
 }
 
 
@@ -96,8 +184,18 @@ this.onChange?.({
 
         this.states = Array.from({ length: this.padCount }, (_, i) => ({
             etat: arr[i]?.etat === 1 ? 1 : 0,
-            highlight: false
+            highlight: false,
+            flash: 0,
+            item: arr[i]?.item ?? null,
+            itemIndex: arr[i]?.itemIndex ?? null
         }));
+
+        if (!this.measures || this.measures.length === 0) {
+            this.measures = [this.states];
+            this.measureIndex = 0;
+        } else {
+            this.measures[this.measureIndex] = this.states;
+        }
 
         this.invalidate();
     }
@@ -109,13 +207,86 @@ this.onChange?.({
         const mx = evt.x;
         const my = evt.y;
 
-        const padAreaH = this.h;
-        const padSize = this.w / this.padCount;
+        const outerPadY = this.h * 0.015;
+        const sectionGap = this.h * 0.008;
+        const controlH = this.h * 0.16;
 
-        if (my < this.y || my > this.y + padAreaH) return false;
+        const padAreaY = this.y + outerPadY;
+        const padAreaH = this.h - controlH - sectionGap - outerPadY * 2;
+        const controlY = padAreaY + padAreaH + sectionGap;
 
-        const index = Math.floor((mx - this.x) / padSize);
+        // -------------------------------------------------
+        // BARRE DE CONTROLES MESURES
+        // -------------------------------------------------
+        if (my >= controlY && my <= controlY + controlH) {
+            const btnH = controlH * 0.72;
+            const btnW = btnH * 0.875;
+            const btnY = controlY + (controlH - btnH) * 0.5;
+            const gap = btnW * 0.18;
+
+            const plusX = this.x + this.w * 0.03;
+            const cloneX = plusX + btnW + gap;
+            const prevX = cloneX + btnW + gap;
+
+            const minusX = this.x + this.w * 0.97 - btnW;
+            const nextX = minusX - gap - btnW;
+
+            const isInside = (x, y, w, h) => (
+                mx >= x && mx <= x + w && my >= y && my <= y + h
+            );
+
+            if (isInside(plusX, btnY, btnW, btnH)) {
+                this.addMeasureAfterCurrent();
+                return true;
+            }
+
+            if (isInside(cloneX, btnY, btnW, btnH)) {
+                this.cloneMeasureAfterCurrent();
+                return true;
+            }
+
+            if (isInside(prevX, btnY, btnW, btnH)) {
+                this.setMeasureIndex(this.measureIndex - 1);
+                return true;
+            }
+
+            if (isInside(nextX, btnY, btnW, btnH)) {
+                this.setMeasureIndex(this.measureIndex + 1);
+                return true;
+            }
+
+            if (isInside(minusX, btnY, btnW, btnH)) {
+                this.removeCurrentMeasure();
+                return true;
+            }
+
+            return true;
+        }
+
+        if (my < padAreaY || my > padAreaY + padAreaH) return false;
+
+        const padAreaX = this.x + this.w * 0.02;
+        const padAreaW = this.w * 0.96;
+        if (mx < padAreaX || mx > padAreaX + padAreaW) return false;
+
+        const contentPadX = padAreaW * 0.04;
+        const contentPadY = padAreaH * 0.05;
+
+        const gridX = padAreaX + contentPadX;
+        const gridY = padAreaY + contentPadY;
+        const gridW = padAreaW - contentPadX * 2;
+        const gridH = padAreaH - contentPadY * 2;
+
+        const cellW = gridW / this.gridCols;
+        const cellH = gridH / this.gridRows;
+
+        const col = Math.floor((mx - gridX) / cellW);
+        const row = Math.floor((my - gridY) / cellH);
+
+        const index = row * this.gridCols + col;
         if (!Number.isFinite(index)) return false;
+        if (col < 0 || col >= this.gridCols) return false;
+        if (row < 0 || row >= this.gridRows) return false;
         if (index < 0 || index >= this.states.length) return false;
 
         const old = this.states[index];
@@ -123,7 +294,7 @@ this.onChange?.({
 
         // suppression interne (1 → 0)
         if (old.etat !== 0) {
-            this.states[index] = { etat: 0, highlight: false };
+            this.states[index] = this.createEmptyStep();
             this.invalidate();
 
             this.onChange?.({
@@ -153,42 +324,116 @@ this.onChange?.({
         strokeWeight(this.w * 0.003);
         rect(this.x, this.y, this.w, this.h, this.h * 0.08);
 
-        const padAreaH = this.h;
+        const outerPadY = this.h * 0.015;
+        const sectionGap = this.h * 0.008;
+        const controlH = this.h * 0.16;
+        const padAreaY = this.y + outerPadY;
+        const padAreaH = this.h - controlH - sectionGap - outerPadY * 2;
+        const controlY = padAreaY + padAreaH + sectionGap;
 
-        const padSize = (this.w * 0.96) / this.padCount;
-        const padW = padSize * 0.80;
-        const padH = padAreaH * 0.75;
+        const padAreaX = this.x + this.w * 0.02;
+        const padAreaW = this.w * 0.96;
 
-        const padOffsetX = (padSize - padW) / 2;
-        const padOffsetY = (padAreaH - padH) / 2;
+        // Liseret externe dedie aux 16 pads
+        noFill();
+        stroke(105, 105, 105, 220);
+        strokeWeight(max(1, this.h * 0.008));
+        rect(padAreaX, padAreaY, padAreaW, padAreaH, this.h * 0.04);
 
-        const radius = padH * 0.08;
-        const sw = padW * 0.10;
+        // -------------------------------------------------
+        // BARRE DE CONTROLES MESURES
+        // -------------------------------------------------
+        const btnH = controlH * 0.72;
+        const btnW = btnH * 0.875;
+        const btnY = controlY + (controlH - btnH) * 0.5;
+        const gap = btnW * 0.18;
+        const radiusBtn = btnH * 0.2;
 
-        const groupGap = padSize * 0.15;
+        const plusX = this.x + this.w * 0.03;
+        const cloneX = plusX + btnW + gap;
+        const prevX = cloneX + btnW + gap;
 
-        let xCursor = this.x + (this.w - (padSize * this.padCount + groupGap * 3)) / 2;
+        const minusX = this.x + this.w * 0.97 - btnW;
+        const nextX = minusX - gap - btnW;
+
+        // Fond barre
+        noStroke();
+        fill(20, 20, 20, 170);
+        rect(this.x + this.w * 0.02, controlY + this.h * 0.002, this.w * 0.96, controlH * 0.96, radiusBtn);
+
+        const drawBtn = (x, symbol) => {
+            stroke(150);
+            strokeWeight(max(1, btnH * 0.08));
+            fill(50);
+            rect(x, btnY, btnW, btnH, radiusBtn);
+
+            noStroke();
+            fill(230);
+            textAlign(CENTER, CENTER);
+            textSize(btnH * 0.55);
+            text(symbol, x + btnW * 0.5, btnY + btnH * 0.52);
+        };
+
+        drawBtn(plusX, "+");
+        drawBtn(cloneX, "C");
+        drawBtn(prevX, "<");
+        drawBtn(nextX, ">");
+        drawBtn(minusX, "-");
+
+        noStroke();
+        fill(200);
+        textAlign(CENTER, CENTER);
+
+        const seqLeft = prevX + btnW + gap;
+        const seqRight = nextX - gap;
+        const seqX = (seqLeft < seqRight)
+            ? (seqLeft + seqRight) * 0.5
+            : this.x + this.w * 0.5;
+
+        const seqLabel = `Seq ${this.measureIndex + 1}/${this.measures.length}`;
+        const seqAvail = max(1, seqRight - seqLeft);
+
+        let seqSize = controlH * 0.36;
+        textSize(seqSize);
+        while (textWidth(seqLabel) > seqAvail * 0.92 && seqSize > 7) {
+            seqSize *= 0.9;
+            textSize(seqSize);
+        }
+
+        text(
+            seqLabel,
+            seqX,
+            controlY + controlH * 0.52
+        );
+
+        const contentPadX = padAreaW * 0.02;
+        const contentPadY = padAreaH * 0.03;
+
+        const gridX = padAreaX + contentPadX;
+        const gridY = padAreaY + contentPadY;
+        const gridW = padAreaW - contentPadX * 2;
+        const gridH = padAreaH - contentPadY * 2;
+
+        const cellW = gridW / this.gridCols;
+        const cellH = gridH / this.gridRows;
+
+        const padW = cellW * 0.90;
+        const padH = cellH * 0.90;
+        const radius = padH * 0.12;
+        const sw = max(1, min(padW, padH) * 0.12);
 
         for (let i = 0; i < this.padCount; i++) {
 
-            // --- GAP + LIGNE ENTRE GROUPES DE 4 ---
-            if (i > 0 && i % 4 === 0) {
-
-                const sepX = xCursor + groupGap * 0.5;
-
-                push();
-                stroke(80);
-                strokeWeight(2);
-                line(sepX, this.y + padOffsetY, sepX, this.y + padOffsetY + padH);
-                pop();
-
-                xCursor += groupGap;
-            }
+            const row = Math.floor(i / this.gridCols);
+            const col = i % this.gridCols;
 
             const s = this.states[i] || { etat: 0, highlight: false };
 
-            const x = xCursor + padOffsetX;
-            const y = this.y + padOffsetY;
+            const cellX = gridX + col * cellW;
+            const cellY = gridY + row * cellH;
+
+            const x = cellX + (cellW - padW) * 0.5;
+            const y = cellY + (cellH - padH) * 0.5;
 
             push();
 
@@ -278,8 +523,6 @@ if (s.flash > 0.01) {
 }
 
             pop();
-
-            xCursor += padSize;
         }
     }
 }

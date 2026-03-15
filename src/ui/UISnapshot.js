@@ -20,6 +20,8 @@ class SnapshotButton extends UIComponent {
         // NOUVEAU : label optionnel
         this.label = cfg.label || null;
         this.led = cfg.led ?? false;
+        this.stateCount = Math.max(2, cfg.stateCount ?? 2);
+        this.stateLabels = Array.isArray(cfg.stateLabels) ? cfg.stateLabels : null;
 
         this._state = 0;
     }
@@ -46,7 +48,12 @@ class SnapshotButton extends UIComponent {
     }
 
 trigger() {
-    this.state = this.state ? 0 : 1;
+    if (this.stateCount <= 2) {
+        this.state = this.state ? 0 : 1;
+        return;
+    }
+
+    this.state = (this.state + 1) % this.stateCount;
 }
 
 
@@ -76,12 +83,14 @@ draw() {
     // -----------------------------------------
     // LABEL (toujours affiché)
     // -----------------------------------------
-    if (this.label) {
+    const activeLabel = this.stateLabels?.[this._state] ?? this.label;
+
+    if (activeLabel) {
         noStroke();
         fill(230);
         textAlign(CENTER, CENTER);
         textSize(this.h * 0.55);
-        text(this.label, this.x + this.w * 0.5, this.y + this.h * 0.5);
+        text(activeLabel, this.x + this.w * 0.5, this.y + this.h * 0.5);
     }
 
 // -----------------------------------------
@@ -93,7 +102,7 @@ if (this.led) {
     const ledY = this.y + ledR * 1.2;
 
     noStroke();
-    fill(this._state === 1 ? color(255, 20, 20) : color(80, 80, 80));
+    fill(this._state !== 0 ? color(255, 20, 20) : color(80, 80, 80));
     circle(ledX, ledY, ledR);
 }
 
@@ -102,7 +111,7 @@ if (this.led) {
     // Si pas de label → icône appareil photo
     // (comportement d’origine)
     // -----------------------------------------
-    if (!this.label) {
+    if (!activeLabel) {
         const cx = this.x + this.w * 0.5;
         const cy = this.y + this.h * 0.5;
         const r  = this.w * 0.25;

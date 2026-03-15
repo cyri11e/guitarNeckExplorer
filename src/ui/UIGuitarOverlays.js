@@ -50,8 +50,13 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         return false;
     }
 
-    enqueuePopOut(note, type = "pinned") {
+    enqueuePopOut(note, type = "pinned", opts = {}) {
         if (!note) return;
+
+        const {
+            animType = "popOut",
+            duration = 380
+        } = opts;
 
         const app = this.g.app;
         const raw = app?.instrument?.getNoteAt(note.string - 1, note.fret);
@@ -77,6 +82,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             string: note.string,
             type,
             startAt: millis(),
+            animType,
+            popOutDuration: duration,
             label,
             fillColor: isSelected ? "#fcb900" : "#3494f3",
             strokeColor: "black",
@@ -143,12 +150,14 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             let animOpts = {};
             if (n.animStart) {
                 const elapsed = millis() - n.animStart;
-                const duration = 360; // pop plus nerveux
+                const duration = n.animDuration ?? 360;
                 const t = constrain(elapsed / duration, 0, 1);
                 if (t < 1) {
-                    animOpts = { anim: { type: "pop", t } };
+                    animOpts = { anim: { type: n.animType ?? "pop", t } };
                 } else {
                     delete n.animStart;
+                    delete n.animDuration;
+                    delete n.animType;
                 }
             }
 
@@ -188,10 +197,10 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         const g = this.g;
         if (!this.popOutNotes || this.popOutNotes.length === 0) return;
 
-        const duration = 380;
         const now = millis();
 
         this.popOutNotes = this.popOutNotes.filter(n => {
+            const duration = n.popOutDuration ?? 380;
             const t = constrain((now - n.startAt) / duration, 0, 1);
             if (t >= 1) return false;
 
@@ -204,7 +213,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 shapeType: n.shapeType,
                 hasShadow: n.hasShadow,
                 label: n.label,
-                anim: { type: "popOut", t }
+                anim: { type: n.animType ?? "popOut", t }
             });
 
             return true;

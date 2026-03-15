@@ -20,7 +20,12 @@ class InstrumentTheory {
 
         // Accordage sous forme d'objets complets
         this.tuning = tuning.map(t => this.parseNoteName(t));
-        this.runInternalTests();
+
+        // Tests internes verbeux, desactives en runtime normal.
+        this.enableInternalTests = false;
+        if (this.enableInternalTests) {
+            this.runInternalTests();
+        }
     }
 
     parseNoteName(name) {

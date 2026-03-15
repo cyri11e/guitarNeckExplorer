@@ -297,13 +297,6 @@ _buildEvent(mx, my) {
     // ============================================================
 
     onComponentChange(component, newState) {
-        console.log(
-            "%c[RULE DISPATCH] source=" + component.constructor.name +
-            "  id=" + (component.id ?? "none") +
-            "  state=" + newState,
-            "color:#00aaff; font-weight:bold;"
-        );
-
         for (const rule of UI_RULES) {
             rule(this.components, component, newState);
         }

@@ -447,10 +447,12 @@ loopBtn: {
     xp: 0,
     yp: 0,
     sp: 50,
-    label:'↺',
+    label:'OFF',
+    stateCount: 5,
+    stateLabels: ["OFF", "1", "A", "1↺", "A↺"],
     shortcutKey: "l",
     led: true,
-    description: "play snapshot"
+    description: "loop mode"
 },
 
 lcd2: {
@@ -484,7 +486,7 @@ trRecPanel: {
         type: "panel",
         xp: 5,
         yp: 35,
-        sp: 20,
+        sp: 60,
         aspectRatio: 1,
         children: ["trRecPads"]
     },
@@ -493,7 +495,7 @@ trRecPads: {
     type: "trRecPads",
     xp: 0,
     yp: 150,
-    sp: 80,
+    sp: 100,
     padCount: 16,      // nombre de pads
    //  aspectRatio: padCount / 4,   // dynamique
     description: "TR-REC Pads",
