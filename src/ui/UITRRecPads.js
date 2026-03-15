@@ -76,7 +76,7 @@ class TRRecPads extends UIComponent {
 
         const cloned = Array.from({ length: this.padCount }, (_, i) => ({
             ...this.createEmptyStep(),
-            etat: src[i]?.etat === 1 ? 1 : 0,
+            etat: src[i]?.etat === 2 ? 2 : (src[i]?.etat === 1 ? 1 : 0),
             item: src[i]?.item ?? null,
             itemIndex: src[i]?.itemIndex ?? null
         }));
@@ -155,6 +155,7 @@ const pad = this.states[idx];
 this.onChange?.({
     type: "padChange",
     padIndex: idx,
+    stepState: pad ? pad.etat : 0,
     snapshotIndex: pad ? pad.itemIndex : null
 });
 
@@ -183,7 +184,7 @@ this.onChange?.({
         if (!Array.isArray(arr)) return;
 
         this.states = Array.from({ length: this.padCount }, (_, i) => ({
-            etat: arr[i]?.etat === 1 ? 1 : 0,
+            etat: arr[i]?.etat === 2 ? 2 : (arr[i]?.etat === 1 ? 1 : 0),
             highlight: false,
             flash: 0,
             item: arr[i]?.item ?? null,
@@ -292,8 +293,28 @@ this.onChange?.({
         const old = this.states[index];
         if (!old) return false;
 
-        // suppression interne (1 → 0)
-        if (old.etat !== 0) {
+        // cycle interne : ON (1) -> DISABLED (2) -> OFF (0)
+        if (old.etat === 1) {
+            this.states[index] = {
+                ...old,
+                etat: 2,
+                highlight: false,
+                flash: 0
+            };
+            this.invalidate();
+
+            this.onChange?.({
+                type: "disable",
+                index,
+                etat: 2,
+                item: old.item ?? null,
+                itemIndex: old.itemIndex ?? null
+            });
+
+            return true;
+        }
+
+        if (old.etat === 2) {
             this.states[index] = this.createEmptyStep();
             this.invalidate();
 
@@ -509,6 +530,18 @@ this.onChange?.({
                         pop();
                     }
                 }
+            }
+
+            // --- PAD DISABLED ---
+            else if (s.etat === 2) {
+                noFill();
+                if (s.highlight) {
+                    stroke(210, 210, 210);
+                } else {
+                    stroke(130, 130, 130);
+                }
+                strokeWeight(sw);
+                rect(x, y, padW, padH, radius);
             }
 // --- FLASH TEMPO (blanc) ---
 if (s.flash > 0.01) {

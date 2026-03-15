@@ -32,6 +32,7 @@ class SnapshotButton extends UIComponent {
     get state() { return this._state; }
     set state(v) {
         this._state = v;
+        this.invalidate();
         this.onChange?.(this._state);
     }
 
@@ -50,10 +51,12 @@ class SnapshotButton extends UIComponent {
 trigger() {
     if (this.stateCount <= 2) {
         this.state = this.state ? 0 : 1;
+        this.invalidateNow?.();
         return;
     }
 
     this.state = (this.state + 1) % this.stateCount;
+    this.invalidateNow?.();
 }
 
 

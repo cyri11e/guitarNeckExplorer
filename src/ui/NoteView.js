@@ -249,16 +249,10 @@ if (opts.anim && opts.anim.type === "popOut") {
 
 if (opts.anim && opts.anim.type === "popOutSeq") {
     const t = constrain(opts.anim.t, 0, 1);
-    const easeOut = 1 - Math.pow(1 - t, 2.2);
+    const easeOut = 1 - Math.pow(1 - t, 1.9);
 
-    // Sequence fade-out: plus sobre qu'une suppression manuelle
-    const growPhase = min(t / 0.22, 1);
-    const shrinkPhase = max((t - 0.20) / 0.80, 0);
-    const growScale = lerp(1.0, 1.08, growPhase);
-    const shrinkScale = lerp(1.0, 0.22, shrinkPhase);
-    R *= growScale * shrinkScale;
-
-    y -= this.g.getThickness() * 0.025 * easeOut;
+    // Sequence fade-out pur: pas de scale, pas d'effet de retrecissement
+    y -= this.g.getThickness() * 0.012 * easeOut;
 
     const outAlpha = lerp(230, 0, easeOut);
     const outColor = color(fillColor);

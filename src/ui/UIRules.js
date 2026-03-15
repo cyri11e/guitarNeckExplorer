@@ -7,6 +7,208 @@ const LOOP_MODES = {
     ALL_LOOP: 4
 };
 
+const TRREC_EXPORT_TYPE = "guitarNeckExplorer.trrec";
+const TRREC_EXPORT_VERSION = 1;
+
+function deepClone(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeStepEtat(value) {
+    if (value === 2) return 2;
+    if (value === 1) return 1;
+    return 0;
+}
+
+function sanitizeSnapshot(snap) {
+    const src = snap || {};
+    return {
+        title: String(src.title ?? "Snapshot"),
+        pinnedNotes: Array.isArray(src.pinnedNotes) ? deepClone(src.pinnedNotes) : [],
+        selectedNotes: Array.isArray(src.selectedNotes) ? deepClone(src.selectedNotes) : [],
+        root: src.root ?? null,
+        markerSegments: Array.isArray(src.markerSegments) ? deepClone(src.markerSegments) : []
+    };
+}
+
+function createTRRecExportPayload(components) {
+    const guitar = components.find(c => c.name === "guitar1");
+    const trRec = components.find(c => c.name === "trRecPads");
+    if (!guitar || !trRec) return null;
+
+    const measures = Array.isArray(trRec.measures) ? trRec.measures : [];
+    const snapshots = Array.isArray(guitar.snapshots) ? guitar.snapshots : [];
+
+    const usedIndexSet = new Set();
+
+    const sequence = measures.map(measure => {
+        const steps = Array.isArray(measure) ? measure : [];
+        return steps.map(step => {
+            const etat = normalizeStepEtat(step?.etat);
+            const hasIdx = Number.isInteger(step?.itemIndex);
+            const itemIndex = hasIdx ? step.itemIndex : null;
+
+            if (itemIndex != null && itemIndex >= 0) {
+                usedIndexSet.add(itemIndex);
+            }
+
+            const out = { etat, itemIndex };
+
+            if (itemIndex == null && step?.item != null) {
+                out.item = String(step.item);
+            }
+
+            return out;
+        });
+    });
+
+    const usedIndices = [...usedIndexSet]
+        .filter(i => i >= 0 && i < snapshots.length)
+        .sort((a, b) => a - b);
+
+    const dependencies = usedIndices.map(sourceIndex => ({
+        sourceIndex,
+        snapshot: sanitizeSnapshot(snapshots[sourceIndex])
+    }));
+
+    return {
+        type: TRREC_EXPORT_TYPE,
+        version: TRREC_EXPORT_VERSION,
+        exportedAt: new Date().toISOString(),
+        padCount: trRec.padCount,
+        sequence,
+        dependencies
+    };
+}
+
+function downloadJSON(payload, filename) {
+    if (!payload) return;
+
+    const blob = new Blob([
+        JSON.stringify(payload, null, 2)
+    ], { type: "application/json" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function pickJSONFile(onData, onError) {
+    let input = document.getElementById("trrec-import-input");
+
+    if (!input) {
+        input = document.createElement("input");
+        input.type = "file";
+        input.id = "trrec-import-input";
+        input.accept = "application/json,.json";
+        input.style.display = "none";
+        document.body.appendChild(input);
+    }
+
+    input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const parsed = JSON.parse(String(reader.result ?? "{}"));
+                onData?.(parsed);
+            } catch (err) {
+                onError?.(err);
+            }
+            input.value = "";
+        };
+        reader.onerror = () => {
+            onError?.(new Error("read-error"));
+            input.value = "";
+        };
+        reader.readAsText(file);
+    };
+
+    input.click();
+}
+
+function applyTRRecImportPayload(components, payload) {
+    if (!payload || payload.type !== TRREC_EXPORT_TYPE) {
+        throw new Error("invalid-type");
+    }
+
+    const guitar = components.find(c => c.name === "guitar1");
+    const trRec = components.find(c => c.name === "trRecPads");
+    const lcd2 = components.find(c => c.name === "lcd2");
+    if (!guitar || !trRec || !lcd2) {
+        throw new Error("missing-components");
+    }
+
+    const depsRaw = Array.isArray(payload.dependencies) ? payload.dependencies : [];
+    const importedSnapshots = depsRaw.map(d => sanitizeSnapshot(d?.snapshot ?? d));
+
+    const sourceToImported = new Map();
+    depsRaw.forEach((d, idx) => {
+        if (Number.isInteger(d?.sourceIndex)) {
+            sourceToImported.set(d.sourceIndex, idx);
+        }
+    });
+
+    guitar.snapshots = importedSnapshots;
+
+    lcd2.items = guitar.snapshots.map(s => s.title);
+    lcd2.isOn = lcd2.items.length > 0;
+    lcd2.state = lcd2.items.length > 0 ? 0 : 0;
+    lcd2.invalidate();
+
+    const incomingMeasures = Array.isArray(payload.sequence) ? payload.sequence : [];
+    const expectedPadCount = trRec.padCount;
+
+    const rebuiltMeasures = incomingMeasures.map(measure => {
+        const row = Array.isArray(measure) ? measure : [];
+        return Array.from({ length: expectedPadCount }, (_, i) => {
+            const raw = row[i] || {};
+            const etat = normalizeStepEtat(raw.etat);
+
+            let newItemIndex = null;
+            if (Number.isInteger(raw.itemIndex)) {
+                if (sourceToImported.has(raw.itemIndex)) {
+                    newItemIndex = sourceToImported.get(raw.itemIndex);
+                } else if (raw.itemIndex >= 0 && raw.itemIndex < guitar.snapshots.length) {
+                    newItemIndex = raw.itemIndex;
+                }
+            }
+
+            const step = trRec.createEmptyStep();
+
+            // ON exige une dependance valide; DISABLED peut rester sans item pour servir de coupe.
+            if (etat === 1 && newItemIndex == null) {
+                return step;
+            }
+
+            step.etat = etat;
+            step.itemIndex = newItemIndex;
+            step.item = (newItemIndex != null)
+                ? lcd2.items[newItemIndex]
+                : (raw.item ?? null);
+
+            return step;
+        });
+    });
+
+    trRec.measures = rebuiltMeasures.length > 0
+        ? rebuiltMeasures
+        : [trRec.createEmptyMeasure()];
+
+    trRec.setMeasureIndex(0);
+    trRec.playIndex = 0;
+    trRec.invalidate();
+
+    guitar.invalidate();
+}
+
 function stopTRRecPlayback(components) {
     const bpm = components.find(c => c.name === "bpmCtrl");
     const playBtn = components.find(c => c.name === "playBtn");
@@ -1156,6 +1358,52 @@ guitar.invalidate();
     });
 },
 
+// EXPORT sequence TRREC + dependances snapshots
+(components, source, newState) => {
+
+    if (source.name !== "saveSeqBtn") return;
+    if (newState !== 1) return;
+
+    const payload = createTRRecExportPayload(components);
+    if (!payload) return;
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    const h = String(now.getHours()).padStart(2, "0");
+    const min = String(now.getMinutes()).padStart(2, "0");
+
+    downloadJSON(payload, `trrec-sequence-${y}${m}${d}-${h}${min}.json`);
+
+    source.state = 0;
+    source.invalidateNow?.();
+},
+
+// IMPORT sequence TRREC + dependances snapshots
+(components, source, newState) => {
+
+    if (source.name !== "loadSeqBtn") return;
+    if (newState !== 1) return;
+
+    pickJSONFile(
+        (payload) => {
+            try {
+                applyTRRecImportPayload(components, payload);
+            } catch (err) {
+                console.warn("Import sequence invalide:", err?.message || err);
+            } finally {
+                source.state = 0;
+                source.invalidateNow?.();
+            }
+        },
+        () => {
+            source.state = 0;
+            source.invalidateNow?.();
+        }
+    );
+},
+
 (components, source, evt) => {
 
     // On ne réagit qu’au BPMControl
@@ -1330,6 +1578,23 @@ guitar.invalidate();
     const guitar = components.find(c => c.name === "guitar1");
     const lcd2   = components.find(c => c.name === "lcd2");
     if (!guitar || !lcd2) return;
+
+    // Etat disabled: coupe nette de la tenue precedente
+    if (evt.stepState === 2) {
+        guitar.applySnapshotAnimated({
+            title: "__mute__",
+            pinnedNotes: [],
+            selectedNotes: [],
+            root: null,
+            markerSegments: []
+        }, {
+            popInDuration: 0,
+            includeMarkers: true,
+            replayExisting: false,
+            animProfile: "sequence"
+        });
+        return;
+    }
 
     const snapshotIndex = evt.snapshotIndex;
     if (snapshotIndex == null) return;

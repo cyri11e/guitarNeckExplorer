@@ -413,7 +413,7 @@ snapshotPanel: {
     yp: 55,
     sp: 20,
     aspectRatio: 1,
-    children: ["snapshotBtn","lcd2","playBtn","loopBtn","trashBtn","bpmCtrl"]
+    children: ["snapshotBtn","lcd2","playBtn","loopBtn","saveSeqBtn","loadSeqBtn","trashBtn","bpmCtrl"]
 },
 
 snapshotBtn: {
@@ -447,12 +447,32 @@ loopBtn: {
     xp: 0,
     yp: 0,
     sp: 50,
-    label:'OFF',
+    label:'Ø',
     stateCount: 5,
-    stateLabels: ["OFF", "1", "A", "1↺", "A↺"],
+    stateLabels: ["Ø", "1", "A", "1↺", "A↺"],
     shortcutKey: "l",
     led: true,
     description: "loop mode"
+},
+
+saveSeqBtn: {
+    type: "snapshotButton",
+    xp: 0,
+    yp: 0,
+    sp: 50,
+    label: "S",
+    shortcutKey: "e",
+    description: "export sequence"
+},
+
+loadSeqBtn: {
+    type: "snapshotButton",
+    xp: 0,
+    yp: 0,
+    sp: 50,
+    label: "I",
+    shortcutKey: "i",
+    description: "import sequence"
 },
 
 lcd2: {
