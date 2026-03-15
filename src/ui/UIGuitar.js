@@ -93,6 +93,10 @@ class Guitar extends UIComponent {
         this.playing = false;
         this.bpm = 80;
         this.sequence = [];
+
+        this._chainAddTimer = null;
+        this._chainAddQueue = [];
+        this._chainAddTarget = "pinned";
     }
 
     setBPM(bpm) {
@@ -388,6 +392,28 @@ fromScreen(x, y) {
         return this.selectedNotes.some(n => n.fret === fret && n.string === string);
     }
 
+    _addAnimatedNote(list, fret, string, burstType) {
+        const now = millis();
+        const idx = list.findIndex(n => n.fret === fret && n.string === string);
+
+        if (idx >= 0) {
+            // Note déjà présente: relance seulement le pop-in.
+            list[idx].animStart = now;
+            return false;
+        }
+
+        list.push({ fret, string, animStart: now });
+
+        this.interactionBursts.push({
+            fret,
+            string,
+            t: 0,
+            type: burstType
+        });
+        this._startBurstTimer();
+        return true;
+    }
+
     togglePinnedNote(fret, string) {
         const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);
 
@@ -397,16 +423,7 @@ fromScreen(x, y) {
 
         } else {
             // Pin
-            this.pinnedNotes.push({ fret, string, animStart: millis() });
-
-            // Animation rapide
-            this.interactionBursts.push({
-                fret,
-                string,
-                t: 0,
-                type: "pin"
-            });
-            this._startBurstTimer();
+            this._addAnimatedNote(this.pinnedNotes, fret, string, "pin");
         }
         this.invalidate();
     }
@@ -420,16 +437,7 @@ fromScreen(x, y) {
 
         } else {
             // Sélection
-            this.selectedNotes.push({ fret, string, animStart: millis() });
-
-            // Animation rapide
-            this.interactionBursts.push({
-                fret,
-                string,
-                t: 0,
-                type: "select"
-            });
-            this._startBurstTimer();
+            this._addAnimatedNote(this.selectedNotes, fret, string, "select");
         }
 
         this.invalidate();
@@ -480,6 +488,42 @@ fromScreen(x, y) {
             this.invalidate();
 
         }, 16); // ~60 FPS
+    }
+
+    _enqueueNotesChain(notes, usePinned = true) {
+        if (!Array.isArray(notes) || notes.length === 0) return;
+
+        this._chainAddQueue = notes.map(n => ({
+            string: n.string,
+            fret: n.fret
+        }));
+        this._chainAddTarget = usePinned ? "pinned" : "selected";
+
+        if (this._chainAddTimer) {
+            clearInterval(this._chainAddTimer);
+            this._chainAddTimer = null;
+        }
+
+        const stepMs = 55;
+
+        this._chainAddTimer = setInterval(() => {
+            if (this._chainAddQueue.length === 0) {
+                clearInterval(this._chainAddTimer);
+                this._chainAddTimer = null;
+                return;
+            }
+
+            const n = this._chainAddQueue.shift();
+
+            const target = this._chainAddTarget === "pinned"
+                ? this.pinnedNotes
+                : this.selectedNotes;
+
+            const burstType = this._chainAddTarget === "pinned" ? "pin" : "select";
+            this._addAnimatedNote(target, n.fret, n.string, burstType);
+
+            this.invalidate();
+        }, stepMs);
     }
 
     _moveFrets(list, delta) {
@@ -786,16 +830,7 @@ if (kc === ENTER) {
     if (notes.length === 0) return true;
 
     const usePinned = !keyIsDown(SHIFT);
-
-    if (usePinned) {
-        for (const n of notes) {
-            this.pinnedNotes.push({ string: n.string, fret: n.fret });
-        }
-    } else {
-        for (const n of notes) {
-            this.selectedNotes.push({ string: n.string, fret: n.fret });
-        }
-    }
+    this._enqueueNotesChain(notes, usePinned);
 
     this.invalidate();
     return true;
