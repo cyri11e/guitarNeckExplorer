@@ -2,9 +2,9 @@ const UI_CONFIG = {
 
     aspectPanel: {
         type: "panel",
-        xp: 5,
-        yp: 55,
-        sp: 20,
+        xp: 30,
+        yp: 30,
+        sp: 10,
         aspectRatio: 1.5,
         visible: true,
         debug: false,
@@ -25,9 +25,9 @@ const UI_CONFIG = {
 // PANEL HARMONIE
 harmonyPanel: {
     type: "panel",
-    xp: 5,
-    yp: 75,
-    sp: 20,
+    xp: 52,
+    yp: 50,
+    sp: 10,
     aspectRatio: 1.2,
     visible: true,
     isDraggable: true,
@@ -52,9 +52,9 @@ harmonyPanel: {
 // PANEL type de vue curseur
 cursorPanel: {
     type: "panel",
-    xp: 50,
-    yp: 75,
-    sp: 20,
+    xp: 52,
+    yp: 40,
+    sp: 10,
     aspectRatio: 1.2,
     visible: true,
     isDraggable: true,
@@ -319,8 +319,8 @@ metalCAGED: {
     panel2: {
         type: "panel",
         xp: 80,
-        yp: 55,
-        sp: 40,
+        yp: 30,
+        sp: 20,
         aspectRatio: 1.2,
         visible: true,
         debug: false,
@@ -333,9 +333,9 @@ metalCAGED: {
 
 guitar1: {
     type: "guitar",
-    xp: 5,
+    xp: 2,
     yp: 5,
-    sp: 40,
+    sp: 20,
     aspectRatio: 8,
     debug: false,
     isDraggable: true,
@@ -409,9 +409,9 @@ markerSelector1: {
 
 snapshotPanel: {
     type: "panel",
-    xp: 50,
-    yp: 55,
-    sp: 20,
+    xp: 2,
+    yp: 60,
+    sp: 10,
     aspectRatio: 1,
     children: ["snapshotBtn","lcd2","playBtn","loopBtn","saveSeqBtn","loadSeqBtn","trashBtn","bpmCtrl"]
 },
@@ -505,9 +505,9 @@ bpmCtrl: {
 
 trRecPanel: {
         type: "panel",
-        xp: 5,
-        yp: 35,
-        sp: 60,
+        xp: 2,
+        yp: 30,
+        sp: 30,
         aspectRatio: 1,
         children: ["trRecPads"]
     },

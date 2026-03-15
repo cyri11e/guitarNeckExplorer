@@ -125,7 +125,7 @@ class CAGEDOverlay {
         rect(x, y - hRect/2, w, hRect, hRect * 0.2);
 
         noFill();
-        stroke(40, 40, 40, 200);
+        stroke(40, 40, 40, 80);
         textSize(hRect * 0.8);
         text(box.shape, x + w/2, y);
         noStroke();
