@@ -120,7 +120,7 @@ class CAGEDOverlay {
 
         const hRect = g.getThickness();
 
-        fill(255, 255, 255, 85);
+        fill(255, 255, 255, 45);
         rectMode(CORNER);
         rect(x, y - hRect/2, w, hRect, hRect * 0.2);
 

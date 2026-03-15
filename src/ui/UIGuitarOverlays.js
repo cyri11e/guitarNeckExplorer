@@ -37,6 +37,19 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         this.noteRenderer.draw(x, y, opts);
     }
 
+    hasActiveNoteAnimations() {
+        const g = this.g;
+
+        const hasPopOut = (this.popOutNotes && this.popOutNotes.length > 0);
+        if (hasPopOut) return true;
+
+        const hasPopIn = (list) => (list || []).some(n => !!n.animStart);
+        if (hasPopIn(g.pinnedNotes)) return true;
+        if (hasPopIn(g.selectedNotes)) return true;
+
+        return false;
+    }
+
     enqueuePopOut(note, type = "pinned") {
         if (!note) return;
 
@@ -227,6 +240,10 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         const app = g.app;
 
         if (g.markerMode) return;
+        if (this.hasActiveNoteAnimations()) {
+            this.intervalOverlayNotes = [];
+            return;
+        }
         if (!g.isHovered) return;
 
         const h = g.hoveredNote;

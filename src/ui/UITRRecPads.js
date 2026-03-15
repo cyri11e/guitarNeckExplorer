@@ -5,7 +5,7 @@ class TRRecPads extends UIComponent {
 
         this.padCount = cfg.padCount ?? 16;
 
-        this.aspectRatio = this.padCount / 1.5;
+        this.aspectRatio = this.padCount / 1.2;
 
         const xp = cfg.xp ?? 0;
         const yp = cfg.yp ?? 0;
