@@ -162,8 +162,7 @@ class NoteRenderer {
 
         if (!label) return;
 
-        const colors = this.getColors(ghost, overlayAlpha);
-        const { blanc, noir } = colors;
+        let effectiveOverlayAlpha = overlayAlpha;
 
         const { base, chroma } = label;
 
@@ -200,6 +199,36 @@ if (opts.anim && opts.anim.type === "pop") {
     popColor.setAlpha(popAlpha);
     fillColor = popColor;
 }
+
+if (opts.anim && opts.anim.type === "popOut") {
+    const t = constrain(opts.anim.t, 0, 1);
+    const easeOut = 1 - Math.pow(1 - t, 3);
+
+    // Pop-out visible: petit gonflement puis disparition
+    const growPhase = min(t / 0.25, 1);
+    const shrinkPhase = max((t - 0.15) / 0.85, 0);
+    const growScale = lerp(1.0, 1.18, growPhase);
+    const shrinkScale = lerp(1.0, 0.05, shrinkPhase);
+    R *= growScale * shrinkScale;
+
+    // Drift vertical plus visible
+    y -= this.g.getThickness() * 0.04 * easeOut;
+
+    // Fade-out global
+    const outAlpha = lerp(255, 0, easeOut);
+    const outColor = color(fillColor);
+    outColor.setAlpha(outAlpha);
+    fillColor = outColor;
+
+    if (effectiveOverlayAlpha == null) {
+        effectiveOverlayAlpha = outAlpha;
+    } else {
+        effectiveOverlayAlpha = min(effectiveOverlayAlpha, outAlpha);
+    }
+}
+
+        const colors = this.getColors(ghost, effectiveOverlayAlpha);
+        const { blanc, noir } = colors;
 
 
         const STROKE = R / 10;

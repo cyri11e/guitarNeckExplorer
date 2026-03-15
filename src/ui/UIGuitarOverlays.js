@@ -9,6 +9,8 @@ class GuitarOverlays {
         this.style = style;
         this.intervalDispatcher = new MultiNotes(this.g);
         this.intervalOverlayNotes =[];
+        this.popOutNotes = [];
+        this._popOutTimer = null;
         this.intervalSelectorLabels = [
             "1",  // 0
             "b2", // 1
@@ -33,6 +35,57 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     // ------------------------------------------------------------
     drawNote(x, y, opts = {}) {
         this.noteRenderer.draw(x, y, opts);
+    }
+
+    enqueuePopOut(note, type = "pinned") {
+        if (!note) return;
+
+        const app = this.g.app;
+        const raw = app?.instrument?.getNoteAt(note.string - 1, note.fret);
+
+        let label = null;
+        if (raw) {
+            label = app.theory.getNoteLabel(
+                raw.index,
+                this.g.displayMode === "note" ? this.g.labelType : this.g.displayMode
+            );
+
+            const full = app.theory.getFullNote(raw.index);
+            if (label && full) label.chroma = full.chroma;
+        }
+
+        if (!label) {
+            label = { base: "", alt: "", type: "note", chroma: null };
+        }
+
+        const isSelected = type === "selected";
+        this.popOutNotes.push({
+            fret: note.fret,
+            string: note.string,
+            type,
+            startAt: millis(),
+            label,
+            fillColor: isSelected ? "#fcb900" : "#3494f3",
+            strokeColor: "black",
+            shapeType: isSelected ? "square" : "circle",
+            hasShadow: isSelected
+        });
+
+        this._startPopOutTimer();
+    }
+
+    _startPopOutTimer() {
+        if (this._popOutTimer) return;
+
+        this._popOutTimer = setInterval(() => {
+            if (!this.popOutNotes || this.popOutNotes.length === 0) {
+                clearInterval(this._popOutTimer);
+                this._popOutTimer = null;
+                return;
+            }
+
+            this.g.invalidate();
+        }, 16);
     }
 
 
@@ -116,6 +169,34 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             shapeType: "square",
             hasShadow: true
         });
+    }
+
+    drawPopOutNotes() {
+        const g = this.g;
+        if (!this.popOutNotes || this.popOutNotes.length === 0) return;
+
+        const duration = 380;
+        const now = millis();
+
+        this.popOutNotes = this.popOutNotes.filter(n => {
+            const t = constrain((now - n.startAt) / duration, 0, 1);
+            if (t >= 1) return false;
+
+            const pos = g.toScreen(n.fret, n.string);
+            if (!pos) return false;
+
+            this.drawNote(pos.x, pos.y, {
+                fillColor: n.fillColor,
+                strokeColor: n.strokeColor,
+                shapeType: n.shapeType,
+                hasShadow: n.hasShadow,
+                label: n.label,
+                anim: { type: "popOut", t }
+            });
+
+            return true;
+        });
+
     }
 
     // ------------------------------------------------------------
@@ -589,6 +670,7 @@ const list = this.intervalDispatcher
         // 2) Notes utilisateur
         this.drawPinnedNotes();
         this.drawSelectedNotes();
+        this.drawPopOutNotes();
 
         // 3) Animations (bursts)
         this.drawInteractionBursts();

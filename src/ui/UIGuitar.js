@@ -414,12 +414,32 @@ fromScreen(x, y) {
         return true;
     }
 
+    _emitPopOut(note, type) {
+        this.overlays?.enqueuePopOut(note, type);
+    }
+
+    _removeWithPopOut(list, fret, string, type) {
+        const idx = list.findIndex(n => n.fret === fret && n.string === string);
+        if (idx < 0) return false;
+
+        const [removed] = list.splice(idx, 1);
+        this._emitPopOut(removed, type);
+        return true;
+    }
+
+    _clearWithPopOut(list, type) {
+        for (const n of list) {
+            this._emitPopOut(n, type);
+        }
+        list.length = 0;
+    }
+
     togglePinnedNote(fret, string) {
         const idx = this.pinnedNotes.findIndex(n => n.fret === fret && n.string === string);
 
         if (idx >= 0) {
             // Dépin
-            this.pinnedNotes.splice(idx, 1);
+            this._removeWithPopOut(this.pinnedNotes, fret, string, "pinned");
 
         } else {
             // Pin
@@ -433,7 +453,7 @@ fromScreen(x, y) {
 
         if (idx >= 0) {
             // Déselection
-            this.selectedNotes.splice(idx, 1);
+            this._removeWithPopOut(this.selectedNotes, fret, string, "selected");
 
         } else {
             // Sélection
@@ -708,9 +728,7 @@ fromScreen(x, y) {
 
         // si on dépinne → on retire aussi de selected
         if (!this.isPinned(fret, string)) {
-            this.selectedNotes = this.selectedNotes.filter(
-                n => !(n.fret === fret && n.string === string)
-            );
+            this._removeWithPopOut(this.selectedNotes, fret, string, "selected");
         }
 
         this.invalidate();
@@ -768,13 +786,15 @@ keyPressed(k, kc) {
         if (usePinned) {
             // efface la dernière selected
             if (this.selectedNotes.length > 0) {
-                this.selectedNotes.pop();
+                const n = this.selectedNotes[this.selectedNotes.length - 1];
+                this._removeWithPopOut(this.selectedNotes, n.fret, n.string, "selected");
                 this.invalidate();
             }
         } else {
             // efface la dernière pinned
             if (this.pinnedNotes.length > 0) {
-                this.pinnedNotes.pop();
+                const n = this.pinnedNotes[this.pinnedNotes.length - 1];
+                this._removeWithPopOut(this.pinnedNotes, n.fret, n.string, "pinned");
                 this.invalidate();
             }
         }
@@ -787,13 +807,13 @@ keyPressed(k, kc) {
         if (usePinned) {
             // efface toutes les selected
             if (this.selectedNotes.length > 0) {
-                this.selectedNotes = [];
+                this._clearWithPopOut(this.selectedNotes, "selected");
                 this.invalidate();
             }
         } else {
             // efface toutes les pinned
             if (this.pinnedNotes.length > 0) {
-                this.pinnedNotes = [];
+                this._clearWithPopOut(this.pinnedNotes, "pinned");
                 this.invalidate();
             }
         }
