@@ -181,24 +181,24 @@ class NoteRenderer {
 if (opts.anim && opts.anim.type === "pop") {
     const t = constrain(opts.anim.t, 0, 1);
 
-    // EASING "backOut"
-    // Formule classique : overshoot léger pour un pop naturel
-    const overshoot = 1.4;
-    const inv = t - 1;
-    const eased = 1 + (overshoot * inv * inv * inv + overshoot * inv * inv);
+    // EASING "backOut" plus marqué
+    const s = 2.2;
+    const u = t - 1;
+    const backOut = 1 + (s + 1) * u * u * u + s * u * u;
 
-    // Application sur le rayon
-    R *= eased;
+    // Démarre petit puis overshoot visible avant stabilisation
+    const startScale = 0.35;
+    const popScale = lerp(startScale, 1, backOut);
+    R *= popScale;
 
-    // Position : léger offset vers le haut
-    y -= R * 0.1 * (1 - t);
+    // Montée plus franche au démarrage
+    y -= R * 0.22 * (1 - t);
 
-    // Couleur : plus vive au début
-    if (fillColor && typeof fillColor === 'string') {
-        // Si c'est une string, on peut la modifier, mais c'est compliqué.
-        // Pour simplicité, ajoutons une teinte
-        // Mais p5.js utilise color(), donc peut-être multiplier par une valeur.
-    }
+    // Fade-in rapide de la pastille
+    const popAlpha = lerp(110, 255, t);
+    const popColor = color(fillColor);
+    popColor.setAlpha(popAlpha);
+    fillColor = popColor;
 }
 
 

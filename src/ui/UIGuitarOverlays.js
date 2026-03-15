@@ -77,7 +77,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             let animOpts = {};
             if (n.animStart) {
                 const elapsed = millis() - n.animStart;
-                const duration = 500; // 500ms
+                const duration = 360; // pop plus nerveux
                 const t = constrain(elapsed / duration, 0, 1);
                 if (t < 1) {
                     animOpts = { anim: { type: "pop", t } };
@@ -384,6 +384,9 @@ const list = this.intervalDispatcher
         const g = this.g;
         if (g.markerMode) return;
 
+        // Désactivation temporaire du rendu visuel des bursts.
+        const renderBursts = false;
+
         if (!g.interactionBursts || g.interactionBursts.length === 0)
             return;
 
@@ -401,6 +404,10 @@ const list = this.intervalDispatcher
             const col = (b.type === "select")
                 ? [255, 200, 0]
                 : [50, 150, 255];
+
+            if (!renderBursts) {
+                return true;
+            }
 
             stroke(col[0], col[1], col[2], alpha);
             strokeWeight(4);
