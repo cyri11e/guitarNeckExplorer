@@ -7,14 +7,16 @@ class NoteRenderer {
     // ------------------------------------------------------------
     // PALETTE
     // ------------------------------------------------------------
-    getColors(ghost) {
+    getColors(ghost, overlayAlpha = null) {
+        const hasOverlay = overlayAlpha != null;
+        const a = hasOverlay ? constrain(overlayAlpha, 0, 255) : 255;
         return {
-            blanc: ghost ? "#ffffff8c" : 255,
-            noir:  ghost ? "#00000085" : 0,
+            blanc: ghost ? "#ffffff8c" : (hasOverlay ? color(255, 255, 255, a) : 255),
+            noir:  ghost ? "#00000085" : (hasOverlay ? color(0, 0, 0, a) : 0),
             textShadowSquare: "#00000076",
             textShadowCircle: "#ffffff7d",
             textMainSquare:   "#ffffff78",
-            cursorColor:      "red",
+            cursorColor:      hasOverlay ? color(255, 0, 0, a) : "red",
             shadowColor:      [0, 80]
         };
     }
@@ -149,6 +151,7 @@ class NoteRenderer {
             label = null,
             cursor = null,
             ghost = false, 
+            overlayAlpha = null,
             zoomFactor = 1,
             xOffset = 0,
             yOffset = 0
@@ -159,7 +162,7 @@ class NoteRenderer {
 
         if (!label) return;
 
-        const colors = this.getColors(ghost);
+        const colors = this.getColors(ghost, overlayAlpha);
         const { blanc, noir } = colors;
 
         const { base, chroma } = label;
@@ -170,7 +173,35 @@ class NoteRenderer {
             if (chromaCol) fillColor = chromaCol;
         }
 
-        const R = this.g.getThickness() * 0.17 * zoomFactor;
+        let R = this.g.getThickness() * 0.17 * zoomFactor;
+
+// ------------------------------------------------------------
+// ANIMATION : POP-IN
+// ------------------------------------------------------------
+if (opts.anim && opts.anim.type === "pop") {
+    const t = constrain(opts.anim.t, 0, 1);
+
+    // EASING "backOut"
+    // Formule classique : overshoot léger pour un pop naturel
+    const overshoot = 1.4;
+    const inv = t - 1;
+    const eased = 1 + (overshoot * inv * inv * inv + overshoot * inv * inv);
+
+    // Application sur le rayon
+    R *= eased;
+
+    // Position : léger offset vers le haut
+    y -= R * 0.1 * (1 - t);
+
+    // Couleur : plus vive au début
+    if (fillColor && typeof fillColor === 'string') {
+        // Si c'est une string, on peut la modifier, mais c'est compliqué.
+        // Pour simplicité, ajoutons une teinte
+        // Mais p5.js utilise color(), donc peut-être multiplier par une valeur.
+    }
+}
+
+
         const STROKE = R / 10;
 
         // OFFSET normal

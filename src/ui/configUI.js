@@ -418,24 +418,24 @@ snapshotPanel: {
 
 snapshotBtn: {
     type: "snapshotButton",
-    xp: 50,
-    yp: 50,
+    xp: 0,
+    yp: 0,
     sp: 100,
     shortcutKey: "s",
     description: "Capture snapshot"
 },
 trashBtn: {
     type: "snapshotButton",
-    xp: 50,
-    yp: 50,
+    xp: 0,
+    yp: 0,
     sp: 50,
     label: '🗑️',
     description: "delete snapshot"
 },
 playBtn: {
     type: "snapshotButton",
-    xp: 50,
-    yp: 50,
+    xp: 0,
+    yp: 0,
     sp: 50,
     label:'▶',
     led: true,
@@ -444,8 +444,8 @@ playBtn: {
 },
 loopBtn: {
     type: "snapshotButton",
-    xp: 50,
-    yp: 50,
+    xp: 0,
+    yp: 0,
     sp: 50,
     label:'↺',
     shortcutKey: "l",
@@ -455,8 +455,8 @@ loopBtn: {
 
 lcd2: {
     type: "lcdSelector",
-    xp: 50,
-    yp: 50,
+    xp: 0,
+    yp: 0,
     sp: 100,
     aspectRatio: 1.8,
     items: [],
@@ -466,8 +466,9 @@ lcd2: {
 },
 bpmCtrl: {
     type: "bpmCtrl",
-    xp: -150,
-    yp: 50,
+    xp: 0,
+    yp: 0,
+    anchorUnder: "playBtn",
     sp: 50,
     value: 80,
     aspectRatio: 3.2,

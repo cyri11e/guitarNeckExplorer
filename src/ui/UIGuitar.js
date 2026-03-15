@@ -397,7 +397,7 @@ fromScreen(x, y) {
 
         } else {
             // Pin
-            this.pinnedNotes.push({ fret, string });
+            this.pinnedNotes.push({ fret, string, animStart: millis() });
 
             // Animation rapide
             this.interactionBursts.push({
@@ -420,7 +420,7 @@ fromScreen(x, y) {
 
         } else {
             // Sélection
-            this.selectedNotes.push({ fret, string });
+            this.selectedNotes.push({ fret, string, animStart: millis() });
 
             // Animation rapide
             this.interactionBursts.push({

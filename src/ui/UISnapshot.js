@@ -65,10 +65,12 @@ trigger() {
 draw() {
     super.draw();
 
+    const borderW = max(1, this.h * 0.06);
+
     // fond
     fill(60);
     stroke(200);
-    strokeWeight(2 * this.zoomFactor);
+    strokeWeight(borderW);
     rect(this.x, this.y, this.w, this.h, this.h * 0.15);
 
     // -----------------------------------------

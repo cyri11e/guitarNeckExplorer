@@ -18,6 +18,8 @@ class BPMControl extends UIComponent {
 
         this.onChange = cfg.onChange || null;
         this.stayOnX = cfg.stayOnX ?? false;
+        this.anchorUnder = cfg.anchorUnder ?? null;
+        this.relativePos = cfg.relativePos ?? false;
 
         // LED unique
         this.ledPhase = 0;      // 0 → éteint, 1 → plein rouge
@@ -121,10 +123,12 @@ class BPMControl extends UIComponent {
     draw() {
         super.draw();
 
+        const borderW = max(1, this.h * 0.06);
+
         // fond
         fill(40);
         stroke(200);
-        strokeWeight(2 * this.zoomFactor);
+        strokeWeight(borderW);
         rect(this.x, this.y, this.w, this.h, this.h * 0.15);
 
         // BPM text

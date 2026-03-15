@@ -31,6 +31,7 @@ class Panel extends UIComponent {
         
         this.children.push(child);
         child.updateResponsive();     //  recalcul dans le panel
+        this.updateChildrenLayout();
     }
 
     // -------------------------------------------------------
@@ -38,7 +39,7 @@ class Panel extends UIComponent {
     // -------------------------------------------------------
     updateResponsive() {
         super.updateResponsive();     // calcule x,y,w,h du panel
-        //this.updateChildrenLayout();  // layout interne
+        this.updateChildrenLayout();  // layout interne
     }
 
 updateChildrenLayout() {
@@ -46,41 +47,73 @@ updateChildrenLayout() {
 
     const padding = this.h * 0.05;
     const gap = padding;
+    const innerX = this.x + padding;
+    const innerY = this.y + padding;
+    const innerH = Math.max(0, this.h - padding * 2);
 
-    let xCursor = this.x + padding;
+    const getChildHeight = (child) => {
+        const sp = child.sp ?? 100;
+        // Règle demandée: sp = 0 ou 100 => hauteur pleine du panel
+        if (sp === 0 || sp === 100) return innerH;
+        return innerH * (sp / 100);
+    };
+
+    // 1) Layout auto: ligne horizontale (mode historique).
+    let xCursor = innerX;
+    let contentRight = innerX;
 
     for (let c of this.children) {
-
         const ratio = c.aspectRatio ?? 1;
-
-        // taille "normale"
-        c.h = (this.h - padding * 2) * (c.sp / 100);
+        c.h = getChildHeight(c);
         c.w = c.h * ratio;
 
-        // position "de base" (comme aujourd'hui, sans flag)
-        const baseX = xCursor;
-        const baseY = this.y + padding;
+        if (c.relativePos === true) continue;
+        if (c.anchorUnder) continue;
 
-        if (!c.stayOnX) {
-            // comportement actuel : séquentiel horizontal
-            c.x = baseX;
-            c.y = baseY;
+        c.x = xCursor;
+        c.y = innerY;
 
-            xCursor += c.w + gap;
-        } else {
-            // on reste sur la même "colonne" (même baseX),
-            // mais on applique un delta relatif au panel
-            const dx = (c.xp ?? 0) / 100 * this.w;
-            const dy = (c.yp ?? 0) / 100 * this.h;
-
-            c.x = baseX + dx;
-            c.y = baseY + dy;
-            // xCursor ne bouge pas : on reste sur cette colonne
-        }
+        contentRight = Math.max(contentRight, c.x + c.w);
+        xCursor += c.w + gap;
     }
 
-    this.w = xCursor - this.x;
-    this.aspectRatio = this.w / this.h;
+    // 2) La largeur du panel s'adapte au contenu horizontal.
+    const autoContentWidth = Math.max(0, contentRight - innerX);
+    const newPanelWidth = autoContentWidth > 0
+        ? autoContentWidth + padding * 2
+        : this.w;
+
+    this.w = newPanelWidth;
+    this.aspectRatio = this.h > 0 ? (this.w / this.h) : this.aspectRatio;
+
+    // 3) Place les enfants relatifs ou ancrés dans l'espace interne final du panel.
+    const finalInnerW = Math.max(0, this.w - padding * 2);
+    for (let c of this.children) {
+        c.h = getChildHeight(c);
+        c.w = c.h * (c.aspectRatio ?? 1);
+
+        if (c.anchorUnder) {
+            const anchor = this.children.find(x => x.name === c.anchorUnder);
+            if (anchor) {
+                c.x = anchor.x;
+                c.y = anchor.y + anchor.h + gap;
+            } else {
+                c.x = innerX;
+                c.y = innerY;
+            }
+        } else if (c.relativePos === true) {
+            c.x = innerX + finalInnerW * ((c.xp ?? 0) / 100);
+            c.y = innerY + innerH * ((c.yp ?? 0) / 100);
+        } else {
+            continue;
+        }
+
+        // Les children relatifs restent dans le panel.
+        const maxX = innerX + Math.max(0, finalInnerW - c.w);
+        const maxY = innerY + Math.max(0, innerH - c.h);
+        c.x = constrain(c.x, innerX, maxX);
+        c.y = constrain(c.y, innerY, maxY);
+    }
 }
 
 
@@ -155,5 +188,15 @@ updateChildrenLayout() {
 
         this.updateChildrenLayout();
         return true;
+    }
+
+    applyZoomAt(factor, cx, cy) {
+        super.applyZoomAt(factor, cx, cy);
+        this.updateChildrenLayout();
+    }
+
+    moveBy(dx, dy) {
+        super.moveBy(dx, dy);
+        this.updateChildrenLayout();
     }
 }

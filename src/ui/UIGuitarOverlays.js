@@ -73,12 +73,26 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             const full = app.theory.getFullNote(raw.index);
             label.chroma = full.chroma;
 
+            // Animation pop-in
+            let animOpts = {};
+            if (n.animStart) {
+                const elapsed = millis() - n.animStart;
+                const duration = 500; // 500ms
+                const t = constrain(elapsed / duration, 0, 1);
+                if (t < 1) {
+                    animOpts = { anim: { type: "pop", t } };
+                } else {
+                    delete n.animStart;
+                }
+            }
+
             this.drawNote(pos.x, pos.y, {
                 fillColor,
                 strokeColor,
                 shapeType,
                 hasShadow,
-                label
+                label,
+                ...animOpts
             });
         }
     }
@@ -203,29 +217,32 @@ const list = this.intervalDispatcher
             }
 
             this.drawNote(pos.x, pos.y, {
-                fillColor: "#00ff666e",
-                strokeColor: "black",
+                fillColor: "#00ff6618",
+                strokeColor: "rgba(0, 0, 0, 0.18)",
                 hasShadow: true,
                 shapeType: "circle",
                 label,
-                cursor: (label.root)
+                cursor: (label.root),
+                overlayAlpha: 70
             });
         }
 
         const isShift = g.shiftDown === true;
 
         const selectedStyle = {
-            fillColor: "#ff00ccb7",
-            strokeColor: "#00ff26",
+            fillColor: "#ff00cc20",
+            strokeColor: "rgba(0, 255, 38, 0.2)",
             hasShadow: true,
-            shapeType: "square"
+            shapeType: "square",
+            overlayAlpha: 80
         };
 
         const hoverStyle = {
-            fillColor: "#fe00003f",
-            strokeColor: "white",
+            fillColor: "#fe000010",
+            strokeColor: "rgba(255, 255, 255, 0.18)",
             hasShadow: true,
-            shapeType: "circle"
+            shapeType: "circle",
+            overlayAlpha: 60
         };
 
         const style = isShift ? selectedStyle : hoverStyle;
