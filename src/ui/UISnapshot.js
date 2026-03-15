@@ -23,7 +23,8 @@ class SnapshotButton extends UIComponent {
         this.stateCount = Math.max(2, cfg.stateCount ?? 2);
         this.stateLabels = Array.isArray(cfg.stateLabels) ? cfg.stateLabels : null;
 
-        this._state = 0;
+        const initialState = Number.isFinite(cfg.state) ? Math.floor(cfg.state) : 0;
+        this._state = ((initialState % this.stateCount) + this.stateCount) % this.stateCount;
     }
 
     // -----------------------------

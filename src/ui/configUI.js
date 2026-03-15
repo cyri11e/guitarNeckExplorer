@@ -450,6 +450,7 @@ loopBtn: {
     label:'Ø',
     stateCount: 5,
     stateLabels: ["Ø", "1", "A", "1↺", "A↺"],
+    state: 3,
     shortcutKey: "l",
     led: true,
     description: "loop mode"

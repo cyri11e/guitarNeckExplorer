@@ -243,6 +243,44 @@ function resetTRRecPosition(trRec, loopMode) {
     trRec.invalidate();
 }
 
+function isSnapshotReferencedInTRRec(trRec, snapshotIndex) {
+    if (!trRec || !Array.isArray(trRec.measures)) return false;
+
+    for (const measure of trRec.measures) {
+        if (!Array.isArray(measure)) continue;
+        for (const step of measure) {
+            if (!step) continue;
+            if (step.itemIndex === snapshotIndex) return true;
+        }
+    }
+
+    return false;
+}
+
+function reindexTRRecSnapshotRefs(trRec, removedIndex, snapshotTitles) {
+    if (!trRec || !Array.isArray(trRec.measures)) return;
+
+    for (const measure of trRec.measures) {
+        if (!Array.isArray(measure)) continue;
+        for (const step of measure) {
+            if (!step || !Number.isInteger(step.itemIndex)) continue;
+
+            if (step.itemIndex > removedIndex) {
+                step.itemIndex -= 1;
+            }
+
+            if (step.itemIndex >= 0 && step.itemIndex < snapshotTitles.length) {
+                step.item = snapshotTitles[step.itemIndex];
+            } else {
+                step.item = null;
+                if (step.etat === 1) {
+                    step.etat = 0;
+                }
+            }
+        }
+    }
+}
+
 const UI_RULES = [
 
     // RÈGLE : MetalSwitch (♯/♭) synchronise avec guitar.flatMode
@@ -1543,6 +1581,7 @@ guitar.invalidate();
 
     const guitar = components.find(c => c.name === "guitar1");
     const lcd2   = components.find(c => c.name === "lcd2");
+    const trRec  = components.find(c => c.name === "trRecPads");
 
     if (!guitar || !lcd2) return;
 
@@ -1550,11 +1589,21 @@ guitar.invalidate();
 
     if (idx < 0 || idx >= guitar.snapshots.length) return;
 
+    if (isSnapshotReferencedInTRRec(trRec, idx)) {
+        console.warn("Suppression bloquee: snapshot utilise dans la sequence.", idx);
+        source.state = 0;
+        source.invalidateNow?.();
+        return;
+    }
+
     // suppression
     guitar.snapshots.splice(idx, 1);
 
     // mise à jour LCD2
     lcd2.items = guitar.snapshots.map(s => s.title);
+
+    reindexTRRecSnapshotRefs(trRec, idx, lcd2.items);
+    trRec?.invalidate();
 
     if (lcd2.items.length === 0) {
         lcd2.setOnOff(false);
