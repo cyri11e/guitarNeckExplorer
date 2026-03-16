@@ -97,6 +97,30 @@ class Guitar extends UIComponent {
         this._chainAddTimer = null;
         this._chainAddQueue = [];
         this._chainAddTarget = "pinned";
+
+        this._geometryStamp = "";
+        this._hoverInvalidateMs = 24;
+        this._lastHoverInvalidateAt = 0;
+    }
+
+    _computeGeometryStamp() {
+        return [
+            this.x,
+            this.y,
+            this.w,
+            this.h,
+            this.zoomFactor,
+            this.fretCount,
+            this.inlayStyle
+        ].join("|");
+    }
+
+    _ensureGeometryProjected() {
+        const stamp = this._computeGeometryStamp();
+        if (stamp === this._geometryStamp) return;
+
+        this.geometry.projectGeometry();
+        this._geometryStamp = stamp;
     }
 
     setBPM(bpm) {
@@ -301,6 +325,8 @@ setNextIntervalMode() {
     // ------------------------------------------------------------
 
     toScreen(caseIndex, stringIndex) {
+        this._ensureGeometryProjected();
+
         const c = this.cases[caseIndex];
         const s = this.strings[stringIndex - 1];
 
@@ -313,6 +339,7 @@ setNextIntervalMode() {
     }
 
 fromScreen(x, y) {
+    this._ensureGeometryProjected();
 
     // 1) Vérifier que la souris est VRAIMENT dans le manche
     const neck = this.getNeckRect();
@@ -341,10 +368,7 @@ fromScreen(x, y) {
 
     if (fret == null || string == null) return null;
 
-    this.hoveredNote = { fret, string };
-    this.invalidate();
-
-    return this.hoveredNote;
+    return { fret, string };
 }
 
 
@@ -361,7 +385,7 @@ fromScreen(x, y) {
     // ------------------------------------------------------------
 
     draw() {
-        this.geometry.projectGeometry();
+        this._ensureGeometryProjected();
 
         this.renderer.draw();
         this.overlays.draw();
@@ -794,6 +818,10 @@ fromScreen(x, y) {
 
         super.mouseMoved?.(evt);
 
+        const prevInside = this.isHovered;
+        const prevShift = this.shiftDown;
+        const prevHover = this.hoveredNote;
+
         const inside = this.containsRect(evt);
         this.isHovered = inside;
         this.shiftDown = evt.shiftKey;
@@ -804,7 +832,27 @@ fromScreen(x, y) {
             this.hoveredNote = null;
         }
 
-        this.invalidate();
+        const prevFret = prevHover?.fret ?? null;
+        const prevString = prevHover?.string ?? null;
+        const nextFret = this.hoveredNote?.fret ?? null;
+        const nextString = this.hoveredNote?.string ?? null;
+
+        const hoverChanged = (prevFret !== nextFret) || (prevString !== nextString);
+        const stateChanged = (prevInside !== inside) || (prevShift !== this.shiftDown) || hoverChanged;
+
+        if (stateChanged) {
+            const now = millis();
+            const shouldInvalidateNow =
+                hoverChanged ||
+                (prevInside !== inside) ||
+                (now - this._lastHoverInvalidateAt >= this._hoverInvalidateMs);
+
+            if (shouldInvalidateNow) {
+                this._lastHoverInvalidateAt = now;
+                this.invalidate();
+            }
+        }
+
         return inside;
     }
 

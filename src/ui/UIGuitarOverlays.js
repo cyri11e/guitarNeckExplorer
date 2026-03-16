@@ -28,6 +28,12 @@ class GuitarOverlays {
 this.caged = new CAGEDOverlay(this.g);
 this.noteRenderer = new NoteRenderer(this.g, this.style);
 
+    this._hoverDispatchCacheKey = null;
+    this._hoverDispatchCacheList = [];
+    this._occurrenceCacheKey = null;
+    this._occByMidi = new Map();
+    this._occByIndex = new Map();
+
     }
 
     // ------------------------------------------------------------
@@ -241,6 +247,92 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         };
     }
 
+    _buildHoverDispatchCacheKey(mode, intervals, hovered, way, octaveShown) {
+        if (!hovered) return null;
+
+        const intervalKey = (intervals || []).join(",");
+        return [
+            mode,
+            intervalKey,
+            hovered.string,
+            hovered.fret,
+            way,
+            octaveShown
+        ].join("|");
+    }
+
+    _getDispatchedIntervalList(mode, intervals, hovered, way, octaveShown) {
+        const key = this._buildHoverDispatchCacheKey(mode, intervals, hovered, way, octaveShown);
+        if (!key) return [];
+
+        if (this._hoverDispatchCacheKey === key) {
+            return this._hoverDispatchCacheList;
+        }
+
+        const list = this.intervalDispatcher
+            ? this.intervalDispatcher.dispatch(mode, intervals, hovered, way, octaveShown)
+            : [];
+
+        this._hoverDispatchCacheKey = key;
+        this._hoverDispatchCacheList = list || [];
+
+        return this._hoverDispatchCacheList;
+    }
+
+    _getOccurrenceCacheKey() {
+        const g = this.g;
+        const tuning = g.app?.instrument?.tuning || [];
+        const tuningKey = tuning.map(t => t.midi).join(",");
+
+        return [
+            g.x,
+            g.y,
+            g.w,
+            g.h,
+            g.fretCount,
+            g.strings.length,
+            tuningKey
+        ].join("|");
+    }
+
+    _rebuildOccurrenceCacheIfNeeded() {
+        const g = this.g;
+        const app = g.app;
+        const key = this._getOccurrenceCacheKey();
+
+        if (key === this._occurrenceCacheKey) return;
+
+        this._occByMidi = new Map();
+        this._occByIndex = new Map();
+
+        for (let s = 1; s <= g.strings.length; s++) {
+            for (let f = 0; f <= g.fretCount; f++) {
+                const raw = app.instrument.getNoteAt(s - 1, f);
+                if (!raw) continue;
+
+                const pos = g.toScreen(f, s);
+                if (!pos) continue;
+
+                const entry = {
+                    string: s,
+                    fret: f,
+                    index: raw.index,
+                    midi: raw.midi,
+                    x: pos.x,
+                    y: pos.y
+                };
+
+                if (!this._occByMidi.has(raw.midi)) this._occByMidi.set(raw.midi, []);
+                this._occByMidi.get(raw.midi).push(entry);
+
+                if (!this._occByIndex.has(raw.index)) this._occByIndex.set(raw.index, []);
+                this._occByIndex.get(raw.index).push(entry);
+            }
+        }
+
+        this._occurrenceCacheKey = key;
+    }
+
     // ------------------------------------------------------------
     // HOVER DOT + MULTICURSEUR + MARKER
     // ------------------------------------------------------------
@@ -269,15 +361,13 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
 const intervals = g.intervals || [];
 
 
-const list = this.intervalDispatcher
-    ? this.intervalDispatcher.dispatch(
+const list = this._getDispatchedIntervalList(
         mode,
         intervals,
         h,
         g.intervalWay,
         g.octaveShown
-      )
-    : [];
+);
 
     //  Stockage global dans l’overlay
     this.intervalOverlayNotes = list.map(n => ({
@@ -391,50 +481,38 @@ const list = this.intervalDispatcher
 
         // MODE N : NOTE → toutes les occurrences même MIDI
         if (g.hoverMode === "note") {
-            for (let s = 1; s <= g.strings.length; s++) {
-                for (let f = 0; f <= g.fretCount; f++) {
+            this._rebuildOccurrenceCacheIfNeeded();
+            const listByMidi = this._occByMidi.get(baseMidi) || [];
 
-                    const raw = app.instrument.getNoteAt(s - 1, f);
-                    if (!raw || raw.midi !== baseMidi) continue;
+            for (const item of listByMidi) {
+                const label = app.theory.getNoteLabel(
+                    item.index,
+                    g.displayMode === "note" ? g.labelType : g.displayMode
+                );
 
-                    const pos = g.toScreen(f, s);
-                    if (!pos) continue;
-
-                    const label = app.theory.getNoteLabel(
-                        raw.index,
-                        g.displayMode === "note" ? g.labelType : g.displayMode
-                    );
-
-                    this.drawNote(pos.x, pos.y, {
-                        ...style,
-                        label
-                    });
-                }
+                this.drawNote(item.x, item.y, {
+                    ...style,
+                    label
+                });
             }
             return;
         }
 
         // MODE T : OCTAVE → toutes les occurrences même pitch class
         if (g.hoverMode === "octave") {
-            for (let s = 1; s <= g.strings.length; s++) {
-                for (let f = 0; f <= g.fretCount; f++) {
+            this._rebuildOccurrenceCacheIfNeeded();
+            const listByIndex = this._occByIndex.get(baseIndex) || [];
 
-                    const raw = app.instrument.getNoteAt(s - 1, f);
-                    if (!raw || raw.index !== baseIndex) continue;
+            for (const item of listByIndex) {
+                const label = app.theory.getNoteLabel(
+                    item.index,
+                    g.displayMode === "note" ? g.labelType : g.displayMode
+                );
 
-                    const pos = g.toScreen(f, s);
-                    if (!pos) continue;
-
-                    const label = app.theory.getNoteLabel(
-                        raw.index,
-                        g.displayMode === "note" ? g.labelType : g.displayMode
-                    );
-
-                    this.drawNote(pos.x, pos.y, {
-                        ...style,
-                        label
-                    });
-                }
+                this.drawNote(item.x, item.y, {
+                    ...style,
+                    label
+                });
             }
         }
     }
