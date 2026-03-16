@@ -59,9 +59,11 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     enqueuePopOut(note, type = "pinned", opts = {}) {
         if (!note) return;
 
+        const animCfg = this.g.anim?.note || {};
+
         const {
             animType = "popOut",
-            duration = 380
+            duration = (animCfg.popOutDuration ?? 380)
         } = opts;
 
         const app = this.g.app;
@@ -103,6 +105,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     _startPopOutTimer() {
         if (this._popOutTimer) return;
 
+        const timerMs = this.g.anim?.timers?.fastMs ?? 16;
+
         this._popOutTimer = setInterval(() => {
             if (!this.popOutNotes || this.popOutNotes.length === 0) {
                 clearInterval(this._popOutTimer);
@@ -111,7 +115,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             }
 
             this.g.invalidate();
-        }, 16);
+        }, timerMs);
     }
 
 
@@ -156,7 +160,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             let animOpts = {};
             if (n.animStart) {
                 const elapsed = millis() - n.animStart;
-                const duration = n.animDuration ?? 360;
+                const duration = n.animDuration ?? (g.anim?.note?.popInDuration ?? 360);
                 const t = constrain(elapsed / duration, 0, 1);
                 if (t < 1) {
                     animOpts = { anim: { type: n.animType ?? "pop", t } };
@@ -206,7 +210,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         const now = millis();
 
         this.popOutNotes = this.popOutNotes.filter(n => {
-            const duration = n.popOutDuration ?? 380;
+            const duration = n.popOutDuration ?? (g.anim?.note?.popOutDuration ?? 380);
             const t = constrain((now - n.startAt) / duration, 0, 1);
             if (t >= 1) return false;
 
@@ -569,22 +573,24 @@ const list = this._getDispatchedIntervalList(
         const g = this.g;
         if (g.markerMode) return;
 
+        const burstsCfg = g.anim?.bursts || {};
+
         // Désactivation temporaire du rendu visuel des bursts.
-        const renderBursts = false;
+        const renderBursts = burstsCfg.enabled ?? false;
 
         if (!g.interactionBursts || g.interactionBursts.length === 0)
             return;
 
         g.interactionBursts = g.interactionBursts.filter(b => {
 
-            b.t += 0.05;
+            b.t += burstsCfg.tStep ?? 0.05;
             if (b.t >= 1) return false;
 
             const pos = g.toScreen(b.fret, b.string);
             if (!pos) return false;
 
-            const alpha = 255 * Math.pow(1 - b.t, 0.7);
-            const baseR = g.getThickness() * 0.18;
+            const alpha = 255 * Math.pow(1 - b.t, burstsCfg.alphaPow ?? 0.7);
+            const baseR = g.getThickness() * (burstsCfg.baseRadius ?? 0.18);
 
             const col = (b.type === "select")
                 ? [255, 200, 0]
@@ -597,15 +603,15 @@ const list = this._getDispatchedIntervalList(
             stroke(col[0], col[1], col[2], alpha);
             strokeWeight(4);
             noFill();
-            circle(pos.x, pos.y, baseR * (1 + b.t * 1.8));
+            circle(pos.x, pos.y, baseR * (1 + b.t * (burstsCfg.ring1Scale ?? 1.8)));
 
             stroke(col[0], col[1], col[2], alpha * 0.4);
             strokeWeight(2);
-            circle(pos.x, pos.y, baseR * (1 + b.t * 1.3));
+            circle(pos.x, pos.y, baseR * (1 + b.t * (burstsCfg.ring2Scale ?? 1.3)));
 
             noStroke();
             fill(col[0], col[1], col[2], alpha * 0.9);
-            circle(pos.x, pos.y, baseR * (0.7 - b.t * 0.5));
+            circle(pos.x, pos.y, baseR * ((burstsCfg.coreBase ?? 0.7) - b.t * (burstsCfg.coreDecay ?? 0.5)));
 
             return true;
         });
@@ -620,6 +626,8 @@ const list = this._getDispatchedIntervalList(
         const g = this.g;
         if (g.markerMode) return;
 
+        const hiCfg = g.anim?.highlight || {};
+
         if (!g.highlighted || g.highlighted.length === 0)
             return;
 
@@ -627,16 +635,16 @@ const list = this._getDispatchedIntervalList(
 
         for (let h of g.highlighted) {
 
-            h.t += 0.01;
+            h.t += hiCfg.overlayTStep ?? 0.01;
 
             const pos = g.toScreen(h.fret, h.string);
             if (!pos) continue;
 
             const t = h.t;
             const alpha = 255 * (1 - t);
-            const scale = 1 + 0.3 * (1 - t);
+            const scale = 1 + (hiCfg.scaleAmp ?? 0.3) * (1 - t);
 
-            const baseR = g.getThickness() * 0.20 * scale;
+            const baseR = g.getThickness() * (hiCfg.baseRadius ?? 0.20) * scale;
 
             push();
             translate(pos.x, pos.y);
@@ -659,7 +667,7 @@ const list = this._getDispatchedIntervalList(
                 const alpha2 = 255 * fade;
 
                 fill(255, 0, 0, alpha2);
-                const finalR = g.getThickness() * 0.12;
+                const finalR = g.getThickness() * (hiCfg.finalRadius ?? 0.12);
                 circle(0, 0, finalR);
 
                 pts.push({

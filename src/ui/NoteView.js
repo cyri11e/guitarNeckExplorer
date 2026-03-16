@@ -179,22 +179,23 @@ class NoteRenderer {
 // ------------------------------------------------------------
 if (opts.anim && opts.anim.type === "pop") {
     const t = constrain(opts.anim.t, 0, 1);
+    const popCfg = this.g.anim?.note?.pop || {};
 
     // EASING "backOut" plus marqué
-    const s = 2.2;
+    const s = popCfg.backOutS ?? 2.2;
     const u = t - 1;
     const backOut = 1 + (s + 1) * u * u * u + s * u * u;
 
     // Démarre petit puis overshoot visible avant stabilisation
-    const startScale = 0.35;
+    const startScale = popCfg.startScale ?? 0.35;
     const popScale = lerp(startScale, 1, backOut);
     R *= popScale;
 
     // Montée plus franche au démarrage
-    y -= R * 0.22 * (1 - t);
+    y -= R * (popCfg.lift ?? 0.22) * (1 - t);
 
     // Fade-in rapide de la pastille
-    const popAlpha = lerp(110, 255, t);
+    const popAlpha = lerp(popCfg.alphaStart ?? 110, popCfg.alphaEnd ?? 255, t);
     const popColor = color(fillColor);
     popColor.setAlpha(popAlpha);
     fillColor = popColor;
@@ -202,19 +203,20 @@ if (opts.anim && opts.anim.type === "pop") {
 
 if (opts.anim && opts.anim.type === "popSeq") {
     const t = constrain(opts.anim.t, 0, 1);
+    const popSeqCfg = this.g.anim?.note?.popSeq || {};
 
     // Sequence replay: pop plus court et plus compact
-    const s = 1.3;
+    const s = popSeqCfg.backOutS ?? 1.3;
     const u = t - 1;
     const backOut = 1 + (s + 1) * u * u * u + s * u * u;
 
-    const startScale = 0.55;
+    const startScale = popSeqCfg.startScale ?? 0.55;
     const popScale = lerp(startScale, 1, backOut);
     R *= popScale;
 
-    y -= R * 0.10 * (1 - t);
+    y -= R * (popSeqCfg.lift ?? 0.10) * (1 - t);
 
-    const popAlpha = lerp(170, 255, t);
+    const popAlpha = lerp(popSeqCfg.alphaStart ?? 170, popSeqCfg.alphaEnd ?? 255, t);
     const popColor = color(fillColor);
     popColor.setAlpha(popAlpha);
     fillColor = popColor;
@@ -222,20 +224,23 @@ if (opts.anim && opts.anim.type === "popSeq") {
 
 if (opts.anim && opts.anim.type === "popOut") {
     const t = constrain(opts.anim.t, 0, 1);
-    const easeOut = 1 - Math.pow(1 - t, 3);
+    const popOutCfg = this.g.anim?.note?.popOut || {};
+    const easeOut = 1 - Math.pow(1 - t, popOutCfg.easePow ?? 3);
 
     // Pop-out visible: petit gonflement puis disparition
-    const growPhase = min(t / 0.25, 1);
-    const shrinkPhase = max((t - 0.15) / 0.85, 0);
-    const growScale = lerp(1.0, 1.18, growPhase);
-    const shrinkScale = lerp(1.0, 0.05, shrinkPhase);
+    const growSplit = popOutCfg.growSplit ?? 0.25;
+    const shrinkStart = popOutCfg.shrinkStart ?? 0.15;
+    const growPhase = min(t / growSplit, 1);
+    const shrinkPhase = max((t - shrinkStart) / Math.max(1 - shrinkStart, 0.001), 0);
+    const growScale = lerp(1.0, popOutCfg.growTo ?? 1.18, growPhase);
+    const shrinkScale = lerp(1.0, popOutCfg.shrinkTo ?? 0.05, shrinkPhase);
     R *= growScale * shrinkScale;
 
     // Drift vertical plus visible
-    y -= this.g.getThickness() * 0.04 * easeOut;
+    y -= this.g.getThickness() * (popOutCfg.drift ?? 0.04) * easeOut;
 
     // Fade-out global
-    const outAlpha = lerp(255, 0, easeOut);
+    const outAlpha = lerp(popOutCfg.alphaStart ?? 255, popOutCfg.alphaEnd ?? 0, easeOut);
     const outColor = color(fillColor);
     outColor.setAlpha(outAlpha);
     fillColor = outColor;
@@ -249,12 +254,13 @@ if (opts.anim && opts.anim.type === "popOut") {
 
 if (opts.anim && opts.anim.type === "popOutSeq") {
     const t = constrain(opts.anim.t, 0, 1);
-    const easeOut = 1 - Math.pow(1 - t, 1.9);
+    const popOutSeqCfg = this.g.anim?.note?.popOutSeq || {};
+    const easeOut = 1 - Math.pow(1 - t, popOutSeqCfg.easePow ?? 1.9);
 
     // Sequence fade-out pur: pas de scale, pas d'effet de retrecissement
-    y -= this.g.getThickness() * 0.012 * easeOut;
+    y -= this.g.getThickness() * (popOutSeqCfg.drift ?? 0.012) * easeOut;
 
-    const outAlpha = lerp(230, 0, easeOut);
+    const outAlpha = lerp(popOutSeqCfg.alphaStart ?? 230, popOutSeqCfg.alphaEnd ?? 0, easeOut);
     const outColor = color(fillColor);
     outColor.setAlpha(outAlpha);
     fillColor = outColor;

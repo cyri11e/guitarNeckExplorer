@@ -28,6 +28,9 @@ class LCDSelector extends UIComponent {
         this.dragStartY = 0;
         this.dragOffsetY = 0;
 
+        this._wheelAccum = 0;
+        this.wheelStepThreshold = cfg.wheelStepThreshold ?? 180;
+
         this.shortcutKey  = cfg.shortcutKey  || null;
         this.shortcutCode = cfg.shortcutCode || null;
         this.description  = cfg.description  || null;
@@ -180,6 +183,20 @@ setOnOff(state) {
         this.dragging = false;
         this.clickCandidate = false;
 
+        return true;
+    }
+
+    mouseWheel(evt) {
+        if (evt.altKey) return super.mouseWheel(evt);
+        if (!this.isOn) return false;
+        if (!this.containsRect(evt)) return false;
+
+        this._wheelAccum += evt.delta;
+        if (Math.abs(this._wheelAccum) >= this.wheelStepThreshold) {
+            const step = this._wheelAccum > 0 ? -1 : 1;
+            this._wheelAccum = 0;
+            this.state = this._index + step;
+        }
         return true;
     }
 

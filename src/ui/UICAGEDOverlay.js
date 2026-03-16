@@ -122,10 +122,11 @@ class CAGEDOverlay {
 
         fill(255, 255, 255, 45);
         rectMode(CORNER);
-        rect(x, y - hRect/2, w, hRect, hRect * 0.2);
+        rect(x, y - hRect/2, w, hRect, hRect * 0.1);
 
         noFill();
         stroke(40, 40, 40, 80);
+        strokeWeight(hRect * 0.02)
         textSize(hRect * 0.8);
         text(box.shape, x + w/2, y);
         noStroke();

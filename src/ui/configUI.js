@@ -233,7 +233,9 @@ switchDeg5: {
     topLabel: "P",
     bottomLabel: "d",
     shortcutKey: "5",
-    description: "Commuter une quinte"
+    description: "Commuter une quinte",
+    wheelSequence: [3, 1, 2],  // A > P > d (haut → bas)
+    specialMap: { 3: "a", 4: "dd" }
 },
 
 switchDeg6: {
@@ -259,8 +261,9 @@ switchDeg7: {
     topLabel: "M",
     bottomLabel: "m",
     shortcutKey: "7",
-    description: "Commuter une septième"
-    
+    description: "Commuter une septième",
+    wheelSequence: [1, 2, 4],  // M > m > dd (haut → bas)
+    specialMap: { 3: "a", 4: "dd" }
 },
 
 

@@ -200,15 +200,28 @@ updateChildrenLayout() {
     mouseWheel(evt) {
         if (!this.containsRect(evt)) return false;
 
-        const factor = evt.delta > 0 ? 0.95 : 1.05;
-        this.applyZoomAt(factor, evt.x, evt.y);
+        for (let i = this.children.length - 1; i >= 0; i--) {
+            const c = this.children[i];
+            if (c.mouseWheel?.(evt)) return true;
+        }
 
-        this.updateChildrenLayout();
-        return true;
+        if (!evt.altKey) return false;
+
+        if (super.mouseWheel(evt)) {
+            this.updateChildrenLayout();
+            return true;
+        }
+
+        return false;
     }
 
     applyZoomAt(factor, cx, cy) {
         super.applyZoomAt(factor, cx, cy);
+        this.updateChildrenLayout();
+    }
+
+    moveToAbsolute(nx, ny) {
+        super.moveToAbsolute(nx, ny);
         this.updateChildrenLayout();
     }
 

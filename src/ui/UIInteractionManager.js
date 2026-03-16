@@ -94,6 +94,40 @@ _buildEvent(mx, my) {
     };
 }
 
+    _findAltTarget(evt) {
+        for (const root of this._getTopLevelByZDesc()) {
+            if (!root?.containsRect?.(evt)) continue;
+            if (!(root.isDraggable || root.isZoomable)) continue;
+            return root;
+        }
+        return null;
+    }
+
+    _startAltCapture(evt) {
+        const target = this._findAltTarget(evt);
+        if (!target) return false;
+
+        UIComponent.prototype.mousePressed.call(target, evt);
+        this.captureOwner = target;
+        this.altCapture = true;
+
+        if (target.bringToFrontOnPress === true) {
+            this.app?.bringRootToFront?.(target);
+        }
+
+        return true;
+    }
+
+    _releaseAltCapture() {
+        if (!this.captureOwner) return false;
+
+        this.captureOwner.isPressed = false;
+        this.captureOwner.dragging = false;
+        this.captureOwner = null;
+        this.altCapture = false;
+        return true;
+    }
+
 
     // ============================================================
     // INTERACTIONS GUITARE — HANDLERS INTERNES
@@ -199,6 +233,10 @@ _buildEvent(mx, my) {
         this.mouseIsDown = true;
         const evt = this._buildEvent(mx, my);
 
+        if (evt.altKey) {
+            return this._startAltCapture(evt);
+        }
+
         // 1) Interactions guitare
         if (this._handleGlobalMousePressed(evt)) return true;
 
@@ -219,6 +257,10 @@ _buildEvent(mx, my) {
     mouseDragged(mx, my) {
         const evt = this._buildEvent(mx, my);
 
+        if (this.altCapture && this.captureOwner) {
+            return UIComponent.prototype.mouseDragged.call(this.captureOwner, evt) || false;
+        }
+
         // 1) Interactions guitare
         if (this._handleGlobalMouseDragged(evt)) return true;
 
@@ -238,6 +280,10 @@ _buildEvent(mx, my) {
     mouseReleased(mx, my) {
         this.mouseIsDown = false;
         const evt = this._buildEvent(mx, my);
+
+        if (this.altCapture) {
+            return this._releaseAltCapture();
+        }
 
         // 1) Interactions guitare
         this._handleGlobalMouseReleased(evt);
@@ -266,10 +312,17 @@ _buildEvent(mx, my) {
             x: mouseX,
             y: mouseY,
             delta: event.delta,
-            shift: keyIsDown(SHIFT),
-            alt: keyIsDown(ALT),
-            ctrl: keyIsDown(CONTROL)
+            shiftKey: keyIsDown(SHIFT),
+            altKey:   keyIsDown(ALT),
+            ctrlKey:  keyIsDown(CONTROL)
         };
+
+        if (evt.altKey) {
+            const target = this._findAltTarget(evt);
+            if (target) {
+                return UIComponent.prototype.mouseWheel.call(target, evt) || false;
+            }
+        }
 
         for (const c of this._getTopLevelByZDesc()) {
             if (c.mouseWheel?.(evt)) return true;

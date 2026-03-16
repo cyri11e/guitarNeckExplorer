@@ -156,6 +156,7 @@ class UIComponent {
 
 mouseWheel(evt) {
     if (!this.isZoomable) return false;
+    if (!evt.altKey) return false;  // zoom seulement avec ALT
     if (!this.containsRect(evt)) return false;
 
     this.wheelActive = true;
@@ -317,6 +318,7 @@ triggerChange(newState) {
     mouseDragged(evt) {
         if (!this.isPressed) return false;
         if (!evt.altKey) return false; // pas de drag sans ALT
+        if (!this.isDraggable) return false;
 
         const dx = evt.x - this.pressX;
         const dy = evt.y - this.pressY;
@@ -332,11 +334,6 @@ triggerChange(newState) {
 
             // on dépasse le seuil → drag actif
             this.dragging = true;
-
-            // si pas draggable → on ne consomme pas l'event
-            if (!this.isDraggable) {
-                return false;
-            }
         }
 
         // drag actif et autorisé

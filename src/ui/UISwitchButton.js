@@ -22,6 +22,15 @@ class Switch extends UIComponent {
         this._state = 0; // 0 = neutre, 1 = top, 2 = bottom
         this.isPassive = (!this.topLabel && !this.bottomLabel);
 
+        // --- WHEEL ---
+        this._wheelAccum = 0;
+        this.wheelStepThreshold = cfg.wheelStepThreshold ?? 180;
+        // séquence ordonnée du bas vers le haut (qualité musicale croissante)
+        // ex. [2, 1] = bottom < top ; [2, 1, 3] = d < P < A ; [4, 2, 1] = dd < m < M
+        this._wheelSequence = cfg.wheelSequence ?? null;
+        // mapping états étendus → labels (personnalisable par instance)
+        this._specialMap = cfg.specialMap ?? { 3: "a", 4: "dd" };
+
         // --- INTERACTION ---
         this.isDraggable = true;
         this.isZoomable  = true;
@@ -56,6 +65,33 @@ class Switch extends UIComponent {
     onClick() {
         if (!this.isPassive) {
             this.state = (this._state + 1) % 3;
+        }
+        return true;
+    }
+
+    mouseWheel(evt) {
+        if (evt.altKey) return super.mouseWheel(evt);
+        if (this.isPassive) return false;
+        if (!this.containsRect(evt)) return false;
+
+        this._wheelAccum -= evt.delta;
+        if (Math.abs(this._wheelAccum) < this.wheelStepThreshold) return true;
+
+        // delta positif = scroll bas → descend musicalement (qualité basse = bas de la séquence)
+        // séquence ordonnée [haut..bas] : seq[0]=top(M/P), seq[last]=bottom(m/d)
+        // scroll bas (delta>0) → idx+1 → vers la fin de la séquence = qualité basse
+        const step = this._wheelAccum > 0 ? 1 : -1;
+        this._wheelAccum = 0;
+
+        // séquence ordonnée du haut vers le bas : [1(M/P), 2(m/d), ...]
+        const seq = this._wheelSequence ?? [1, 2];
+        const idx = seq.indexOf(this._state);
+
+        if (idx === -1) {
+            // état 0 (off) ou inconnu → bord proche selon direction
+            this.state = step > 0 ? seq[seq.length - 1] : seq[0];
+        } else {
+            this.state = seq[Math.max(0, Math.min(seq.length - 1, idx + step))];
         }
         return true;
     }
@@ -139,7 +175,7 @@ containsRect(evt) {
         text(this.title, this.x + this.w / 2, this.y + labelH * 0.6);
 
         // --- ALTÉRATION / LABELS ---
-        const specialMap = { 3: "a", 4: "dd" };
+        const specialMap = this._specialMap;
         const special = specialMap[this.state] || null;
         const effectiveBottom = special ? special : this.bottomLabel;
 

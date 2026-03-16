@@ -80,6 +80,8 @@ class Guitar extends UIComponent {
         this.interactionBursts = [];
         this.shiftDown = false;
 
+        this.anim = new GuitarAnim();
+this.anim.setPreset("snappy"); 
         // --- MODE MARKER ---
         this.markerMode = false;
         this.markerSegments = [];
@@ -536,7 +538,7 @@ fromScreen(x, y) {
             popInDuration = 220,
             includeMarkers = true,
             replayExisting = false,
-            animProfile = "default"
+            animProfile = "snappy"
         } = opts;
 
         const isSequenceProfile = animProfile === "sequence";
@@ -611,14 +613,22 @@ fromScreen(x, y) {
         this.invalidate();
     }
 
+    // ---- Animation presets -----------------------------------------------
+    setAnimationPreset(name) {
+        this.anim.setPreset(name);
+    }
+
     _startHighlightTimer() {
         if (this._highlightTimer) return;
 
-        this.targetTime = 1.0;   // durée de la cible (en secondes)
-        this.dotTime    = 15.0;  // durée du fade-out du point final (en secondes)
+        const cfg = this.anim?.highlight || {};
 
-        const dt      = 0.02; // vitesse d’incrémentation (≈60 FPS)
+        this.targetTime = cfg.targetTime ?? 1.0;   // durée de la cible (en secondes)
+        this.dotTime    = cfg.dotTime ?? 15.0;  // durée du fade-out du point final (en secondes)
+
+        const dt      = cfg.dt ?? 0.02; // vitesse d’incrémentation (≈60 FPS)
         const totalT  = this.targetTime + this.dotTime; // durée totale
+        const timerMs = this.anim?.timers?.fastMs ?? 16;
 
         this._highlightTimer = setInterval(() => {
 
@@ -639,11 +649,13 @@ fromScreen(x, y) {
                 this.invalidate();
             }
 
-        }, 16);
+        }, timerMs);
     }
 
     _startBurstTimer() {
         if (this._burstTimer) return;
+
+        const timerMs = this.anim?.timers?.fastMs ?? 16;
 
         this._burstTimer = setInterval(() => {
 
@@ -655,7 +667,7 @@ fromScreen(x, y) {
 
             this.invalidate();
 
-        }, 16); // ~60 FPS
+        }, timerMs); // ~60 FPS
     }
 
     _enqueueNotesChain(notes, usePinned = true) {
@@ -672,7 +684,7 @@ fromScreen(x, y) {
             this._chainAddTimer = null;
         }
 
-        const stepMs = 55;
+        const stepMs = this.anim?.chain?.stepMs ?? 55;
 
         this._chainAddTimer = setInterval(() => {
             if (this._chainAddQueue.length === 0) {
