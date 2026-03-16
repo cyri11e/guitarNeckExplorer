@@ -36,6 +36,9 @@ class UIComponent {
 
         // ⭐ AJOUT : référence vers App
         this.app = null;
+
+        // Z-order interaction policy
+        this.bringToFrontOnPress = false;
     }
 
     // ============================================================

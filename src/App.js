@@ -3,6 +3,7 @@ class App {
 
         // Managers
         this.ui = new UIInteractionManager();
+        this.ui.app = this;
         this.rules = new RuleManager();
 
         // Théorie musicale
@@ -85,6 +86,9 @@ class App {
 
             comp.name = key;
             comp.app = this;
+            comp._creationOrder = this.components.length;
+            comp._hasExplicitZ = Number.isFinite(cfg.zIndex);
+            comp.zIndex = comp._hasExplicitZ ? cfg.zIndex : 0;
 
             if (cfg.toggleShortcut) comp.shortcutKey = cfg.toggleShortcut;
             if (cfg.toggleOrientationShortcut) comp.toggleOrientationShortcut = cfg.toggleOrientationShortcut;
@@ -119,6 +123,8 @@ class App {
             parent.updateResponsive();
         }
 
+        this._assignAutomaticZIndex();
+
         // ============================================================
         // 3) ENREGISTREMENT DES COMPOSANTS DANS RULEMANAGER
         // ============================================================
@@ -151,6 +157,74 @@ for (const comp of this.components) {
         this._frameCounter = 0;
     }
 
+    _assignAutomaticZIndex() {
+        let slot = 0;
+
+        for (const comp of this.components) {
+            if (comp.parent) continue;
+
+            if (!comp._hasExplicitZ) {
+                comp.zIndex = slot * 10;
+            }
+
+            const rootZ = comp.zIndex;
+            if (Array.isArray(comp.children)) {
+                for (const child of comp.children) {
+                    if (!child._hasExplicitZ) {
+                        // Dans un panel, tous les enfants partagent le meme z logique.
+                        child.zIndex = rootZ + 1;
+                    }
+                }
+            }
+
+            slot++;
+        }
+    }
+
+    _getRootComponent(component) {
+        let c = component;
+        while (c?.parent) c = c.parent;
+        return c || null;
+    }
+
+    bringRootToFront(component) {
+        const root = this._getRootComponent(component);
+        if (!root) return false;
+
+        const roots = this.components.filter(c => !c.parent);
+        if (roots.length === 0) return false;
+
+        let maxZ = -Infinity;
+        for (const r of roots) {
+            const z = Number.isFinite(r.zIndex) ? r.zIndex : 0;
+            if (z > maxZ) maxZ = z;
+        }
+
+        const current = Number.isFinite(root.zIndex) ? root.zIndex : 0;
+        const nextZ = maxZ + 10;
+        if (current >= nextZ) return false;
+
+        root.zIndex = nextZ;
+        this.invalidate();
+        return true;
+    }
+
+    getTopLevelComponentsByZ(ascending = true) {
+        const roots = this.components.filter(c => !c.parent);
+
+        roots.sort((a, b) => {
+            const za = Number.isFinite(a.zIndex) ? a.zIndex : 0;
+            const zb = Number.isFinite(b.zIndex) ? b.zIndex : 0;
+            if (za !== zb) return ascending ? (za - zb) : (zb - za);
+
+            const oa = Number.isFinite(a._creationOrder) ? a._creationOrder : 0;
+            const ob = Number.isFinite(b._creationOrder) ? b._creationOrder : 0;
+            return ascending ? (oa - ob) : (ob - oa);
+        });
+
+        return roots;
+    }
+
     // ============================================================
     // RENDERING
     // ============================================================
@@ -179,9 +253,9 @@ for (const comp of this.components) {
 
         background(60);
 
-        // dessin bottom → top
-        for (const c of this.components) {
-            c.draw();   //  Panels dessinent leurs enfants
+        // dessin bottom → top (composants racine uniquement)
+        for (const c of this.getTopLevelComponentsByZ(true)) {
+            c.draw();   // Panels dessinent leurs enfants
         }
 
         if (this.debug) this.drawDebugHUD();
@@ -217,6 +291,8 @@ for (const comp of this.components) {
                 c.updateChildrenLayout();
             }
         }
+
+        this._assignAutomaticZIndex();
 
         this.invalidate();
     }

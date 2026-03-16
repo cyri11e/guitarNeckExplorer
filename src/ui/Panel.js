@@ -12,6 +12,7 @@ class Panel extends UIComponent {
         // Drag / zoom
         this.isDraggable = cfg.isDraggable ?? true;
         this.isZoomable  = cfg.isZoomable  ?? true;
+        this.bringToFrontOnPress = cfg.bringToFrontOnPress ?? true;
 
         // Enfants
         this.children = [];
@@ -173,6 +174,22 @@ updateChildrenLayout() {
         }
 
         return false;
+    }
+
+    mouseMoved(evt) {
+        // Les enfants doivent recevoir mouseMoved pour maintenir leurs hovers.
+        for (const c of this.children) {
+            c.mouseMoved?.(evt);
+        }
+
+        const wasHovered = this.isHovered;
+        this.updateHover(evt);
+
+        if (wasHovered !== this.isHovered) {
+            this.invalidate();
+        }
+
+        return this.isHovered;
     }
 
     mouseReleased(evt) {

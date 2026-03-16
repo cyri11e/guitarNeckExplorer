@@ -39,6 +39,46 @@ class UIInteractionManager {
         this.components = this.components.filter(c => c !== component);
     }
 
+    _getTopLevelByZDesc() {
+        if (this.app?.getTopLevelComponentsByZ) {
+            return this.app.getTopLevelComponentsByZ(false);
+        }
+
+        const roots = this.components.filter(c => !c.parent);
+        return roots.reverse();
+    }
+
+    _isHitOnNonGuitarControl(comp, evt) {
+        if (!comp) return false;
+
+        if (Array.isArray(comp.children) && comp.children.length > 0) {
+            for (let i = comp.children.length - 1; i >= 0; i--) {
+                if (this._isHitOnNonGuitarControl(comp.children[i], evt)) {
+                    return true;
+                }
+            }
+        }
+
+        if (comp instanceof Guitar) return false;
+
+        // Les conteneurs (panel) ne doivent pas bloquer la guitare:
+        // on bloque seulement sur un contrôle concret non-guitare.
+        if (Array.isArray(comp.children) && comp.children.length > 0) {
+            return false;
+        }
+
+        return !!comp.containsRect?.(evt);
+    }
+
+    _hasTopControlHit(evt) {
+        for (const root of this._getTopLevelByZDesc()) {
+            if (this._isHitOnNonGuitarControl(root, evt)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ============================================================
     // EVENT BUILDER
     // ============================================================
@@ -63,6 +103,9 @@ _buildEvent(mx, my) {
         if (!this.guitar) return false;
         if (!this.guitar.containsRect(evt)) return false;
 
+        // Ne pas capturer si un contrôle UI non-guitare est visé.
+        if (this._hasTopControlHit(evt)) return false;
+
         this.lastX = evt.x;
         this.lastY = evt.y;
 
@@ -80,6 +123,7 @@ _buildEvent(mx, my) {
             this.eraseActive = false;
             this.dragActive = false;
             this.guitar.addNoteAtEvent(evt);
+            this.app?.bringRootToFront?.(this.guitar);
             return true;
         }
 
@@ -89,6 +133,7 @@ _buildEvent(mx, my) {
             this.brushActive = false;
             this.dragActive = false;
             this.guitar.removeNoteAtEvent(evt);
+            this.app?.bringRootToFront?.(this.guitar);
             return true;
         }
 
@@ -145,7 +190,7 @@ _buildEvent(mx, my) {
         if (this._handleGlobalMouseMoved(evt)) return true;
 
         // propagation UI
-        for (const c of this.components) {
+        for (const c of this._getTopLevelByZDesc()) {
             c.mouseMoved?.(evt);
         }
     }
@@ -158,10 +203,11 @@ _buildEvent(mx, my) {
         if (this._handleGlobalMousePressed(evt)) return true;
 
         // 2) Sinon propagation UI (top → bottom)
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
-
+        for (const c of this._getTopLevelByZDesc()) {
             if (c.mousePressed?.(evt)) {
+                if (c.bringToFrontOnPress === true) {
+                    this.app?.bringRootToFront?.(c);
+                }
                 this.captureOwner = c;
                 return true;
             }
@@ -182,8 +228,7 @@ _buildEvent(mx, my) {
         }
 
         // 3) Propagation UI
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
+        for (const c of this._getTopLevelByZDesc()) {
             if (c.mouseDragged?.(evt)) return true;
         }
 
@@ -205,8 +250,7 @@ _buildEvent(mx, my) {
         }
 
         // 3) Propagation UI
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
+        for (const c of this._getTopLevelByZDesc()) {
             if (c.mouseReleased?.(evt)) return true;
         }
 
@@ -227,8 +271,7 @@ _buildEvent(mx, my) {
             ctrl: keyIsDown(CONTROL)
         };
 
-        for (let i = this.components.length - 1; i >= 0; i--) {
-            const c = this.components[i];
+        for (const c of this._getTopLevelByZDesc()) {
             if (c.mouseWheel?.(evt)) return true;
         }
         return false;
