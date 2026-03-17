@@ -166,6 +166,16 @@ class ModeChordsPanel extends UIComponent {
 
     _drawTightCenteredText(label, cx, cy, accidentalAdvanceFactor = 0.72) {
         const s = String(label ?? "");
+
+        // Sans ♭/♯ : centrage natif p5, exact sur toutes les plateformes.
+        const hasAccidentals = [...s].some(ch => this._isAccidentalChar(ch));
+        if (!hasAccidentals) {
+            textAlign(CENTER, CENTER);
+            text(s, cx, cy);
+            return;
+        }
+
+        // Avec ♭/♯ : rendu caractère par caractère, avance réduite uniquement sur les accidentels.
         const totalW = this._measureTightText(s, accidentalAdvanceFactor);
         let x = cx - totalW / 2;
 
