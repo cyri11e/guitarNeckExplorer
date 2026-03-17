@@ -281,6 +281,30 @@ function reindexTRRecSnapshotRefs(trRec, removedIndex, snapshotTitles) {
     }
 }
 
+function syncModeChordsPanel(components) {
+    const panel = components.find(c => c.name === "modeChordsPanel1");
+    const guitar = components.find(c => c.name === "guitar1");
+    const knobDeg = components.find(c => c.name === "knob13457");
+    const lcd = components.find(c => c.name === "lcd1");
+    const accidentalSw = components.find(c => c.name === "metalSwitch1");
+
+    if (!panel || !guitar) return;
+
+    // Le mode affiché n'est réaffecté que quand le mode "gamme" est actif.
+    if (knobDeg?.state === 4) {
+        const modeName = lcd?.items?.[lcd.state];
+        if (modeName) panel.setMode(modeName);
+    }
+
+    const rootIndex = guitar.theory?.hasRoot?.() ? guitar.theory.root : null;
+    panel.setRootContext(rootIndex, guitar.labelType, guitar.theory);
+
+    const pendingUseFlats = panel.consumePendingUseFlats?.();
+    if (typeof pendingUseFlats === "boolean" && accidentalSw) {
+        accidentalSw.setState(pendingUseFlats ? 0 : 1);
+    }
+}
+
 const UI_RULES = [
 
     // RÈGLE : MetalSwitch (♯/♭) synchronise avec guitar.flatMode
@@ -613,7 +637,7 @@ guitar.invalidate();
 
 
 // ============================================================
-// KNOB MULTI CURSOR → avance au prochain mode multinote
+// KNOB MULTI CURSOR → synchronise le mode multinote sur l'index du knob
 // ============================================================
 (components, source, newState) => {
 
@@ -622,7 +646,11 @@ guitar.invalidate();
     const guitar = components.find(c => c.name === "guitar1");
     if (!guitar) return;
 
-    guitar.setNextIntervalMode();
+    const modes = Array.isArray(guitar.intervalModes) ? guitar.intervalModes : [];
+    const selectedMode = modes[newState];
+    if (!selectedMode) return;
+
+    guitar.setIntervalMode(selectedMode);
 },
 
 // ============================================================
@@ -1063,6 +1091,21 @@ guitar.invalidate();
         }
         return;
     }
+},
+
+// Panel accords des modes: persistant hors mode gamme, refresh root/langue en continu.
+(components, source, newState) => {
+    const watch = new Set([
+        "lcd1",
+        "knob13457",
+        "cof1",
+        "guitar1",
+        "metalSwitchENFR",
+        "metalSwitch1"
+    ]);
+
+    if (!watch.has(source?.name)) return;
+    syncModeChordsPanel(components);
 },
 
 

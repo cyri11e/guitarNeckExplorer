@@ -113,7 +113,7 @@ class NoteRenderer {
     // ------------------------------------------------------------
     // 4. LABEL (texte + altérations)
     // ------------------------------------------------------------
-    drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors) {
+    drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset = 0, yOffset = 0) {
         const { base, alt, type } = label;
 
         noStroke();
@@ -350,7 +350,7 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         this.drawInner(x, y, shapeType, R, OFFSET, blanc);
 
         // 5. Label
-        this.drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors);
+        this.drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset, yOffset);
 
         pop();
     }

@@ -58,6 +58,10 @@ class App {
                     comp = new MarkerSelector(cfg); 
                     break;    
 
+                case "modeChordsPanel":
+                    comp = new ModeChordsPanel(cfg);
+                    break;
+
                 case "lcdSelector":
                     comp = new LCDSelector(cfg); 
                     break; 

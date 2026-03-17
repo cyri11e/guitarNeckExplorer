@@ -7,7 +7,7 @@ class MetalSwitch extends UIComponent {
         const yp = cfg.yp ?? 0;
         const sp = cfg.sp ?? 10;
 
-        this.aspectRatio = 0.55; // vertical
+        this.aspectRatio = cfg.aspectRatio ?? 0.55; // vertical
 
         this.setResponsive(xp, yp, sp);
         this.updateResponsive();

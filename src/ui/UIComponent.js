@@ -6,6 +6,8 @@ class UIComponent {
         this.yp = 0;
         this.sp = 100;      // taille relative (% du parent)
         this.aspectRatio = 1; // largeur = hauteur * aspectRatio
+        this._xpFromRight = false;
+        this._ypFromBottom = false;
 
         // Position / taille absolues
         this.x = 0;
@@ -49,6 +51,8 @@ class UIComponent {
         this.xp = xp;
         this.yp = yp;
         this.sp = sp;
+        this._xpFromRight = (xp < 0);
+        this._ypFromBottom = (yp < 0);
     }
 
     _getParentFrame() {
@@ -73,8 +77,10 @@ class UIComponent {
         const { px, py, pw, ph } = this._getParentFrame();
 
         // Position absolue = position relative * taille parent
-        this.x = px + pw * (this.xp / 100);
-        this.y = py + ph * (this.yp / 100);
+        const xRatio = this._xpFromRight ? (1 + this.xp / 100) : (this.xp / 100);
+        const yRatio = this._ypFromBottom ? (1 + this.yp / 100) : (this.yp / 100);
+        this.x = px + pw * xRatio;
+        this.y = py + ph * yRatio;
 
         // Hauteur = sp% de la hauteur du parent * zoom
         this.h = ph * (this.sp / 100) * this.zoomFactor;
@@ -94,8 +100,10 @@ class UIComponent {
     _updateRelativeFromAbsolute() {
         const { px, py, pw, ph } = this._getParentFrame();
 
-        this.xp = ((this.x - px) / pw) * 100;
-        this.yp = ((this.y - py) / ph) * 100;
+        const leftPct = ((this.x - px) / pw) * 100;
+        const topPct = ((this.y - py) / ph) * 100;
+        this.xp = this._xpFromRight ? (leftPct - 100) : leftPct;
+        this.yp = this._ypFromBottom ? (topPct - 100) : topPct;
     }
 
     moveBy(dx, dy) {

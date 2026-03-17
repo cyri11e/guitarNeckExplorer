@@ -2,8 +2,8 @@ const UI_CONFIG = {
 
     aspectPanel: {
         type: "panel",
-        xp: 30,
-        yp: 30,
+        xp: 2,
+        yp: 62,
         sp: 10,
         aspectRatio: 1.5,
         visible: true,
@@ -17,16 +17,15 @@ const UI_CONFIG = {
             "metalSwitch1",
             "metalSwitchENFR",
             "metalWood",
-            "knobInlays",
-            "metalCAGED"
+            "knobInlays"
         ]
     },
 
 // PANEL HARMONIE
 harmonyPanel: {
     type: "panel",
-    xp: 52,
-    yp: 50,
+    xp: 2,
+    yp: 40,
     sp: 10,
     aspectRatio: 1.2,
     visible: true,
@@ -52,8 +51,8 @@ harmonyPanel: {
 // PANEL type de vue curseur
 cursorPanel: {
     type: "panel",
-    xp: 52,
-    yp: 40,
+    xp: 2,
+    yp: 52,
     sp: 10,
     aspectRatio: 1.2,
     visible: true,
@@ -65,8 +64,16 @@ cursorPanel: {
         "knobMultiCursor",
         "metalWay",
         "knobOctaves",
-        "knobInversions"        
+        "knobInversions" ,
+            "metalCAGED"       
     ]
+},
+
+modeChordsPanel1: {
+    type: "modeChordsPanel",
+    sp: 100,
+    aspectRatio: 3.5,
+    description: "Accords diatoniques en colonnes",
 },
 
 
@@ -109,12 +116,13 @@ knobMultiCursor: {
     yp: 25,
     sp: 100,
     hideBottom: true,
+    aspectRatio: 2,
     items: [
         { symbol: "1S", label: "1 Corde" },
         { symbol: "C", label: "Accord" },
         { symbol: "B>", label: "Box Droite" },
         { symbol: "<B", label: "Box Gauche" },
-        { symbol: "3N", label: "3 Notes/c" },
+        { symbol: "3NPS", label: "3 Notes/c" },
         { symbol: "/", label: "Diagonal" }
     ],
     shortcutKey: "x",
@@ -314,15 +322,15 @@ metalCAGED: {
     sp: 100,     // % de la hauteur du panel
     topLabel: "caged",
     bottomLabel: "off",
-    aspectRatio: 1,
+    aspectRatio: 0.7,
     defaultState: 0,   // ← ON par défaut
     shortcutKey: "q",
     description: "box caged"
 },
     panel2: {
         type: "panel",
-        xp: 80,
-        yp: 30,
+        xp: 52,
+        yp: 40,
         sp: 20,
         aspectRatio: 1.2,
         visible: true,
@@ -331,12 +339,12 @@ metalCAGED: {
         isZoomable: true,
         toggleOnClick: true,
         //toggleShortcut: "w",
-        children: ["cof1"]
+        children: ["cof1", "modeChordsPanel1"]
     },
 
 guitar1: {
     type: "guitar",
-    xp: 2,
+    xp: 5,
     yp: 5,
     sp: 20,
     aspectRatio: 8,
@@ -413,7 +421,7 @@ markerSelector1: {
 snapshotPanel: {
     type: "panel",
     xp: 2,
-    yp: 60,
+    yp: -12,
     sp: 10,
     aspectRatio: 1,
     children: ["snapshotBtn","lcd2","playBtn","loopBtn","saveSeqBtn","loadSeqBtn","trashBtn","bpmCtrl"]
@@ -508,8 +516,8 @@ bpmCtrl: {
 
 trRecPanel: {
         type: "panel",
-        xp: 2,
-        yp: 30,
+        xp: 50,
+        yp: -32,
         sp: 30,
         aspectRatio: 1,
         children: ["trRecPads"]

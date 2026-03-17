@@ -103,8 +103,14 @@ updateChildrenLayout() {
                 c.y = innerY;
             }
         } else if (c.relativePos === true) {
-            c.x = innerX + finalInnerW * ((c.xp ?? 0) / 100);
-            c.y = innerY + innerH * ((c.yp ?? 0) / 100);
+            const childXp = c.xp ?? 0;
+            const childYp = c.yp ?? 0;
+            const fromRight = (c._xpFromRight ?? false) || childXp < 0;
+            const fromBottom = (c._ypFromBottom ?? false) || childYp < 0;
+            const xRatio = fromRight ? (1 + childXp / 100) : (childXp / 100);
+            const yRatio = fromBottom ? (1 + childYp / 100) : (childYp / 100);
+            c.x = innerX + finalInnerW * xRatio;
+            c.y = innerY + innerH * yRatio;
         } else {
             continue;
         }

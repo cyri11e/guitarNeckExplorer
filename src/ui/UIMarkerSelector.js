@@ -18,18 +18,18 @@ class MarkerSelector extends UIComponent {
         this.activeColorIndex = 0;
 
         this.noteColors = [
-            color(255, 20, 20),
-            color(255, 82, 90),
-            color(255, 165, 10),
-            color(255, 210, 10),
-            color(200, 200, 10),
-            color(144, 238, 144),
-            color(72, 169, 127),
-            color(20, 40, 255),
-            color(68, 103, 192),
-            color(75, 10, 130),
-            color(111, 21, 168),
-            color(148, 10, 211)
+            color("#ea0e0e"),  // tonique fondamentale rouge
+            color("#b9730b"),  // m2 seconde orange
+            color("#e38d0c"),  // M2
+            color("#c5b315"),  // m3 tierce jaune
+            color("#d7e60e"),  // M3
+            color("#0fde32"),  // P4 vert
+            color("#42b5c7"),  // TT bleu vert
+            color("#3863f1"),  // P5 bleu
+            color("#ae48da"),  // m6
+            color("#860ce3"),  // M6
+            color("#d165b9"),  // m7
+            color("#e80cb4"),  // M7
         ];
 
         this.activeColor = this.noteColors[0];
