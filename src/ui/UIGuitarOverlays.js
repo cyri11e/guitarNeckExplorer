@@ -524,6 +524,42 @@ const list = this._getDispatchedIntervalList(
     // ------------------------------------------------------------
     // MARKER — SEGMENTS
     // ------------------------------------------------------------
+    _markerColorWithAlpha(src, alpha = 180) {
+        const fallback = color(255, 20, 20, alpha);
+
+        if (!src) return fallback;
+
+        // p5.Color
+        if (src.levels && Array.isArray(src.levels)) {
+            return color(src.levels[0], src.levels[1], src.levels[2], alpha);
+        }
+
+        // Tableau RGB/RGBA
+        if (Array.isArray(src) && src.length >= 3) {
+            return color(src[0], src[1], src[2], alpha);
+        }
+
+        // Cas signalé: objet Arguments avec [0] = p5.Color
+        if (typeof src === "object" && typeof src.length === "number" && src.length > 0) {
+            const first = src[0];
+            if (first && first.levels && Array.isArray(first.levels)) {
+                return color(first.levels[0], first.levels[1], first.levels[2], alpha);
+            }
+            if (Array.isArray(first) && first.length >= 3) {
+                return color(first[0], first[1], first[2], alpha);
+            }
+        }
+
+        // Dernier recours: chaînes css, hex, etc.
+        try {
+            const c = color(src);
+            c.setAlpha(alpha);
+            return c;
+        } catch (_) {
+            return fallback;
+        }
+    }
+
     drawMarkedSegments() {
         const g = this.g;
         // if (!g.markerMode) return;
@@ -532,8 +568,7 @@ const list = this._getDispatchedIntervalList(
         strokeWeight(thickness);
 
         for (let s of (g.markerSegments || [])) {
-            const col = color(s.color);
-            col.setAlpha(180);
+            const col = this._markerColorWithAlpha(s.color, 180);
             stroke(col);
 
             const p1 = g.toScreen(s.a.fret, s.a.string);
@@ -555,8 +590,7 @@ const list = this._getDispatchedIntervalList(
 
         const thickness = g.getThickness() * 0.1;
 
-        const col = color(g.markerColor);
-        col.setAlpha(180);
+        const col = this._markerColorWithAlpha(g.markerColor, 180);
 
         push();
         strokeWeight(thickness);

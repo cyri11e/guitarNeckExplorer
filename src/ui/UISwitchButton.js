@@ -236,12 +236,11 @@ containsRect(evt) {
 
         if (this.isHovered){
             push();
-            stroke("#ee3713")
-            noFill()
+            stroke("#ee3713");
+            noFill();
             rect(capX, capY, capW, innerH);
             pop();
         }
-
 
         // --- LABELS ---
         const topY    = this.y + labelH + capH * 0.3;

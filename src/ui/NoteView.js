@@ -21,6 +21,37 @@ class NoteRenderer {
         };
     }
 
+    // Clone une couleur vers une instance locale pour eviter de modifier
+    // des p5.Color partagees (palette chromatique, etc.).
+    toLocalColor(src, alphaOverride = null) {
+        const a = alphaOverride == null ? null : constrain(alphaOverride, 0, 255);
+
+        if (src && src.levels && Array.isArray(src.levels)) {
+            const lv = src.levels;
+            return color(lv[0], lv[1], lv[2], a == null ? lv[3] : a);
+        }
+
+        if (Array.isArray(src) && src.length >= 3) {
+            return color(src[0], src[1], src[2], a == null ? (src[3] ?? 255) : a);
+        }
+
+        if (typeof src === "object" && src && typeof src.length === "number" && src.length > 0) {
+            const first = src[0];
+            if (first && first.levels && Array.isArray(first.levels)) {
+                const lv = first.levels;
+                return color(lv[0], lv[1], lv[2], a == null ? lv[3] : a);
+            }
+        }
+
+        try {
+            const c = color(src ?? "#ffffff");
+            if (a != null) c.setAlpha(a);
+            return c;
+        } catch (_) {
+            return color(255, 255, 255, a == null ? 255 : a);
+        }
+    }
+
     // ------------------------------------------------------------
     // 1. SHADOW
     // ------------------------------------------------------------
@@ -172,6 +203,9 @@ class NoteRenderer {
             if (chromaCol) fillColor = chromaCol;
         }
 
+        // Toujours travailler sur une copie locale pour eviter les effets de bord d'alpha.
+        fillColor = this.toLocalColor(fillColor);
+
         let R = this.g.getThickness() * 0.17 * zoomFactor;
 
 // ------------------------------------------------------------
@@ -196,8 +230,7 @@ if (opts.anim && opts.anim.type === "pop") {
 
     // Fade-in rapide de la pastille
     const popAlpha = lerp(popCfg.alphaStart ?? 110, popCfg.alphaEnd ?? 255, t);
-    const popColor = color(fillColor);
-    popColor.setAlpha(popAlpha);
+    const popColor = this.toLocalColor(fillColor, popAlpha);
     fillColor = popColor;
 }
 
@@ -217,8 +250,7 @@ if (opts.anim && opts.anim.type === "popSeq") {
     y -= R * (popSeqCfg.lift ?? 0.10) * (1 - t);
 
     const popAlpha = lerp(popSeqCfg.alphaStart ?? 170, popSeqCfg.alphaEnd ?? 255, t);
-    const popColor = color(fillColor);
-    popColor.setAlpha(popAlpha);
+    const popColor = this.toLocalColor(fillColor, popAlpha);
     fillColor = popColor;
 }
 
@@ -241,8 +273,7 @@ if (opts.anim && opts.anim.type === "popOut") {
 
     // Fade-out global
     const outAlpha = lerp(popOutCfg.alphaStart ?? 255, popOutCfg.alphaEnd ?? 0, easeOut);
-    const outColor = color(fillColor);
-    outColor.setAlpha(outAlpha);
+    const outColor = this.toLocalColor(fillColor, outAlpha);
     fillColor = outColor;
 
     if (effectiveOverlayAlpha == null) {
@@ -261,8 +292,7 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
     y -= this.g.getThickness() * (popOutSeqCfg.drift ?? 0.012) * easeOut;
 
     const outAlpha = lerp(popOutSeqCfg.alphaStart ?? 230, popOutSeqCfg.alphaEnd ?? 0, easeOut);
-    const outColor = color(fillColor);
-    outColor.setAlpha(outAlpha);
+    const outColor = this.toLocalColor(fillColor, outAlpha);
     fillColor = outColor;
 
     if (effectiveOverlayAlpha == null) {

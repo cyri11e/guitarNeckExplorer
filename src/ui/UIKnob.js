@@ -281,7 +281,7 @@ containsRect(evt) {
     // -----------------------------
     draw() {
 
-        push()
+        push();
         const topP = 0.25;
         const circleP = 0.50;
         const labelP = 0.25;
@@ -358,6 +358,7 @@ containsRect(evt) {
     }
 
     drawSymbols(cx, cy, r) {
+        push();  // sauvegarder l'état avant de modifier fill/stroke
         for (let i = 0; i < this.items.length; i++) {
             let a = this.angles[i];
             if (this.hideBottom && abs(a - 90) < 0.1) continue;
@@ -386,5 +387,6 @@ containsRect(evt) {
 
             text(this.items[i].symbol, sx, sy);
         }
+        pop();  // restaurer l'état de dessin
     }
 }

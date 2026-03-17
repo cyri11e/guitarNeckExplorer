@@ -260,6 +260,8 @@ setOnOff(state) {
         }
 
         drawingContext.restore();
+        noFill();
+        noStroke();
 
         // --- CADRE CENTRAL ---
         stroke(0);
