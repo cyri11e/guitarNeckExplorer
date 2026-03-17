@@ -2,7 +2,7 @@ const UI_CONFIG = {
 
     aspectPanel: {
         type: "panel",
-        xp: 2,
+        xp: 5,
         yp: 62,
         sp: 10,
         aspectRatio: 1.5,
@@ -24,8 +24,8 @@ const UI_CONFIG = {
 // PANEL HARMONIE
 harmonyPanel: {
     type: "panel",
-    xp: 2,
-    yp: 40,
+    xp: 47,
+    yp: 52,
     sp: 10,
     aspectRatio: 1.2,
     visible: true,
@@ -51,7 +51,7 @@ harmonyPanel: {
 // PANEL type de vue curseur
 cursorPanel: {
     type: "panel",
-    xp: 2,
+    xp: 5,
     yp: 52,
     sp: 10,
     aspectRatio: 1.2,
@@ -116,7 +116,7 @@ knobMultiCursor: {
     yp: 25,
     sp: 100,
     hideBottom: true,
-    aspectRatio: 2,
+    aspectRatio: 1.2,
     items: [
         { symbol: "1S", label: "1 Corde" },
         { symbol: "C", label: "Accord" },
@@ -329,8 +329,8 @@ metalCAGED: {
 },
     panel2: {
         type: "panel",
-        xp: 52,
-        yp: 40,
+        xp: 5,
+        yp: 30,
         sp: 20,
         aspectRatio: 1.2,
         visible: true,
@@ -420,7 +420,7 @@ markerSelector1: {
 
 snapshotPanel: {
     type: "panel",
-    xp: 2,
+    xp: 5,
     yp: -12,
     sp: 10,
     aspectRatio: 1,
@@ -516,7 +516,7 @@ bpmCtrl: {
 
 trRecPanel: {
         type: "panel",
-        xp: 50,
+        xp: 55,
         yp: -32,
         sp: 30,
         aspectRatio: 1,
