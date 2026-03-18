@@ -750,13 +750,11 @@ fromScreen(x, y) {
 
     moveSelectedFrets(delta) {
         this.selectedNotes = this._moveFrets(this.selectedNotes, delta);
-        this._moveMarkerSegmentsFrets(delta);
         this.invalidate();
     }
 
     moveSelectedStrings(delta) {
         this.selectedNotes = this._moveStrings(this.selectedNotes, delta);
-        this._moveMarkerSegmentsStrings(delta);
         this.invalidate();
     }
 
