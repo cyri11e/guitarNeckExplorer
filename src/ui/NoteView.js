@@ -10,14 +10,31 @@ class NoteRenderer {
     getColors(ghost, overlayAlpha = null) {
         const hasOverlay = overlayAlpha != null;
         const a = hasOverlay ? constrain(overlayAlpha, 0, 255) : 255;
+
+        const textShadowSquare = hasOverlay
+            ? color(0, 0, 0, min(118, a))
+            : "#00000076";
+
+        const textShadowCircle = hasOverlay
+            ? color(255, 255, 255, min(125, a))
+            : "#ffffff7d";
+
+        const textMainSquare = hasOverlay
+            ? color(255, 255, 255, min(120, a))
+            : "#ffffff78";
+
+        const shadowAlpha = hasOverlay
+            ? min(80, round(a * 0.32))
+            : 80;
+
         return {
             blanc: ghost ? "#ffffff8c" : (hasOverlay ? color(255, 255, 255, a) : 255),
             noir:  ghost ? "#00000085" : (hasOverlay ? color(0, 0, 0, a) : 0),
-            textShadowSquare: "#00000076",
-            textShadowCircle: "#ffffff7d",
-            textMainSquare:   "#ffffff78",
+            textShadowSquare,
+            textShadowCircle,
+            textMainSquare,
             cursorColor:      hasOverlay ? color(255, 0, 0, a) : "red",
-            shadowColor:      [0, 80]
+            shadowColor:      [0, shadowAlpha]
         };
     }
 
@@ -304,6 +321,10 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
 
         const colors = this.getColors(ghost, effectiveOverlayAlpha);
         const { blanc, noir } = colors;
+
+        if (effectiveOverlayAlpha != null) {
+            strokeColor = this.toLocalColor(strokeColor, effectiveOverlayAlpha);
+        }
 
 
         const STROKE = R / 10;

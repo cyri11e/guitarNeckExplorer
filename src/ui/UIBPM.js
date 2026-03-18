@@ -68,6 +68,12 @@ class BPMControl extends UIComponent {
     setValue(v) {
         v = constrain(v, this.min, this.max);
         this.value = v;
+
+        // Evite un premier tick trop tardif ou trop rapproché après changement de BPM.
+        if (this.isPlaying) {
+            this.lastTickTime = millis();
+        }
+
         this.onChange?.(v);
         this.invalidate();
     }
@@ -93,19 +99,22 @@ class BPMControl extends UIComponent {
         if (now - this.lastTickTime >= interval) {
             this.lastTickTime = now;
 
-            // tick index (0 → 15)
-            this.tickIndex = (this.tickIndex + 1) % 16;
+            // Step courant joue maintenant (0 -> 15). TRRec utilise ce meme step.
+            const stepIndex = this.tickIndex;
 
-            // ⭐ LED : clignote uniquement sur le temps fort (tick 0,4,8,12)
-            if (this.tickIndex % 4 === 0) {
+            // LED sur le premier temps de chaque groupe de 4: 0, 4, 8, 12.
+            if (stepIndex % 4 === 0) {
                 this.ledPhase = 1;
             }
 
             // ⭐ ÉMISSION D’UN ÉVÉNEMENT UI STANDARD
             this.onChange?.({
                 type: "tick",
-                tick: this.tickIndex
+                tick: stepIndex
             });
+
+            // Prépare le prochain step.
+            this.tickIndex = (stepIndex + 1) % 16;
 
             this.invalidate();
         }
@@ -115,6 +124,10 @@ class BPMControl extends UIComponent {
             this.ledPhase *= this.ledDecay;
             this.invalidate();
         }
+
+        // Heartbeat visuel: garantit un redraw continu pendant la lecture,
+        // meme entre deux ticks BPM (sinon l'animation semble saccadee).
+        this.invalidate();
     }
 
     // -----------------------------------------

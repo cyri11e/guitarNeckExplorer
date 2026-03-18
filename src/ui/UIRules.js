@@ -1623,8 +1623,9 @@ guitar.invalidate();
     bpm.isPlaying = (newState === 1);
 
     if (bpm.isPlaying) {
-        bpm.lastStepTime = millis();
-        bpm.ledPhase = 1;
+        bpm.lastTickTime = millis();
+        bpm.tickIndex = 0;
+        bpm.ledPhase = 0;
         resetTRRecPosition(tr, loopMode);
     } else if (tr) {
         tr.playIndex = 0;
