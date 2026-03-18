@@ -47,10 +47,12 @@ class Guitar extends UIComponent {
             // { fret: 1, string: 6 }, 
             // { fret: 2, string: 4 } 
         ]; // { fret, string }
+        this.previousPadNotesPinned = []; // Historique pour animations de séquence TRRec
 
         this.selectedNotes = [
             // { fret: 3, string: 3 }
         ]; // { fret, string }
+        this.previousPadNotesSelected = []; // Historique pour animations de séquence TRRec
 
         this.snapshots =[]
         //  Ajout : flag anti-clic-après-drag
@@ -487,11 +489,15 @@ fromScreen(x, y) {
         replayExisting = false,
         popInAnimType = "pop",
         popOutAnimType = "popOut",
-        popOutDuration = 380
+        popOutDuration = 380,
+        previousPadNotes = null
     ) {
         const now = millis();
         const currentMap = new Map(currentList.map(n => [`${n.string}:${n.fret}`, n]));
         const targetMap = new Map(targetList.map(n => [`${n.string}:${n.fret}`, n]));
+        const prevMap = previousPadNotes 
+            ? new Map(previousPadNotes.map(n => [`${n.string}:${n.fret}`, true]))
+            : new Map();
 
         // 1) Sorties: tout ce qui n'existe plus -> pop-out.
         for (const n of currentList) {
@@ -512,9 +518,13 @@ fromScreen(x, y) {
 
             if (existing) {
                 if (replayExisting) {
-                    existing.animStart = now;
-                    existing.animDuration = popInDuration;
-                    existing.animType = popInAnimType;
+                    // Ne ré-animer que si la note ne vient PAS du pad précédent
+                    const wasInPreviousPad = prevMap.has(key);
+                    if (!wasInPreviousPad) {
+                        existing.animStart = now;
+                        existing.animDuration = popInDuration;
+                        existing.animType = popInAnimType;
+                    }
                 }
                 next.push(existing);
             } else {
@@ -555,27 +565,37 @@ fromScreen(x, y) {
         const targetPinned = this._normalizeSnapshotNotes(snap.pinnedNotes);
         const targetSelected = this._normalizeSnapshotNotes(snap.selectedNotes);
 
+        // Sauvegarde des notes du pad précédent avant transition (pour éviter pop sur notes persistantes)
+        const prevPinned = this.pinnedNotes;
+        const prevSelected = this.selectedNotes;
+
         this.pinnedNotes = this._transitionNoteList(
-            this.pinnedNotes,
+            prevPinned,
             targetPinned,
             "pinned",
             popInDuration,
             replayExisting,
             popInAnimType,
             popOutAnimType,
-            popOutDuration
+            popOutDuration,
+            this.previousPadNotesPinned
         );
 
         this.selectedNotes = this._transitionNoteList(
-            this.selectedNotes,
+            prevSelected,
             targetSelected,
             "selected",
             popInDuration,
             replayExisting,
             popInAnimType,
             popOutAnimType,
-            popOutDuration
+            popOutDuration,
+            this.previousPadNotesSelected
         );
+
+        // Mise à jour de l'historique du pad pour la prochaine transition
+        this.previousPadNotesPinned = prevPinned;
+        this.previousPadNotesSelected = prevSelected;
 
         if (includeMarkers) {
             this.markerSegments = [...(snap.markerSegments || [])];
