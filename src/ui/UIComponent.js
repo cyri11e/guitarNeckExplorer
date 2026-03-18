@@ -302,6 +302,7 @@ triggerChange(newState) {
     moveToAbsolute(nx, ny) {
         this.x = nx;
         this.y = ny;
+        this._updateRelativeFromAbsolute();
         this.invalidate?.();
     }
 
