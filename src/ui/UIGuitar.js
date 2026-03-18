@@ -750,22 +750,68 @@ fromScreen(x, y) {
 
     moveSelectedFrets(delta) {
         this.selectedNotes = this._moveFrets(this.selectedNotes, delta);
+        this._moveMarkerSegmentsFrets(delta);
         this.invalidate();
     }
 
     moveSelectedStrings(delta) {
         this.selectedNotes = this._moveStrings(this.selectedNotes, delta);
+        this._moveMarkerSegmentsStrings(delta);
         this.invalidate();
     }
 
     movePinnedFrets(delta) {
         this.pinnedNotes = this._moveFrets(this.pinnedNotes, delta);
+        this._moveMarkerSegmentsFrets(delta);
         this.invalidate();
     }
 
     movePinnedStrings(delta) {
         this.pinnedNotes = this._moveStrings(this.pinnedNotes, delta);
+        this._moveMarkerSegmentsStrings(delta);
         this.invalidate();
+    }
+
+    _moveMarkerSegmentsFrets(delta) {
+        if (!Array.isArray(this.markerSegments) || this.markerSegments.length === 0) return;
+
+        this.markerSegments = this.markerSegments.map(seg => {
+            if (!seg) return seg;
+
+            const a0 = seg.a ?? null;
+            const b0 = seg.b ?? null;
+            const moved = this._moveFrets([a0, b0].filter(Boolean), delta);
+
+            const a = a0 ? moved[0] : null;
+            const b = b0 ? moved[a0 ? 1 : 0] : null;
+
+            return {
+                ...seg,
+                a,
+                b
+            };
+        });
+    }
+
+    _moveMarkerSegmentsStrings(delta) {
+        if (!Array.isArray(this.markerSegments) || this.markerSegments.length === 0) return;
+
+        this.markerSegments = this.markerSegments.map(seg => {
+            if (!seg) return seg;
+
+            const a0 = seg.a ?? null;
+            const b0 = seg.b ?? null;
+            const moved = this._moveStrings([a0, b0].filter(Boolean), delta);
+
+            const a = a0 ? moved[0] : null;
+            const b = b0 ? moved[a0 ? 1 : 0] : null;
+
+            return {
+                ...seg,
+                a,
+                b
+            };
+        });
     }
 
     // ------------------------------------------------------------
