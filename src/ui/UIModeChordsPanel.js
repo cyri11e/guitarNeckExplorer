@@ -17,6 +17,8 @@ class ModeChordsPanel extends UIComponent {
         this._hitColumns = [];
         this._hoverCol = -1;
         this._pendingUseFlats = null;
+        this._selectedCols = new Set();
+        this._selectionContextKey = "";
 
         this._modeDef = null;
         this._rootIndex = null;
@@ -85,6 +87,7 @@ class ModeChordsPanel extends UIComponent {
         this._modeDef = def;
         this.selectedModeLabel = def.display;
 
+        this._syncSelectionContext();
         this._refreshColumns();
         this.invalidate();
     }
@@ -94,6 +97,7 @@ class ModeChordsPanel extends UIComponent {
         this._labelType = labelType || "noteEN";
         this._theory = theory || null;
 
+        this._syncSelectionContext();
         this._refreshColumns();
         this.invalidate();
     }
@@ -217,14 +221,106 @@ class ModeChordsPanel extends UIComponent {
             const noteName = this._toNoteName(pc, useFlats);
             if (!noteName) continue;
 
+            const chordPitchClasses = this._buildTriadPitchClasses(pc, quality);
+
             out.push({
                 degreeIndex: i,
                 note: noteName,
                 quality,
+                rootPc: pc,
+                chordPitchClasses,
                 chord: this._withUnicodeAccidentals(noteName + this._qualitySuffix(quality))
             });
         }
         return out;
+    }
+
+    _buildTriadPitchClasses(rootPc, quality) {
+        let intervals = [0, 4, 7];
+
+        if (quality === "m") intervals = [0, 3, 7];
+        if (quality === "dim") intervals = [0, 3, 6];
+        if (quality === "aug") intervals = [0, 4, 8];
+
+        return intervals.map(semitones => (rootPc + semitones) % 12);
+    }
+
+    _getSelectionContextKey() {
+        const mode = this._normalizeModeName(this.selectedModeLabel);
+        const root = this._rootIndex == null ? "none" : this._rootIndex;
+        return `${mode}|${root}`;
+    }
+
+    _syncSelectionContext() {
+        const nextKey = this._getSelectionContextKey();
+        if (nextKey === this._selectionContextKey) return;
+
+        const hadSelection = this._selectedCols.size > 0;
+        this._selectionContextKey = nextKey;
+        this._selectedCols.clear();
+
+        if (hadSelection) {
+            this.onChange?.({
+                type: "modeChordSelectionClear",
+                selectedIndices: [],
+                selectedChords: []
+            });
+        }
+    }
+
+    _buildColumnPayload(index) {
+        const col = this.columns[index] || {};
+        const selectedChords = this._getSelectedChordPayloads();
+
+        return {
+            index,
+            roman: col.roman ?? "",
+            chord: col.chord ?? "",
+            degreeIndex: col.degreeIndex ?? index,
+            quality: col.quality ?? "",
+            rootPc: col.rootPc ?? null,
+            chordPitchClasses: Array.isArray(col.chordPitchClasses) ? [...col.chordPitchClasses] : [],
+            selectionKey: `${this._selectionContextKey}|${index}`,
+            selected: this._selectedCols.has(index),
+            selectedIndices: Array.from(this._selectedCols).sort((a, b) => a - b),
+            selectedChords
+        };
+    }
+
+    _getSelectedChordPayloads() {
+        return Array.from(this._selectedCols)
+            .sort((a, b) => a - b)
+            .map(index => {
+                const col = this.columns[index] || {};
+                return {
+                    index,
+                    roman: col.roman ?? "",
+                    chord: col.chord ?? "",
+                    degreeIndex: col.degreeIndex ?? index,
+                    quality: col.quality ?? "",
+                    rootPc: col.rootPc ?? null,
+                    chordPitchClasses: Array.isArray(col.chordPitchClasses) ? [...col.chordPitchClasses] : [],
+                    selectionKey: `${this._selectionContextKey}|${index}`
+                };
+            });
+    }
+
+    _emitHoverChange(index) {
+        if (index == null || index < 0) {
+            this.onChange?.({
+                type: "modeChordHover",
+                active: false,
+                index: -1,
+                chordPitchClasses: []
+            });
+            return;
+        }
+
+        this.onChange?.({
+            type: "modeChordHover",
+            active: true,
+            ...this._buildColumnPayload(index)
+        });
     }
 
     _refreshColumns() {
@@ -266,7 +362,11 @@ class ModeChordsPanel extends UIComponent {
             return {
                 index: i,
                 roman: this._decorateRoman(roman, i),
-                chord: ch ? ch.chord : "-"
+                chord: ch ? ch.chord : "-",
+                degreeIndex: ch ? ch.degreeIndex : i,
+                quality: ch ? ch.quality : "",
+                rootPc: ch ? ch.rootPc : null,
+                chordPitchClasses: ch ? [...ch.chordPitchClasses] : []
             };
         });
     }
@@ -311,6 +411,7 @@ class ModeChordsPanel extends UIComponent {
         if (!this.containsRect(evt)) {
             if (this._hoverCol !== -1) {
                 this._hoverCol = -1;
+                this._emitHoverChange(-1);
                 this.invalidate();
             }
             return false;
@@ -323,6 +424,7 @@ class ModeChordsPanel extends UIComponent {
 
         if (idx !== this._hoverCol) {
             this._hoverCol = idx;
+            this._emitHoverChange(idx);
             this.invalidate();
         }
         return true;
@@ -336,13 +438,17 @@ class ModeChordsPanel extends UIComponent {
             const inside = evt.x >= h.x && evt.x <= h.x + h.w && evt.y >= h.yRoman && evt.y <= h.yChord + h.h;
             if (!inside) continue;
 
-            const col = this.columns[h.index];
+            if (this._selectedCols.has(h.index)) {
+                this._selectedCols.delete(h.index);
+            } else {
+                this._selectedCols.add(h.index);
+            }
+
             this.onChange?.({
-                type: "modeChordColumn",
-                index: h.index,
-                roman: col?.roman ?? "",
-                chord: col?.chord ?? ""
+                type: "modeChordToggle",
+                ...this._buildColumnPayload(h.index)
             });
+            this.invalidate();
             return true;
         }
 
@@ -366,19 +472,25 @@ class ModeChordsPanel extends UIComponent {
         for (const h of this._hitColumns) {
             const col = this.columns[h.index] || { roman: "", chord: "" };
             const hovered = h.index === this._hoverCol;
+            const selected = this._selectedCols.has(h.index);
 
             noStroke();
-            fill(hovered ? color(70, 90, 105, 240) : color(48, 62, 72, 230));
+            const boxColor = selected
+                ? color(32, 126, 92, hovered ? 245 : 232)
+                : hovered
+                    ? color(70, 90, 105, 240)
+                    : color(48, 62, 72, 230);
+            fill(boxColor);
             rect(h.x, h.yRoman, h.w, h.h, this.h * 0.03);
             rect(h.x, h.yChord, h.w, h.h, this.h * 0.03);
 
-            fill(245);
+            fill(selected ? color(235, 255, 245) : 245);
             textAlign(CENTER, CENTER);
             textFont("Times New Roman");
             textSize(Math.min(this.h * 0.2, h.h * 0.72));
             this._drawTightCenteredText(col.roman, h.x + h.w / 2, h.yRoman + h.h / 2, 0.68);
 
-            fill(255, 230, 150);
+            fill(selected ? color(210, 255, 230) : color(255, 230, 150));
             textFont("sans-serif");
             textSize(Math.min(this.h * 0.18, h.h * 0.55));
             this._drawTightCenteredText(col.chord, h.x + h.w / 2, h.yChord + h.h / 2, 0.7);

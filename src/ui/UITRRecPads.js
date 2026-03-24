@@ -30,6 +30,13 @@ class TRRecPads extends UIComponent {
 
         // playhead externe
         this.playIndex = 0;
+
+        // drag & drop pads
+        this.dragSourceIndex = null;
+        this.dragHoverIndex = null;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.dragDidMove = false;
     }
 
     createEmptyStep() {
@@ -44,6 +51,82 @@ class TRRecPads extends UIComponent {
 
     createEmptyMeasure() {
         return Array.from({ length: this.padCount }, () => this.createEmptyStep());
+    }
+
+    _normalizeEtat(value) {
+        return value === 2 ? 2 : (value === 1 ? 1 : 0);
+    }
+
+    _cloneStepData(step) {
+        return {
+            ...this.createEmptyStep(),
+            etat: this._normalizeEtat(step?.etat),
+            item: step?.item ?? null,
+            itemIndex: step?.itemIndex ?? null
+        };
+    }
+
+    _clearDragState() {
+        this.dragSourceIndex = null;
+        this.dragHoverIndex = null;
+        this.dragDidMove = false;
+    }
+
+    _getLayoutMetrics() {
+        const outerPadY = this.h * 0.015;
+        const sectionGap = this.h * 0.008;
+        const controlH = this.h * 0.16;
+
+        const padAreaY = this.y + outerPadY;
+        const padAreaH = this.h - controlH - sectionGap - outerPadY * 2;
+        const controlY = padAreaY + padAreaH + sectionGap;
+
+        const padAreaX = this.x + this.w * 0.02;
+        const padAreaW = this.w * 0.96;
+
+        const contentPadX = padAreaW * 0.04;
+        const contentPadY = padAreaH * 0.05;
+
+        const gridX = padAreaX + contentPadX;
+        const gridY = padAreaY + contentPadY;
+        const gridW = padAreaW - contentPadX * 2;
+        const gridH = padAreaH - contentPadY * 2;
+
+        const cellW = gridW / this.gridCols;
+        const cellH = gridH / this.gridRows;
+
+        return {
+            outerPadY,
+            sectionGap,
+            controlH,
+            padAreaY,
+            padAreaH,
+            controlY,
+            padAreaX,
+            padAreaW,
+            gridX,
+            gridY,
+            cellW,
+            cellH
+        };
+    }
+
+    _getPadIndexFromPoint(mx, my, metrics = null) {
+        const m = metrics || this._getLayoutMetrics();
+
+        if (my < m.padAreaY || my > m.padAreaY + m.padAreaH) return null;
+        if (mx < m.padAreaX || mx > m.padAreaX + m.padAreaW) return null;
+
+        const col = Math.floor((mx - m.gridX) / m.cellW);
+        const row = Math.floor((my - m.gridY) / m.cellH);
+        const index = row * this.gridCols + col;
+
+        if (!Number.isFinite(index)) return null;
+        if (col < 0 || col >= this.gridCols) return null;
+        if (row < 0 || row >= this.gridRows) return null;
+        if (index < 0 || index >= this.states.length) return null;
+
+        return index;
     }
 
     setMeasureIndex(index) {
@@ -113,13 +196,13 @@ class TRRecPads extends UIComponent {
         });
     }
 
-    // appelé par le moteur global (tick BPM)
+    // appel├® par le moteur global (tick BPM)
 advancePlayhead() {
 
     // 1) index courant
     const idx = this.playIndex;
 
-    // sécurité
+    // s├®curit├®
     if (!this.states || this.states.length === 0) return;
 
     // clear highlight
@@ -147,7 +230,7 @@ advancePlayhead() {
         }
     }
 
-    //  notifier les règles UI avec l’index COURANT
+    //  notifier les r├¿gles UI avec lÔÇÖindex COURANT
 
 const pad = this.states[idx];
 
@@ -201,20 +284,85 @@ this.onChange?.({
         this.invalidate();
     }
 
+    mousePressed(evt) {
+        if (!evt) return false;
+        if (!this.containsRect(evt)) return false;
+
+        this.dragStartX = evt.x;
+        this.dragStartY = evt.y;
+        this.dragDidMove = false;
+        this.dragHoverIndex = null;
+
+        this.dragSourceIndex = this._getPadIndexFromPoint(evt.x, evt.y);
+        return true;
+    }
+
+    mouseDragged(evt) {
+        if (!evt) return false;
+        if (this.dragSourceIndex == null) return false;
+
+        const dx = evt.x - this.dragStartX;
+        const dy = evt.y - this.dragStartY;
+        if (Math.hypot(dx, dy) > 6) {
+            this.dragDidMove = true;
+        }
+
+        this.dragHoverIndex = this._getPadIndexFromPoint(evt.x, evt.y);
+        this.invalidate();
+        return true;
+    }
+
     mouseReleased(evt) {
         if (!evt) return false;
+
+        if (this.dragDidMove && this.dragSourceIndex != null) {
+            const fromIndex = this.dragSourceIndex;
+            const toIndex = this.dragHoverIndex;
+            const isCopy = !!evt.ctrlKey;
+
+            if (
+                toIndex != null &&
+                toIndex !== fromIndex &&
+                fromIndex >= 0 &&
+                fromIndex < this.states.length
+            ) {
+                const sourceStep = this.states[fromIndex];
+
+                if (sourceStep && this._normalizeEtat(sourceStep.etat) !== 0) {
+                    this.states[toIndex] = this._cloneStepData(sourceStep);
+
+                    if (!isCopy) {
+                        this.states[fromIndex] = this.createEmptyStep();
+                    }
+
+                    this.onChange?.({
+                        type: "pad-transfer",
+                        fromIndex,
+                        toIndex,
+                        isCopy
+                    });
+
+                    this._clearDragState();
+                    this.invalidate();
+                    return true;
+                }
+            }
+
+            this._clearDragState();
+            this.invalidate();
+            return true;
+        }
+
+        this._clearDragState();
+
         if (!this.containsRect(evt)) return false;
 
         const mx = evt.x;
         const my = evt.y;
+        const metrics = this._getLayoutMetrics();
 
-        const outerPadY = this.h * 0.015;
-        const sectionGap = this.h * 0.008;
-        const controlH = this.h * 0.16;
-
-        const padAreaY = this.y + outerPadY;
-        const padAreaH = this.h - controlH - sectionGap - outerPadY * 2;
-        const controlY = padAreaY + padAreaH + sectionGap;
+        const controlH = metrics.controlH;
+        const controlY = metrics.controlY;
 
         // -------------------------------------------------
         // BARRE DE CONTROLES MESURES
@@ -264,31 +412,8 @@ this.onChange?.({
             return true;
         }
 
-        if (my < padAreaY || my > padAreaY + padAreaH) return false;
-
-        const padAreaX = this.x + this.w * 0.02;
-        const padAreaW = this.w * 0.96;
-        if (mx < padAreaX || mx > padAreaX + padAreaW) return false;
-
-        const contentPadX = padAreaW * 0.04;
-        const contentPadY = padAreaH * 0.05;
-
-        const gridX = padAreaX + contentPadX;
-        const gridY = padAreaY + contentPadY;
-        const gridW = padAreaW - contentPadX * 2;
-        const gridH = padAreaH - contentPadY * 2;
-
-        const cellW = gridW / this.gridCols;
-        const cellH = gridH / this.gridRows;
-
-        const col = Math.floor((mx - gridX) / cellW);
-        const row = Math.floor((my - gridY) / cellH);
-
-        const index = row * this.gridCols + col;
-        if (!Number.isFinite(index)) return false;
-        if (col < 0 || col >= this.gridCols) return false;
-        if (row < 0 || row >= this.gridRows) return false;
-        if (index < 0 || index >= this.states.length) return false;
+        const index = this._getPadIndexFromPoint(mx, my, metrics);
+        if (index == null) return false;
 
         const old = this.states[index];
         if (!old) return false;
@@ -327,7 +452,7 @@ this.onChange?.({
             return true;
         }
 
-        // ajout externe (0 → ?)
+        // ajout externe (0 ÔåÆ ?)
         this.onChange?.({
             type: "request-add",
             index,
@@ -442,6 +567,8 @@ this.onChange?.({
         const padH = cellH * 0.90;
         const radius = padH * 0.12;
         const sw = max(1, min(padW, padH) * 0.12);
+        const isDraggingPads = this.dragSourceIndex != null && this.dragDidMove;
+        const isCopyDrag = isDraggingPads && keyIsDown(CONTROL);
 
         for (let i = 0; i < this.padCount; i++) {
 
@@ -496,7 +623,7 @@ this.onChange?.({
                         const maxChars = Math.floor(padW / (txtSize * 0.55));
                         let display = label;
                         if (display.length > maxChars) {
-                            display = display.substring(0, maxChars - 1) + "…";
+                            display = display.substring(0, maxChars - 1) + "ÔÇª";
                         }
 
                         text(display, x + padW / 2, y + padH / 2);
@@ -523,7 +650,7 @@ this.onChange?.({
                         const maxChars = Math.floor(padW / (txtSize * 0.55));
                         let display = label;
                         if (display.length > maxChars) {
-                            display = display.substring(0, maxChars - 1) + "…";
+                            display = display.substring(0, maxChars - 1) + "ÔÇª";
                         }
 
                         text(display, x + padW / 2, y + padH / 2);
@@ -554,6 +681,29 @@ if (s.flash > 0.01) {
     s.flash *= 0.85;
     this.invalidate();
 }
+
+            // --- DRAG OVERLAY ---
+            if (isDraggingPads && i === this.dragSourceIndex) {
+                noFill();
+                stroke(255, 230, 120, 220);
+                strokeWeight(max(1, sw * 0.8));
+                rect(x, y, padW, padH, radius);
+            }
+
+            if (isDraggingPads && i === this.dragHoverIndex) {
+                noFill();
+                stroke(isCopyDrag ? color(120, 255, 160) : color(255, 190, 90));
+                strokeWeight(max(1, sw));
+                rect(x - sw * 0.2, y - sw * 0.2, padW + sw * 0.4, padH + sw * 0.4, radius);
+
+                if (isCopyDrag) {
+                    noStroke();
+                    fill(120, 255, 160, 230);
+                    textAlign(CENTER, CENTER);
+                    textSize(padH * 0.42);
+                    text("+", x + padW * 0.5, y + padH * 0.5);
+                }
+            }
 
             pop();
         }

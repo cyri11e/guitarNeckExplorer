@@ -33,6 +33,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     this._occurrenceCacheKey = null;
     this._occByMidi = new Map();
     this._occByIndex = new Map();
+    this._chordRadarCacheKey = null;
+    this._chordRadarCacheList = [];
 
     }
 
@@ -54,6 +56,55 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         if (hasPopIn(g.selectedNotes)) return true;
 
         return false;
+    }
+
+    _buildChordRadarCacheKey(chords) {
+        if (!Array.isArray(chords) || chords.length === 0) return null;
+
+        return chords
+            .map(chord => `${chord.selectionKey}:${(chord.chordPitchClasses || []).join(",")}`)
+            .join("|");
+    }
+
+    getChordRadarOccurrences(chords) {
+        const key = this._buildChordRadarCacheKey(chords);
+        if (!key) return [];
+
+        if (this._chordRadarCacheKey === key) {
+            return this._chordRadarCacheList;
+        }
+
+        const app = this.g.app;
+        const pitchClasses = new Set();
+        const rootClasses = new Set();
+
+        for (const chord of chords) {
+            for (const pc of (chord.chordPitchClasses || [])) {
+                pitchClasses.add(pc);
+            }
+            if (Number.isInteger(chord.rootPc)) {
+                rootClasses.add(chord.rootPc);
+            }
+        }
+
+        const list = [];
+        for (let string = 1; string <= this.g.strings.length; string++) {
+            for (let fret = 0; fret <= this.g.fretCount; fret++) {
+                const raw = app.instrument.getNoteAt(string - 1, fret);
+                if (!raw || !pitchClasses.has(raw.index)) continue;
+
+                list.push({
+                    string,
+                    fret,
+                    index: raw.index,
+                    isRoot: rootClasses.has(raw.index)
+                });
+            }
+        }
+
+        this._chordRadarCacheKey = key;
+        this._chordRadarCacheList = list;
+        return list;
     }
 
     enqueuePopOut(note, type = "pinned", opts = {}) {
@@ -85,6 +136,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         }
 
         const isSelected = type === "selected";
+        const isChordRadar = type === "chordRadar";
         this.popOutNotes.push({
             fret: note.fret,
             string: note.string,
@@ -93,10 +145,10 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             animType,
             popOutDuration: duration,
             label,
-            fillColor: isSelected ? "#fcb900" : "#3494f3",
-            strokeColor: "black",
+            fillColor: isChordRadar ? "#4fe0a0" : (isSelected ? "#fcb900" : "#3494f3"),
+            strokeColor: isChordRadar ? "rgba(16, 44, 32, 0.85)" : "black",
             shapeType: isSelected ? "square" : "circle",
-            hasShadow: isSelected
+            hasShadow: isSelected || isChordRadar
         });
 
         this._startPopOutTimer();
@@ -345,6 +397,10 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         const app = g.app;
 
         if (g.markerMode) return;
+        if (g.isChordRadarOverlayActive?.()) {
+            this.intervalOverlayNotes = [];
+            return;
+        }
         if (this.hasActiveNoteAnimations()) {
             this.intervalOverlayNotes = [];
             return;
@@ -518,6 +574,98 @@ const list = this._getDispatchedIntervalList(
                     label
                 });
             }
+        }
+    }
+
+    _getChordRadarLabel(raw) {
+        const g = this.g;
+        const app = g.app;
+
+        return app.theory.getNoteLabel(
+            raw.index,
+            g.displayMode === "note" ? g.labelType : g.displayMode
+        );
+    }
+
+    drawChordRadarPreview() {
+        const g = this.g;
+        const chord = g.chordRadarPreview;
+        if (!chord) return;
+
+        const app = g.app;
+        const notes = this.getChordRadarOccurrences([chord]);
+
+        for (const note of notes) {
+            const pos = g.toScreen(note.fret, note.string);
+            if (!pos) continue;
+
+            const raw = app.instrument.getNoteAt(note.string - 1, note.fret);
+            if (!raw) continue;
+
+            const label = this._getChordRadarLabel(raw);
+            if (!label) continue;
+
+            this.drawNote(pos.x, pos.y, {
+                fillColor: "#4fe0a0",
+                strokeColor: "rgba(16, 44, 32, 0.8)",
+                hasShadow: true,
+                shapeType: "circle",
+                label,
+                cursor: note.isRoot,
+                overlayAlpha: note.isRoot ? 108 : 82
+            });
+        }
+    }
+
+    drawChordRadarMode() {
+        const g = this.g;
+        if (!g.hasChordRadarSelections?.()) return;
+        if (!g.isHovered || !g.chordRadarPointer) return;
+
+        const notes = this.getChordRadarOccurrences(g.chordRadarSelections);
+        if (notes.length === 0) return;
+
+        const app = g.app;
+        const radius = g.getChordRadarRadiusPx();
+        const center = g.chordRadarPointer;
+
+        push();
+        noFill();
+        stroke(110, 255, 190, 90);
+        strokeWeight(Math.max(1.5, g.getThickness() * 0.018));
+        circle(center.x, center.y, radius * 2);
+        stroke(110, 255, 190, 32);
+        circle(center.x, center.y, radius * 1.3);
+        pop();
+
+        for (const note of notes) {
+            const pos = g.toScreen(note.fret, note.string);
+            if (!pos) continue;
+
+            const dx = pos.x - center.x;
+            const dy = pos.y - center.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > radius) continue;
+
+            const raw = app.instrument.getNoteAt(note.string - 1, note.fret);
+            if (!raw) continue;
+
+            const reveal = 1 - (dist / Math.max(radius, 0.001));
+            const eased = Math.pow(reveal, 0.55);
+            const alpha = Math.round(50 + eased * (note.isRoot ? 170 : 130));
+
+            const label = this._getChordRadarLabel(raw);
+            if (!label) continue;
+
+            this.drawNote(pos.x, pos.y, {
+                fillColor: note.isRoot ? "#8cffc1" : "#5ff1ac",
+                strokeColor: "rgba(8, 28, 18, 0.95)",
+                hasShadow: true,
+                shapeType: "circle",
+                label,
+                cursor: note.isRoot,
+                overlayAlpha: alpha
+            });
         }
     }
 
@@ -824,7 +972,11 @@ const list = this._getDispatchedIntervalList(
         // 4) Highlight octave
         this.drawHighlightOctave();
 
-        // 5) Hover normal (désactivé automatiquement si markerMode = true)
+        // 5) Chord radar
+        this.drawChordRadarMode();
+        this.drawChordRadarPreview();
+
+        // 6) Hover normal (désactivé automatiquement si markerMode = true)
         this.drawHoverDot();
 
 

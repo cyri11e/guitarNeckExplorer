@@ -105,6 +105,12 @@ this.anim.setPreset("snappy");
         this._geometryStamp = "";
         this._hoverInvalidateMs = 24;
         this._lastHoverInvalidateAt = 0;
+
+        this.chordRadarPreview = null;
+        this.chordRadarSelections = [];
+        this.chordRadarPointer = null;
+        this.chordRadarRadiusT = 0.35;
+        this.chordRadarRadiusStep = 0.08;
     }
 
     _computeGeometryStamp() {
@@ -297,6 +303,141 @@ setNextIntervalMode() {
 
     getNeckRect() {
         return { x:this.x, y:this.y, w:this.w, h:this.h };
+    }
+
+    _normalizeChordRadarChord(chord) {
+        if (!chord) return null;
+
+        const chordPitchClasses = Array.isArray(chord.chordPitchClasses)
+            ? [...new Set(chord.chordPitchClasses.map(pc => ((pc % 12) + 12) % 12))]
+            : [];
+
+        if (chordPitchClasses.length === 0) return null;
+
+        const index = Number.isInteger(chord.index) ? chord.index : -1;
+        const rootPc = Number.isInteger(chord.rootPc)
+            ? ((chord.rootPc % 12) + 12) % 12
+            : chordPitchClasses[0];
+
+        return {
+            index,
+            roman: String(chord.roman ?? ""),
+            chord: String(chord.chord ?? ""),
+            quality: String(chord.quality ?? ""),
+            degreeIndex: Number.isInteger(chord.degreeIndex) ? chord.degreeIndex : index,
+            rootPc,
+            chordPitchClasses,
+            selectionKey: String(chord.selectionKey ?? `chord|${index}|${rootPc}|${chordPitchClasses.join(",")}`)
+        };
+    }
+
+    _sameChordRadarChord(a, b) {
+        if (!a && !b) return true;
+        if (!a || !b) return false;
+        return a.selectionKey === b.selectionKey;
+    }
+
+    _sameChordRadarChordList(a, b) {
+        if (a === b) return true;
+        if (!Array.isArray(a) || !Array.isArray(b)) return false;
+        if (a.length !== b.length) return false;
+
+        for (let i = 0; i < a.length; i++) {
+            if (!this._sameChordRadarChord(a[i], b[i])) return false;
+        }
+
+        return true;
+    }
+
+    _fadeOutChordRadarPreview(chord) {
+        if (!chord || !this.overlays?.getChordRadarOccurrences) return;
+
+        const notes = this.overlays.getChordRadarOccurrences([chord]);
+        for (const note of notes) {
+            this.overlays.enqueuePopOut(note, "chordRadar", {
+                animType: "popOutSeq",
+                duration: 220
+            });
+        }
+    }
+
+    setChordRadarPreview(chord) {
+        const next = this._normalizeChordRadarChord(chord);
+        const prev = this.chordRadarPreview;
+
+        if (this._sameChordRadarChord(prev, next)) return;
+
+        if (prev) {
+            this._fadeOutChordRadarPreview(prev);
+        }
+
+        this.chordRadarPreview = next;
+        this.invalidate();
+    }
+
+    clearChordRadarPreview() {
+        this.setChordRadarPreview(null);
+    }
+
+    setChordRadarSelections(chords) {
+        const next = (Array.isArray(chords) ? chords : [])
+            .map(chord => this._normalizeChordRadarChord(chord))
+            .filter(Boolean)
+            .sort((a, b) => a.selectionKey.localeCompare(b.selectionKey));
+
+        if (this._sameChordRadarChordList(this.chordRadarSelections, next)) return;
+
+        this.chordRadarSelections = next;
+        if (next.length > 0) {
+            this.clearChordRadarPreview();
+        }
+        this.invalidate();
+    }
+
+    clearChordRadarSelections() {
+        if (this.chordRadarSelections.length === 0) return;
+        this.chordRadarSelections = [];
+        this.invalidate();
+    }
+
+    hasChordRadarSelections() {
+        return Array.isArray(this.chordRadarSelections) && this.chordRadarSelections.length > 0;
+    }
+
+    hasChordRadarPreview() {
+        return !!this.chordRadarPreview;
+    }
+
+    isChordRadarOverlayActive() {
+        return this.hasChordRadarSelections() || this.hasChordRadarPreview();
+    }
+
+    getChordRadarRadiusPx() {
+        this._ensureGeometryProjected();
+
+        const minRadius = this.getThickness();
+        const caseA = this.cases[0];
+        const caseB = this.cases[Math.min(5, this.fretCount)] ?? this.cases[this.cases.length - 1];
+        const span = (caseA && caseB)
+            ? Math.abs(caseB.xc - caseA.xc) + (caseA.width * 0.5)
+            : this.getThickness() * 2.5;
+        const maxRadius = Math.max(minRadius, span);
+
+        return lerp(minRadius, maxRadius, this.chordRadarRadiusT);
+    }
+
+    adjustChordRadarRadius(direction) {
+        const prev = this.chordRadarRadiusT;
+        this.chordRadarRadiusT = constrain(
+            this.chordRadarRadiusT + direction * this.chordRadarRadiusStep,
+            0,
+            1
+        );
+
+        if (prev === this.chordRadarRadiusT) return false;
+
+        this.invalidate();
+        return true;
     }
 
     getNutWidth() {
@@ -901,6 +1042,7 @@ fromScreen(x, y) {
         const inside = this.containsRect(evt);
         this.isHovered = inside;
         this.shiftDown = evt.shiftKey;
+        this.chordRadarPointer = inside ? { x: evt.x, y: evt.y } : null;
 
         if (inside) {
             this.hoveredNote = this.fromScreen(evt.x, evt.y);
@@ -930,6 +1072,15 @@ fromScreen(x, y) {
         }
 
         return inside;
+    }
+
+    mouseWheel(evt) {
+        if (!evt.altKey && this.hasChordRadarSelections() && this.containsRect(evt)) {
+            const direction = evt.delta < 0 ? 1 : -1;
+            return this.adjustChordRadarRadius(direction);
+        }
+
+        return super.mouseWheel(evt);
     }
 
     onClick() {

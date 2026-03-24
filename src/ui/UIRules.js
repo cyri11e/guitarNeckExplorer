@@ -1096,43 +1096,32 @@ guitar.invalidate();
 // Panel accords des modes: clic colonne => mode Triade + preset triade correspondant.
 (components, source, evt) => {
     if (source?.name !== "modeChordsPanel1") return;
-    if (!evt || evt.type !== "modeChordColumn") return;
+    const guitar = components.find(c => c.name === "guitar1");
+    if (!guitar || !evt) return;
 
-    const knobDeg = components.find(c => c.name === "knob13457");
-    const lcd = components.find(c => c.name === "lcd1");
-    if (!knobDeg || !lcd) return;
+    if (evt.type === "modeChordHover") {
+        if (guitar.hasChordRadarSelections?.()) return;
 
-    const chord = String(evt.chord ?? "").trim();
-    const roman = String(evt.roman ?? "").trim();
-
-    let triadName = "Majeur";
-
-    // Priorité: info explicite dans le nom d'accord si disponible.
-    if (chord && chord !== "-" && chord.includes("°")) {
-        triadName = "Diminué";
-    } else if (chord && chord !== "-" && chord.endsWith("m")) {
-        triadName = "Mineur";
-    } else if (chord && chord !== "-" && (chord.endsWith("+") || /aug/i.test(chord))) {
-        triadName = "Augmenté";
-    } else {
-        // Fallback sans root: déduire depuis le chiffre romain.
-        const coreRoman = roman.replace(/^[#b♯♭]+/, "");
-        if (coreRoman.includes("°")) {
-            triadName = "Diminué";
+        if (evt.active) {
+            guitar.setChordRadarPreview(evt);
         } else {
-            const m = coreRoman.match(/[IVXivx]/);
-            if (m && m[0] === m[0].toLowerCase()) {
-                triadName = "Mineur";
-            }
+            guitar.clearChordRadarPreview();
         }
+        return;
     }
 
-    // Index 1 du knob = Triade (symbole "3").
-    knobDeg.setIndex(1);
+    if (evt.type === "modeChordToggle") {
+        guitar.setChordRadarSelections(evt.selectedChords || []);
 
-    const triadIndex = Array.isArray(lcd.items) ? lcd.items.indexOf(triadName) : -1;
-    if (triadIndex >= 0) {
-        lcd.setIndex(triadIndex);
+        if ((evt.selectedChords || []).length === 0) {
+            guitar.setChordRadarPreview(evt);
+        }
+        return;
+    }
+
+    if (evt.type === "modeChordSelectionClear") {
+        guitar.clearChordRadarSelections();
+        guitar.clearChordRadarPreview();
     }
 },
 
