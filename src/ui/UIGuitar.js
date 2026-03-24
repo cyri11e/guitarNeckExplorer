@@ -415,7 +415,7 @@ setNextIntervalMode() {
     getChordRadarRadiusPx() {
         this._ensureGeometryProjected();
 
-        const minRadius = this.getThickness();
+        const minRadius = this.getThickness() * 0.62;
         const caseA = this.cases[0];
         const caseB = this.cases[Math.min(5, this.fretCount)] ?? this.cases[this.cases.length - 1];
         const span = (caseA && caseB)

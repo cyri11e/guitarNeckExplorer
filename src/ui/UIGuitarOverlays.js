@@ -595,6 +595,8 @@ const list = this._getDispatchedIntervalList(
         const app = g.app;
         const notes = this.getChordRadarOccurrences([chord]);
 
+        const revealed = [];
+
         for (const note of notes) {
             const pos = g.toScreen(note.fret, note.string);
             if (!pos) continue;
@@ -629,14 +631,37 @@ const list = this._getDispatchedIntervalList(
         const radius = g.getChordRadarRadiusPx();
         const center = g.chordRadarPointer;
 
+        // Ambiance globale: on baisse la luminosite de tout l'ecran en mode radar.
+        push();
+        noStroke();
+        fill(0, 0, 0, 120);
+        rectMode(CORNER);
+        rect(0, 0, width, height);
+        pop();
+
+        // Sur le manche: hors cercle radar presque noir.
+        const ctx = drawingContext;
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.90)";
+        ctx.beginPath();
+        ctx.rect(g.x, g.y, g.w, g.h);
+        ctx.moveTo(center.x + radius, center.y);
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2, true);
+        ctx.fill("evenodd");
+        ctx.restore();
+
         push();
         noFill();
-        stroke(110, 255, 190, 90);
+        stroke(110, 255, 190, 120);
         strokeWeight(Math.max(1.5, g.getThickness() * 0.018));
         circle(center.x, center.y, radius * 2);
-        stroke(110, 255, 190, 32);
+        stroke(110, 255, 190, 48);
         circle(center.x, center.y, radius * 1.3);
+        stroke(110, 255, 190, 24);
+        circle(center.x, center.y, radius * 0.72);
         pop();
+
+        const revealed = [];
 
         for (const note of notes) {
             const pos = g.toScreen(note.fret, note.string);
@@ -656,6 +681,126 @@ const list = this._getDispatchedIntervalList(
 
             const label = this._getChordRadarLabel(raw);
             if (!label) continue;
+
+            revealed.push({
+                note,
+                pos,
+                label,
+                alpha,
+                midi: raw.midi,
+                revealStrength: eased
+            });
+        }
+
+        if (revealed.length >= 2) {
+            const linkMaxDistance = Math.max(g.getThickness() * 1.1, radius * 0.88);
+            const linkMaxDistanceSameString = Math.max(linkMaxDistance * 2.2, g.getThickness() * 3.2);
+
+            const withId = revealed.map((item, idx) => ({ ...item, _id: idx }));
+
+            const groupsMap = new Map();
+            for (const item of withId) {
+                if (!groupsMap.has(item.midi)) groupsMap.set(item.midi, []);
+                groupsMap.get(item.midi).push(item);
+            }
+
+            const midiKeys = Array.from(groupsMap.keys()).sort((a, b) => a - b);
+
+            const distance = (a, b) => {
+                const dx = b.pos.x - a.pos.x;
+                const dy = b.pos.y - a.pos.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            };
+
+            const distanceToCursor = (item) => {
+                const dx = item.pos.x - center.x;
+                const dy = item.pos.y - center.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            };
+
+            const pickNearestToCursor = (group) => {
+                let best = null;
+                let bestDist = Infinity;
+
+                for (const candidate of group) {
+                    const dc = distanceToCursor(candidate);
+                    if (dc < bestDist) {
+                        bestDist = dc;
+                        best = candidate;
+                    }
+                }
+
+                return best;
+            };
+
+            const pickRepresentative = (group, prevNode) => {
+                if (!group || group.length === 0) return null;
+                if (!prevNode) return pickNearestToCursor(group);
+
+                let best = null;
+                let bestScore = Infinity;
+
+                for (const candidate of group) {
+                    const dPrev = distance(prevNode, candidate);
+                    const dCursor = distanceToCursor(candidate);
+                    const score = dPrev * 0.7 + dCursor * 0.3;
+
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = candidate;
+                    }
+                }
+
+                return best;
+            };
+
+            // Chemin unique strict: une note choisie par niveau de pitch.
+            const pathNodes = [];
+            let prevNode = null;
+            for (const midi of midiKeys) {
+                const group = groupsMap.get(midi) || [];
+                const node = pickRepresentative(group, prevNode);
+                if (!node) continue;
+
+                pathNodes.push(node);
+                prevNode = node;
+            }
+
+            push();
+            noFill();
+            for (let i = 0; i < pathNodes.length - 1; i++) {
+                const a = pathNodes[i];
+                const b = pathNodes[i + 1];
+
+                // Jamais de liaison entre unissons (meme pitch/midi).
+                if (a.midi === b.midi) continue;
+
+                const d = distance(a, b);
+                const isSameString = a.note.string === b.note.string;
+                const maxAllowed = isSameString ? linkMaxDistanceSameString : linkMaxDistance;
+                if (d > maxAllowed) continue;
+
+                const revealMix = (a.revealStrength + b.revealStrength) * 0.5;
+                const lineAlpha = Math.round(105 + 110 * revealMix);
+                if (lineAlpha <= 28) continue;
+
+                const lineWeight = Math.max(2.8, g.getThickness() * (0.02 + 0.018 * revealMix));
+                strokeWeight(lineWeight);
+
+                if (a.note.isRoot || b.note.isRoot) {
+                    stroke(165, 255, 215, Math.min(190, lineAlpha + 32));
+                } else {
+                    stroke(110, 228, 170, lineAlpha);
+                }
+
+                line(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+                }
+
+            pop();
+        }
+
+        for (const item of revealed) {
+            const { note, pos, label, alpha } = item;
 
             this.drawNote(pos.x, pos.y, {
                 fillColor: note.isRoot ? "#8cffc1" : "#5ff1ac",
