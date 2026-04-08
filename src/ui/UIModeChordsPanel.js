@@ -25,6 +25,21 @@ class ModeChordsPanel extends UIComponent {
         this._labelType = "noteEN";
         this._theory = null;
 
+        this._chromaNeonHex = [
+            "#ea0e0e",
+            "#b9730b",
+            "#e38d0c",
+            "#c5b315",
+            "#d7e60e",
+            "#0fde32",
+            "#42b5c7",
+            "#3863f1",
+            "#ae48da",
+            "#860ce3",
+            "#d165b9",
+            "#e80cb4"
+        ];
+
         this.modeDefs = {
             ionien: {
                 display: "Ionien",
@@ -323,6 +338,12 @@ class ModeChordsPanel extends UIComponent {
         });
     }
 
+    _getChordNeonColor(rootPc) {
+        if (!Number.isInteger(rootPc)) return color(58, 78, 92, 230);
+        const idx = ((rootPc % 12) + 12) % 12;
+        return color(this._chromaNeonHex[idx]);
+    }
+
     _refreshColumns() {
         if (!this._modeDef || !this._theory || this._rootIndex == null) {
             this.columns = (this._modeDef?.romans ?? []).map((roman, i) => ({
@@ -473,18 +494,50 @@ class ModeChordsPanel extends UIComponent {
             const col = this.columns[h.index] || { roman: "", chord: "" };
             const hovered = h.index === this._hoverCol;
             const selected = this._selectedCols.has(h.index);
+            const baseNeon = this._getChordNeonColor(col.rootPc);
+
+            const boxColor = color(baseNeon);
+            boxColor.setAlpha(selected ? 235 : (hovered ? 215 : 168));
+
+            const glowColor = color(baseNeon);
+            glowColor.setAlpha(selected ? 210 : (hovered ? 170 : 95));
 
             noStroke();
-            const boxColor = selected
-                ? color(32, 126, 92, hovered ? 245 : 232)
-                : hovered
-                    ? color(70, 90, 105, 240)
-                    : color(48, 62, 72, 230);
             fill(boxColor);
             rect(h.x, h.yRoman, h.w, h.h, this.h * 0.03);
             rect(h.x, h.yChord, h.w, h.h, this.h * 0.03);
 
+            noFill();
+            if (selected) {
+                const ringOuter = color(baseNeon);
+                ringOuter.setAlpha(245);
+
+                const ringInner = color(255, 255, 255, 230);
+
+                drawingContext.save();
+                drawingContext.shadowColor = ringOuter.toString();
+                drawingContext.shadowBlur = this.h * 0.05;
+
+                stroke(ringOuter);
+                strokeWeight(this.h * 0.014);
+                rect(h.x, h.yRoman, h.w, h.h, this.h * 0.03);
+                rect(h.x, h.yChord, h.w, h.h, this.h * 0.03);
+
+                drawingContext.restore();
+
+                stroke(ringInner);
+                strokeWeight(this.h * 0.006);
+                rect(h.x, h.yRoman, h.w, h.h, this.h * 0.03);
+                rect(h.x, h.yChord, h.w, h.h, this.h * 0.03);
+            } else {
+                stroke(glowColor);
+                strokeWeight(hovered ? this.h * 0.009 : this.h * 0.007);
+                rect(h.x, h.yRoman, h.w, h.h, this.h * 0.03);
+                rect(h.x, h.yChord, h.w, h.h, this.h * 0.03);
+            }
+
             fill(selected ? color(235, 255, 245) : 245);
+            noStroke();
             textAlign(CENTER, CENTER);
             textFont("Times New Roman");
             textSize(Math.min(this.h * 0.2, h.h * 0.72));

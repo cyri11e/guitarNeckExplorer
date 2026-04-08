@@ -75,32 +75,45 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         }
 
         const app = this.g.app;
-        const pitchClasses = new Set();
-        const rootClasses = new Set();
+        const chordDefs = (chords || []).map(chord => ({
+            selectionKey: chord.selectionKey,
+            rootPc: Number.isInteger(chord.rootPc) ? ((chord.rootPc % 12) + 12) % 12 : null,
+            pitchSet: new Set((chord.chordPitchClasses || []).map(pc => ((pc % 12) + 12) % 12))
+        }));
 
-        for (const chord of chords) {
-            for (const pc of (chord.chordPitchClasses || [])) {
-                pitchClasses.add(pc);
-            }
-            if (Number.isInteger(chord.rootPc)) {
-                rootClasses.add(chord.rootPc);
-            }
-        }
-
-        const list = [];
+        const byPos = new Map();
         for (let string = 1; string <= this.g.strings.length; string++) {
             for (let fret = 0; fret <= this.g.fretCount; fret++) {
                 const raw = app.instrument.getNoteAt(string - 1, fret);
-                if (!raw || !pitchClasses.has(raw.index)) continue;
+                if (!raw) continue;
 
-                list.push({
+                const hitChordKeys = [];
+                const rootChordKeys = [];
+
+                for (const chord of chordDefs) {
+                    if (!chord.pitchSet.has(raw.index)) continue;
+
+                    hitChordKeys.push(chord.selectionKey);
+                    if (chord.rootPc === raw.index) {
+                        rootChordKeys.push(chord.selectionKey);
+                    }
+                }
+
+                if (hitChordKeys.length === 0) continue;
+
+                const posKey = `${string}:${fret}`;
+                byPos.set(posKey, {
                     string,
                     fret,
                     index: raw.index,
-                    isRoot: rootClasses.has(raw.index)
+                    chordKeys: hitChordKeys,
+                    rootChordKeys,
+                    isRoot: rootChordKeys.length > 0
                 });
             }
         }
+
+        const list = Array.from(byPos.values());
 
         this._chordRadarCacheKey = key;
         this._chordRadarCacheList = list;
@@ -581,10 +594,14 @@ const list = this._getDispatchedIntervalList(
         const g = this.g;
         const app = g.app;
 
-        return app.theory.getNoteLabel(
+        const label = app.theory.getNoteLabel(
             raw.index,
             g.displayMode === "note" ? g.labelType : g.displayMode
         );
+
+        if (label) label.chroma = null;
+
+        return label;
     }
 
     drawChordRadarPreview() {
@@ -614,6 +631,7 @@ const list = this._getDispatchedIntervalList(
                 shapeType: "circle",
                 label,
                 cursor: note.isRoot,
+                zoomFactor: 0.82,
                 overlayAlpha: note.isRoot ? 108 : 82
             });
         }
@@ -696,16 +714,6 @@ const list = this._getDispatchedIntervalList(
             const linkMaxDistance = Math.max(g.getThickness() * 1.1, radius * 0.88);
             const linkMaxDistanceSameString = Math.max(linkMaxDistance * 2.2, g.getThickness() * 3.2);
 
-            const withId = revealed.map((item, idx) => ({ ...item, _id: idx }));
-
-            const groupsMap = new Map();
-            for (const item of withId) {
-                if (!groupsMap.has(item.midi)) groupsMap.set(item.midi, []);
-                groupsMap.get(item.midi).push(item);
-            }
-
-            const midiKeys = Array.from(groupsMap.keys()).sort((a, b) => a - b);
-
             const distance = (a, b) => {
                 const dx = b.pos.x - a.pos.x;
                 const dy = b.pos.y - a.pos.y;
@@ -754,47 +762,68 @@ const list = this._getDispatchedIntervalList(
                 return best;
             };
 
-            // Chemin unique strict: une note choisie par niveau de pitch.
-            const pathNodes = [];
-            let prevNode = null;
-            for (const midi of midiKeys) {
-                const group = groupsMap.get(midi) || [];
-                const node = pickRepresentative(group, prevNode);
-                if (!node) continue;
-
-                pathNodes.push(node);
-                prevNode = node;
-            }
+            const chordList = Array.isArray(g.chordRadarSelections) ? g.chordRadarSelections : [];
 
             push();
             noFill();
-            for (let i = 0; i < pathNodes.length - 1; i++) {
-                const a = pathNodes[i];
-                const b = pathNodes[i + 1];
 
-                // Jamais de liaison entre unissons (meme pitch/midi).
-                if (a.midi === b.midi) continue;
+            for (const chord of chordList) {
+                const chordKey = chord.selectionKey;
+                const chordColor = this.style?.getChromaColor?.(chord.rootPc) || color("#6ee4b0");
 
-                const d = distance(a, b);
-                const isSameString = a.note.string === b.note.string;
-                const maxAllowed = isSameString ? linkMaxDistanceSameString : linkMaxDistance;
-                if (d > maxAllowed) continue;
+                const withId = revealed
+                    .filter(item => Array.isArray(item.note.chordKeys) && item.note.chordKeys.includes(chordKey))
+                    .map((item, idx) => ({ ...item, _id: idx }));
 
-                const revealMix = (a.revealStrength + b.revealStrength) * 0.5;
-                const lineAlpha = Math.round(105 + 110 * revealMix);
-                if (lineAlpha <= 28) continue;
+                if (withId.length < 2) continue;
 
-                const lineWeight = Math.max(2.8, g.getThickness() * (0.02 + 0.018 * revealMix));
-                strokeWeight(lineWeight);
-
-                if (a.note.isRoot || b.note.isRoot) {
-                    stroke(165, 255, 215, Math.min(190, lineAlpha + 32));
-                } else {
-                    stroke(110, 228, 170, lineAlpha);
+                const groupsMap = new Map();
+                for (const item of withId) {
+                    if (!groupsMap.has(item.midi)) groupsMap.set(item.midi, []);
+                    groupsMap.get(item.midi).push(item);
                 }
 
-                line(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+                const midiKeys = Array.from(groupsMap.keys()).sort((a, b) => a - b);
+
+                const pathNodes = [];
+                let prevNode = null;
+                for (const midi of midiKeys) {
+                    const group = groupsMap.get(midi) || [];
+                    const node = pickRepresentative(group, prevNode);
+                    if (!node) continue;
+
+                    pathNodes.push(node);
+                    prevNode = node;
                 }
+
+                for (let i = 0; i < pathNodes.length - 1; i++) {
+                    const a = pathNodes[i];
+                    const b = pathNodes[i + 1];
+
+                    if (a.midi === b.midi) continue;
+
+                    const d = distance(a, b);
+                    const isSameString = a.note.string === b.note.string;
+                    const maxAllowed = isSameString ? linkMaxDistanceSameString : linkMaxDistance;
+                    if (d > maxAllowed) continue;
+
+                    const revealMix = (a.revealStrength + b.revealStrength) * 0.5;
+                    const lineAlpha = Math.round(105 + 110 * revealMix);
+                    if (lineAlpha <= 28) continue;
+
+                    const lineWeight = Math.max(2.8, g.getThickness() * (0.02 + 0.018 * revealMix));
+                    strokeWeight(lineWeight);
+
+                    const lineCol = color(chordColor);
+                    const isChordRootEdge =
+                        (a.note.rootChordKeys || []).includes(chordKey) ||
+                        (b.note.rootChordKeys || []).includes(chordKey);
+                    lineCol.setAlpha(isChordRootEdge ? Math.min(225, lineAlpha + 30) : lineAlpha);
+                    stroke(lineCol);
+
+                    line(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+                }
+            }
 
             pop();
         }
@@ -809,6 +838,7 @@ const list = this._getDispatchedIntervalList(
                 shapeType: "circle",
                 label,
                 cursor: note.isRoot,
+                zoomFactor: 0.82,
                 overlayAlpha: alpha
             });
         }
