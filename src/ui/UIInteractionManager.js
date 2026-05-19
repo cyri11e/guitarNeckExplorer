@@ -16,6 +16,16 @@ class UIInteractionManager {
 
         this.lastX = 0;
         this.lastY = 0;
+        // ============================================================
+        // SÉLECTION RECTANGULAIRE
+        // ============================================================
+        this.rectangleSelectionActive = false;
+        this.selectionStartX = null;
+        this.selectionStartY = null;
+        this.selectionEndX = null;
+        this.selectionEndY = null;
+        this.selectionMovedThreshold = 8;
+        this.leftDownHit = null;
     }
 
     // ============================================================
@@ -133,40 +143,69 @@ _buildEvent(mx, my) {
     // INTERACTIONS GUITARE — HANDLERS INTERNES
     // ============================================================
 
+    _guitarContainsWithMargin(evt, marginRatio = 0.20) {
+        const g = this.guitar;
+        const mx = g.w * marginRatio;
+        const my = g.h * marginRatio;
+        return (
+            evt.x >= g.x - mx &&
+            evt.x <= g.x + g.w + mx &&
+            evt.y >= g.y - my &&
+            evt.y <= g.y + g.h + my
+        );
+    }
+
     _handleGlobalMousePressed(evt) {
-        if (!this.guitar) return false;
-        if (!this.guitar.containsRect(evt)) return false;
+        if (!this.guitar) {
+            console.log("_handleGlobalMousePressed: NO GUITAR");
+            return false;
+        }
+        if (!this._guitarContainsWithMargin(evt)) {
+            console.log("_handleGlobalMousePressed: NOT IN GUITAR");
+            return false;
+        }
 
         // Ne pas capturer si un contrôle UI non-guitare est visé.
-        if (this._hasTopControlHit(evt)) return false;
+        if (this._hasTopControlHit(evt)) {
+            console.log("_handleGlobalMousePressed: HAS TOP CONTROL HIT");
+            return false;
+        }
+
+        console.log("_handleGlobalMousePressed: CAPTURED! btn=" + evt.button);
 
         this.lastX = evt.x;
         this.lastY = evt.y;
 
-        // CTRL = drag du manche
-        // if (evt.ctrl) {
-        //     this.dragActive = true;
-        //     this.brushActive = false;
-        //     this.eraseActive = false;
-        //     return true;
-        // }
+        // Clic gauche: on attend le release pour valider un clic simple,
+        // ou on bascule en sélection rectangulaire si déplacement.
+        if (evt.button === LEFT) {
+            this.leftDownHit = this.guitar.fromScreen(evt.x, evt.y);
+            this.selectionStartX = evt.x;
+            this.selectionStartY = evt.y;
+            this.selectionEndX = evt.x;
+            this.selectionEndY = evt.y;
+            this.rectangleSelectionActive = false;
 
-        // Clic gauche = pinceau
-        if (evt.button === 0) {
-            this.brushActive = true;
+            console.log("LEFT CLICK: selection start at", { x: evt.x, y: evt.y });
+
             this.eraseActive = false;
             this.dragActive = false;
-            this.guitar.addNoteAtEvent(evt);
             this.app?.bringRootToFront?.(this.guitar);
+            this.guitar.invalidate();
             return true;
         }
 
         // Clic droit = gomme
-        if (evt.button === 2) {
+        if (evt.button === RIGHT) {
             this.eraseActive = true;
             this.brushActive = false;
             this.dragActive = false;
-            this.guitar.removeNoteAtEvent(evt);
+            const hit = this.guitar.fromScreen(evt.x, evt.y);
+            if (hit) {
+                this.guitar._removeWithPopOut(this.guitar.pinnedNotes, hit.fret, hit.string, "pinned");
+                this.guitar._removeWithPopOut(this.guitar.selectedNotes, hit.fret, hit.string, "selected");
+                this.guitar.invalidate();
+            }
             this.app?.bringRootToFront?.(this.guitar);
             return true;
         }
@@ -177,13 +216,13 @@ _buildEvent(mx, my) {
     _handleGlobalMouseMoved(evt) {
         if (!this.guitar) return false;
 
-        if (this.brushActive) {
-            this.guitar.addNoteAtEvent(evt);
-            return true;
-        }
-
         if (this.eraseActive) {
-            this.guitar.removeNoteAtEvent(evt);
+            const hit = this.guitar.fromScreen(evt.x, evt.y);
+            if (hit) {
+                this.guitar._removeWithPopOut(this.guitar.pinnedNotes, hit.fret, hit.string, "pinned");
+                this.guitar._removeWithPopOut(this.guitar.selectedNotes, hit.fret, hit.string, "selected");
+                this.guitar.invalidate();
+            }
             return true;
         }
 
@@ -192,6 +231,25 @@ _buildEvent(mx, my) {
 
     _handleGlobalMouseDragged(evt) {
         if (!this.guitar) return false;
+
+        if (this.selectionStartX != null && this.selectionStartY != null) {
+            const dx = evt.x - this.selectionStartX;
+            const dy = evt.y - this.selectionStartY;
+            const distSq = dx * dx + dy * dy;
+            const thresholdSq = this.selectionMovedThreshold * this.selectionMovedThreshold;
+            const moved = distSq >= thresholdSq;
+
+            console.log("mouseDragged:", { dx, dy, distSq, thresholdSq, moved, active: this.rectangleSelectionActive });
+
+            if (moved || this.rectangleSelectionActive) {
+                this.rectangleSelectionActive = true;
+                this.selectionEndX = evt.x;
+                this.selectionEndY = evt.y;
+                console.log("Rectangle active! End:", { x: evt.x, y: evt.y });
+                this.guitar.invalidate();
+                return true;
+            }
+        }
 
         if (this.dragActive) {
             const dx = evt.x - this.lastX;
@@ -208,9 +266,130 @@ _buildEvent(mx, my) {
     }
 
     _handleGlobalMouseReleased(evt) {
+        if (this.guitar && this.selectionStartX != null && this.selectionStartY != null) {
+            if (this.rectangleSelectionActive) {
+                const rect = {
+                    x1: Math.min(this.selectionStartX, this.selectionEndX),
+                    y1: Math.min(this.selectionStartY, this.selectionEndY),
+                    x2: Math.max(this.selectionStartX, this.selectionEndX),
+                    y2: Math.max(this.selectionStartY, this.selectionEndY)
+                };
+
+                const notesInRect = this._getNoteListInRectangle(rect);
+
+                if (evt.ctrlKey) {
+                    // CTRL: toggle par lot dans la sélection courante.
+                    for (const n of notesInRect) {
+                        const selectedIdx = this.guitar.selectedNotes.findIndex(
+                            s => s.fret === n.fret && s.string === n.string
+                        );
+
+                        if (selectedIdx >= 0) {
+                            // Retire de selected -> remet en pinned
+                            this.guitar.selectedNotes.splice(selectedIdx, 1);
+
+                            const pinnedExists = this.guitar.pinnedNotes.some(
+                                p => p.fret === n.fret && p.string === n.string
+                            );
+                            if (!pinnedExists) {
+                                this.guitar.pinnedNotes.push({ fret: n.fret, string: n.string });
+                            }
+                        } else {
+                            // Ajoute à selected -> retire de pinned
+                            this.guitar.pinnedNotes = this.guitar.pinnedNotes.filter(
+                                p => !(p.fret === n.fret && p.string === n.string)
+                            );
+
+                            const selectedExists = this.guitar.selectedNotes.some(
+                                s => s.fret === n.fret && s.string === n.string
+                            );
+                            if (!selectedExists) {
+                                this.guitar.selectedNotes.push({ fret: n.fret, string: n.string });
+                            }
+                        }
+                    }
+                } else {
+                    // Sans CTRL: la sélection rectangle devient la sélection courante.
+                    // Les anciens selected hors rectangle reviennent en pinned (pas de disparition).
+                    const rectKeys = new Set(notesInRect.map(n => `${n.string}:${n.fret}`));
+                    const pool = [
+                        ...(this.guitar.pinnedNotes || []),
+                        ...(this.guitar.selectedNotes || [])
+                    ];
+
+                    const nextPinned = [];
+                    const nextSelected = [];
+                    const seenPinned = new Set();
+                    const seenSelected = new Set();
+
+                    for (const n of pool) {
+                        const key = `${n.string}:${n.fret}`;
+                        if (rectKeys.has(key)) {
+                            if (!seenSelected.has(key)) {
+                                seenSelected.add(key);
+                                nextSelected.push({ fret: n.fret, string: n.string });
+                            }
+                        } else {
+                            if (!seenPinned.has(key)) {
+                                seenPinned.add(key);
+                                nextPinned.push({ fret: n.fret, string: n.string });
+                            }
+                        }
+                    }
+
+                    this.guitar.pinnedNotes = nextPinned;
+                    this.guitar.selectedNotes = nextSelected;
+                }
+
+                this.guitar.invalidate();
+            } else {
+                // Si selectedNotes actives: clic confirme la sélection (remet les notes dans pinnedNotes)
+                if (this.guitar.selectedNotes && this.guitar.selectedNotes.length > 0) {
+                    for (let note of this.guitar.selectedNotes) {
+                        const exists = this.guitar.pinnedNotes.some(
+                            n => n.fret === note.fret && n.string === note.string
+                        );
+                        if (!exists) {
+                            this.guitar.pinnedNotes.push({ fret: note.fret, string: note.string });
+                        }
+                    }
+                    this.guitar.selectedNotes = [];
+                    this.guitar.invalidate();
+                    // Pas de return ici — on laisse le cleanup s'exécuter normalement ci-dessous
+                } else {
+                    // Sinon: clic simple toggle pinnedNotes
+                    const releaseHit = this.guitar.fromScreen(evt.x, evt.y);
+                    const sameNote = !!(
+                        this.leftDownHit &&
+                        releaseHit &&
+                        this.leftDownHit.fret === releaseHit.fret &&
+                        this.leftDownHit.string === releaseHit.string
+                    );
+
+                    if (sameNote && releaseHit) {
+                        const idx = this.guitar.pinnedNotes.findIndex(
+                            n => n.fret === releaseHit.fret && n.string === releaseHit.string
+                        );
+                        if (idx >= 0) {
+                            this.guitar._removeWithPopOut(this.guitar.pinnedNotes, releaseHit.fret, releaseHit.string, "pinned");
+                        } else {
+                            this.guitar.pinnedNotes.push({ fret: releaseHit.fret, string: releaseHit.string });
+                        }
+                        this.guitar.invalidate();
+                    }
+                }
+            }
+        }
+
         this.brushActive = false;
         this.eraseActive = false;
         this.dragActive = false;
+        this.rectangleSelectionActive = false;
+        this.selectionStartX = null;
+        this.selectionStartY = null;
+        this.selectionEndX = null;
+        this.selectionEndY = null;
+        this.leftDownHit = null;
         return false;
     }
 
@@ -232,13 +411,18 @@ _buildEvent(mx, my) {
     mousePressed(mx, my) {
         this.mouseIsDown = true;
         const evt = this._buildEvent(mx, my);
+        console.log("UIInteractionManager.mousePressed:", { mx, my });
 
         if (evt.altKey) {
+            console.log("→ AltCapture mode");
             return this._startAltCapture(evt);
         }
 
         // 1) Interactions guitare
-        if (this._handleGlobalMousePressed(evt)) return true;
+        if (this._handleGlobalMousePressed(evt)) {
+            console.log("→ Handled by _handleGlobalMousePressed");
+            return true;
+        }
 
         // 2) Sinon propagation UI (top → bottom)
         for (const c of this._getTopLevelByZDesc()) {
@@ -247,22 +431,28 @@ _buildEvent(mx, my) {
                     this.app?.bringRootToFront?.(c);
                 }
                 this.captureOwner = c;
+                console.log("→ Handled by UI component:", c.name);
                 return true;
             }
         }
 
+        console.log("→ Not handled");
         return false;
     }
 
     mouseDragged(mx, my) {
         const evt = this._buildEvent(mx, my);
+        console.log("UIInteractionManager.mouseDragged:", { mx, my });
 
         if (this.altCapture && this.captureOwner) {
             return UIComponent.prototype.mouseDragged.call(this.captureOwner, evt) || false;
         }
 
         // 1) Interactions guitare
-        if (this._handleGlobalMouseDragged(evt)) return true;
+        if (this._handleGlobalMouseDragged(evt)) {
+            console.log("→ Handled by _handleGlobalMouseDragged");
+            return true;
+        }
 
         // 2) Capture UI
         if (this.captureOwner) {
@@ -378,6 +568,43 @@ _buildEvent(mx, my) {
         }
 
         return false;
+    }
+
+    _getNoteListInRectangle(rect) {
+        if (!this.guitar) return [];
+
+        const notes = [];
+        const seen = new Set();
+        console.log("_getNoteListInRectangle: rect =", rect);
+
+        // Sélectionne parmi l'union pinned + selected pour éviter la perte d'une
+        // sélection en cours lors d'une nouvelle boîte de sélection.
+        const pool = [
+            ...(this.guitar.pinnedNotes || []),
+            ...(this.guitar.selectedNotes || [])
+        ];
+
+        for (let note of pool) {
+            const key = `${note.string}:${note.fret}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const pos = this.guitar.toScreen(note.fret, note.string);
+            if (!pos) continue;
+
+            const inRect = (pos.x >= rect.x1 && pos.x <= rect.x2 && pos.y >= rect.y1 && pos.y <= rect.y2);
+            
+            if (inRect) {
+                console.log(`  ✓ Selected note: fret=${note.fret}, string=${note.string}, pos={x:${pos.x}, y:${pos.y}}`);
+                notes.push({ fret: note.fret, string: note.string });
+            } else {
+                console.log(`  - Outside rect: fret=${note.fret}, string=${note.string}, pos={x:${pos.x}, y:${pos.y}}`);
+            }
+        }
+        
+        console.log("_getNoteListInRectangle: total selected =", notes.length, notes);
+
+        return notes;
     }
 
     // ============================================================

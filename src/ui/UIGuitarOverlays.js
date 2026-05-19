@@ -260,12 +260,53 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     }
 
     drawSelectedNotes() {
-        this.drawNoteList(this.g.selectedNotes || [], {
-            fillColor: "#fcb900",
-            strokeColor: "black",
-            shapeType: "square",
-            hasShadow: true
-        });
+        const g = this.g;
+        const app = g.app;
+
+        for (let n of (g.selectedNotes || [])) {
+            const inFretRange = n.fret >= 0 && n.fret <= g.fretCount;
+            const inStringRange = n.string >= 1 && n.string <= g.strings.length;
+            if (!inFretRange || !inStringRange) continue;
+
+            const pos = g.toScreen(n.fret, n.string);
+            if (!pos) continue;
+
+            const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
+            if (!raw) continue;
+
+            const label = app.theory.getNoteLabel(
+                raw.index,
+                g.displayMode === "note" ? g.labelType : g.displayMode
+            );
+
+            const full = app.theory.getFullNote(raw.index);
+            label.chroma = full.chroma;
+
+            let animOpts = {};
+            if (n.animStart) {
+                const elapsed = millis() - n.animStart;
+                const duration = n.animDuration ?? (g.anim?.note?.popInDuration ?? 360);
+                const t = constrain(elapsed / duration, 0, 1);
+
+                if (t < 1) {
+                    animOpts = { anim: { type: n.animType ?? "pop", t } };
+                } else {
+                    delete n.animStart;
+                    delete n.animDuration;
+                    delete n.animType;
+                }
+            }
+
+            this.drawNote(pos.x, pos.y, {
+                fillColor: "#fcb900",
+                strokeColor: "black",
+                shapeType: "circle",
+                hasShadow: false,
+                label,
+                isSelected: true,
+                ...animOpts
+            });
+        }
     }
 
     drawPopOutNotes() {
@@ -497,16 +538,6 @@ const list = this._getDispatchedIntervalList(
             });
         }
 
-        const isShift = g.shiftDown === true;
-
-        const selectedStyle = {
-            fillColor: "#ff00cc20",
-            strokeColor: "rgba(0, 255, 38, 0.2)",
-            hasShadow: true,
-            shapeType: "square",
-            overlayAlpha: 80
-        };
-
         const hoverStyle = {
             fillColor: "#fe000010",
             strokeColor: "rgba(255, 255, 255, 0.18)",
@@ -515,7 +546,7 @@ const list = this._getDispatchedIntervalList(
             overlayAlpha: 60
         };
 
-        const style = isShift ? selectedStyle : hoverStyle;
+        const style = hoverStyle;
 
         // MODE C : CURSOR → un seul dot sous la souris
         if (g.hoverMode === "cursor") {
@@ -1119,6 +1150,106 @@ const list = this._getDispatchedIntervalList(
         text("+", x, y);
     }
 
+    drawDebugOverlay() {
+        const g = this.g;
+        const app = g.app;
+        if (!app) return;
+        if (!this.harmonyDetector) {
+            this.harmonyDetector = new HarmonyDetector(app.theory);
+        } else {
+            this.harmonyDetector.theory = app.theory;
+        }
+
+        const pinnedList = g.pinnedNotes || [];
+        const selectedList = g.selectedNotes || [];
+
+        // Noms dédoublonnés par pitch class.
+        const toNameDeduped = (list) => {
+            const seen = new Set();
+            const names = [];
+            for (const note of list) {
+                const raw = app.instrument?.getNoteAt(note.string - 1, note.fret);
+                if (!raw || seen.has(raw.index)) continue;
+                seen.add(raw.index);
+                const label = app.theory?.getNoteLabel(raw.index, 'sharp');
+                names.push(label ? (label.base + (label.alt || '')) : `${raw.index}`);
+            }
+            return names.join(', ') || '—';
+        };
+
+        const pinnedNames = toNameDeduped(pinnedList);
+        const selectedNames = toNameDeduped(selectedList);
+
+        const tonicPc = app.theory?.hasRoot?.() ? app.theory.root : null;
+        const pinnedExtract = this.harmonyDetector.extractFromFrettedNotes(pinnedList, app.instrument);
+        const selectedExtract = this.harmonyDetector.extractFromFrettedNotes(selectedList, app.instrument);
+        const pinnedAnalysis = this.harmonyDetector.analyzePitchClassSet(pinnedExtract.pcs, tonicPc, pinnedExtract.bassPc);
+        const selectedAnalysis = this.harmonyDetector.analyzePitchClassSet(selectedExtract.pcs, tonicPc, selectedExtract.bassPc);
+        const pinnedVoicing = this.harmonyDetector.analyzeVoicing(pinnedList);
+        const selectedVoicing = this.harmonyDetector.analyzeVoicing(selectedList);
+
+        const formatAnalysis = (analysis, voicing) => {
+            const base = analysis.label || 'unknown';
+            if (!analysis.chord) return base;
+
+            const extras = [voicing.voicingLabel];
+            if (analysis.isTriad) extras.push('triade');
+            return `${base} - ${extras.join(', ')}`;
+        };
+
+        const pinnedInfo = formatAnalysis(pinnedAnalysis, pinnedVoicing);
+        const selectedInfo = formatAnalysis(selectedAnalysis, selectedVoicing);
+
+        const overlayX = g.x + 4;
+        const overlayY = g.y + g.h + 8;
+        const overlayScale = 3;
+        const overlayPadX = 10 * overlayScale;
+        const overlayPadY = 8 * overlayScale;
+        const overlayLineGap = 20 * overlayScale;
+        const overlayW = Math.max(360 * overlayScale, Math.min(width - overlayX - 4, 760 * overlayScale));
+        const overlayH = 54 * overlayScale;
+
+        push();
+        textAlign(LEFT, TOP);
+        textSize(12 * overlayScale);
+        noStroke();
+        fill(0, 0, 0, 160);
+        rect(overlayX, overlayY, overlayW, overlayH, 4);
+        fill(100, 200, 255);
+        text(`Pinned: [${pinnedNames}] (${pinnedInfo})`, overlayX + overlayPadX, overlayY + overlayPadY);
+        fill(255, 200, 50);
+        text(`Selected: [${selectedNames}] (${selectedInfo})`, overlayX + overlayPadX, overlayY + overlayPadY + overlayLineGap);
+        pop();
+    }
+
+    drawSelectionRectangle() {
+        const g = this.g;
+        const ui = g.app?.ui;
+        
+        if (!ui) return;
+        if (ui.selectionStartX == null || ui.selectionStartY == null) return;
+        if (ui.selectionEndX == null || ui.selectionEndY == null) return;
+        if (!ui.rectangleSelectionActive) return;
+
+        const x = Math.min(ui.selectionStartX, ui.selectionEndX);
+        const y = Math.min(ui.selectionStartY, ui.selectionEndY);
+        const w = Math.abs(ui.selectionEndX - ui.selectionStartX);
+        const h = Math.abs(ui.selectionEndY - ui.selectionStartY);
+
+        if (w < 2 || h < 2) return;  // Minimum size to display
+
+        push();
+        rectMode(CORNER);
+        
+        // Remplissage vert semi-transparent - plus visible
+        fill(76, 255, 0, 80);
+        stroke(76, 255, 0, 255);
+        strokeWeight(3);
+        rect(x, y, w, h);
+        
+        pop();
+    }
+
 
     // ------------------------------------------------------------
     // ENTRY POINT
@@ -1153,6 +1284,12 @@ const list = this._getDispatchedIntervalList(
 
         // 6) Hover normal (désactivé automatiquement si markerMode = true)
         this.drawHoverDot();
+
+        // 7) Rectangle de sélection (interaction globale)
+        this.drawSelectionRectangle();
+
+        // 8) Debug overlay
+        this.drawDebugOverlay();
 
 
 

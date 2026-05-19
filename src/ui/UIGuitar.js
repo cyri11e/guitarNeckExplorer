@@ -910,11 +910,15 @@ fromScreen(x, y) {
     }
 
     moveSelectedFrets(delta) {
+        // Ne JAMAIS toucher pinnedNotes pendant le mouvement
+        // Les selectedNotes sont un ensemble totalement indépendant
         this.selectedNotes = this._moveFrets(this.selectedNotes, delta);
         this.invalidate();
     }
 
     moveSelectedStrings(delta) {
+        // Ne JAMAIS toucher pinnedNotes pendant le mouvement
+        // Les selectedNotes sont un ensemble totalement indépendant
         this.selectedNotes = this._moveStrings(this.selectedNotes, delta);
         this.invalidate();
     }
@@ -1221,25 +1225,22 @@ keyPressed(k, kc) {
     }
 
     // --- ARROWS ---
+    // Les flèches ne bougent QUE les selectedNotes (la sélection courante)
     switch (kc) {
         case LEFT_ARROW:
-            if (!usePinned) this.movePinnedFrets(-1);
-            else this.moveSelectedFrets(-1);
+            this.moveSelectedFrets(-1);
             return true;
 
         case RIGHT_ARROW:
-            if (!usePinned) this.movePinnedFrets(+1);
-            else this.moveSelectedFrets(+1);
+            this.moveSelectedFrets(+1);
             return true;
 
         case UP_ARROW:
-            if (!usePinned) this.movePinnedStrings(+1);
-            else this.moveSelectedStrings(+1);
+            this.moveSelectedStrings(+1);
             return true;
 
         case DOWN_ARROW:
-            if (!usePinned) this.movePinnedStrings(-1);
-            else this.moveSelectedStrings(-1);
+            this.moveSelectedStrings(-1);
             return true;
     }
 

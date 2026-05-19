@@ -43,10 +43,22 @@ function windowResized() {
 // ROUTAGE DES ÉVÉNEMENTS P5 → APP → UIInteractionManager
 // ============================================================
 
-function mousePressed()  { app.mousePressed(mouseX, mouseY); }
-function mouseReleased() { app.mouseReleased(mouseX, mouseY); }
+function mousePressed()  { 
+    console.log("sketch.js: mousePressed", mouseX, mouseY);
+    app.mousePressed(mouseX, mouseY); 
+    return false; 
+}
+function mouseReleased() { 
+    console.log("sketch.js: mouseReleased", mouseX, mouseY);
+    app.mouseReleased(mouseX, mouseY); 
+    return false; 
+}
 function mouseMoved()    { app.mouseMoved(mouseX, mouseY); }
-function mouseDragged()  { app.mouseDragged(mouseX, mouseY); }
+function mouseDragged()  { 
+    console.log("sketch.js: mouseDragged", mouseX, mouseY);
+    app.mouseDragged(mouseX, mouseY); 
+    return false; 
+}
 
 function mouseWheel(e) {
     if (app.mouseWheel(e)) return false;

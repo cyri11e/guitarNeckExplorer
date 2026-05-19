@@ -186,6 +186,35 @@ class NoteRenderer {
         textStyle(NORMAL);
     }
 
+    drawSelectionCorners(x, y, R, OFFSET) {
+        const cs = R * 0.34;
+        const pad = R * 0.12;
+        const x0 = x - OFFSET - R * 0.5 - pad;
+        const x1 = x - OFFSET + R * 0.5 + pad;
+        const y0 = y - OFFSET - R * 0.5 - pad;
+        const y1 = y - OFFSET + R * 0.5 + pad;
+
+        stroke(76, 255, 0);
+        strokeWeight(max(1.2, R * 0.08));
+        noFill();
+
+        // coin haut-gauche
+        line(x0, y0, x0 + cs, y0);
+        line(x0, y0, x0, y0 + cs);
+
+        // coin haut-droit
+        line(x1, y0, x1 - cs, y0);
+        line(x1, y0, x1, y0 + cs);
+
+        // coin bas-gauche
+        line(x0, y1, x0 + cs, y1);
+        line(x0, y1, x0, y1 - cs);
+
+        // coin bas-droit
+        line(x1, y1, x1 - cs, y1);
+        line(x1, y1, x1, y1 - cs);
+    }
+
     // ------------------------------------------------------------
     // MAIN DRAW
     // ------------------------------------------------------------
@@ -202,7 +231,8 @@ class NoteRenderer {
             overlayAlpha = null,
             zoomFactor = 1,
             xOffset = 0,
-            yOffset = 0
+            yOffset = 0,
+            isSelected = false
         } = opts;
 
         x += xOffset;
@@ -372,6 +402,11 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
 
         // 5. Label
         this.drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset, yOffset);
+
+        // 6. Coins de sélection
+        if (isSelected) {
+            this.drawSelectionCorners(x, y, R, OFFSET);
+        }
 
         pop();
     }
