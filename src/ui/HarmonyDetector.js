@@ -7,12 +7,13 @@ class HarmonyDetector {
         this.theory = theory;
 
         this.chordTemplates = [
+            { key: "5",       intervals: [0, 7],        suffix: "5",        label: "powerchord" },
             { key: "maj",     intervals: [0, 4, 7],     suffix: "",         label: "triad" },
             { key: "min",     intervals: [0, 3, 7],     suffix: "m",        label: "triad" },
             { key: "dim",     intervals: [0, 3, 6],     suffix: "dim",      label: "triad" },
             { key: "aug",     intervals: [0, 4, 8],     suffix: "aug",      label: "triad" },
-            { key: "sus2",    intervals: [0, 2, 7],     suffix: "sus2",     label: "triad" },
-            { key: "sus4",    intervals: [0, 5, 7],     suffix: "sus4",     label: "triad" },
+            { key: "sus2",    intervals: [0, 2, 7],     suffix: "sus2",     label: "sus" },
+            { key: "sus4",    intervals: [0, 5, 7],     suffix: "sus4",     label: "sus" },
             { key: "7",       intervals: [0, 4, 7, 10], suffix: "7",        label: "7" },
             { key: "maj7",    intervals: [0, 4, 7, 11], suffix: "maj7",     label: "maj7" },
             { key: "min7",    intervals: [0, 3, 7, 10], suffix: "m7",       label: "m7" },
@@ -87,6 +88,14 @@ class HarmonyDetector {
         return this.theory.getNoteName(this._mod12(pc));
     }
 
+    _templatePriority(tpl) {
+        if (!tpl) return 0;
+        if (tpl.label === "triad") return 90;
+        if (tpl.key === "5") return 80;
+        if (tpl.key?.includes("no5")) return 40;
+        return 70;
+    }
+
     // Ancien extracteur (pitch classes seules) — conservé pour compatibilité.
     extractPitchClassesFromFrettedNotes(noteList, instrument) {
         return this.extractFromFrettedNotes(noteList, instrument).pcs;
@@ -147,7 +156,7 @@ class HarmonyDetector {
 
     detectChord(pitchClasses, bassPc = null) {
         const pcs = this._toSortedUnique(pitchClasses);
-        if (pcs.length < 3) return null;
+        if (pcs.length < 2) return null;
 
         const hasBass = Number.isFinite(bassPc);
         const bassNorm = hasBass ? this._mod12(bassPc) : null;
@@ -164,14 +173,39 @@ class HarmonyDetector {
 
         if (allMatches.length === 0) return null;
 
-        // Priorité: match dont la fondamentale = basse (position fondamentale).
-        // Sinon: premier match → renversement.
-        const best = (hasBass && allMatches.find(m => m.rootPc === bassNorm)) || allMatches[0];
+        // Priorité: fondamentale à la basse + qualité/template (triades avant no5).
+        const best = allMatches.reduce((bestMatch, candidate) => {
+            if (!bestMatch) return candidate;
+
+            const bestBass = hasBass && bestMatch.rootPc === bassNorm ? 1 : 0;
+            const candBass = hasBass && candidate.rootPc === bassNorm ? 1 : 0;
+            if (candBass !== bestBass) {
+                return candBass > bestBass ? candidate : bestMatch;
+            }
+
+            const bestPrio = this._templatePriority(bestMatch.tpl);
+            const candPrio = this._templatePriority(candidate.tpl);
+            if (candPrio !== bestPrio) {
+                return candPrio > bestPrio ? candidate : bestMatch;
+            }
+
+            return bestMatch;
+        }, null);
+
         const { rootPc, tpl } = best;
         const rootName = this._pcName(rootPc);
 
         const isInversion = hasBass && bassNorm !== rootPc;
         const bassName = isInversion ? this._pcName(bassNorm) : null;
+
+        // Calcule le numéro de renversement (position du bass dans les intervalles du template)
+        let inversionNumber = 0;
+        if (isInversion) {
+            const bassInterval = this._mod12(bassNorm - rootPc);
+            const idx = tpl.intervals.indexOf(bassInterval);
+            inversionNumber = idx > 0 ? idx : 1;  // idx dans les intervalles du template
+        }
+
         const symbol = isInversion
             ? `${rootName}${tpl.suffix}/${bassName}`
             : `${rootName}${tpl.suffix}`;
@@ -184,6 +218,7 @@ class HarmonyDetector {
             bassPc: bassNorm,
             bassName,
             isInversion,
+            inversionNumber,
             symbol,
             label: symbol
         };

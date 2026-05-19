@@ -13,16 +13,16 @@ class GuitarOverlays {
         this._popOutTimer = null;
         this.intervalSelectorLabels = [
             "1",  // 0
-            "b2", // 1
+            "♭2", // 1
             "2",  // 2
-            "b3", // 3
+            "♭3", // 3
             "3",  // 4
             "4",  // 5
-            "#4", // 6
+            "♯4", // 6
             "5",  // 7
-            "b6", // 8
+            "♭6", // 8
             "6",  // 9
-            "b7", // 10
+            "♭7", // 10
             "7"   // 11
         ];
 this.caged = new CAGEDOverlay(this.g);
@@ -43,6 +43,71 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     // ------------------------------------------------------------
     drawNote(x, y, opts = {}) {
         this.noteRenderer.draw(x, y, opts);
+    }
+
+    _getChordDegreeText(rootPc, notePc, context = null) {
+        if (!Number.isFinite(rootPc) || !Number.isFinite(notePc)) return null;
+
+        const interval = ((notePc - rootPc) % 12 + 12) % 12;
+
+        // Desambiguise le triton (intervalle 6) selon le contexte harmonique.
+        // - Si 4 existe deja, on affiche b5 (evite 4 + #4).
+        // - Si 5 existe, on affiche #4 (evite 5 + b5 en lydien).
+        if (interval === 6) {
+            if (context?.hasPerfectFourth) return "♭5";
+            if (context?.hasPerfectFifth) return "♯4";
+        }
+
+        const degree = this.g.app?.theory?.getDegreeLabel?.(interval);
+        if (!degree) return null;
+
+        return `${degree.alt || ""}${degree.base || ""}` || null;
+    }
+
+    _buildChordDegreeMap(noteList) {
+        const app = this.g.app;
+        if (!app?.instrument || !app?.theory) return new Map();
+
+        if (!this.harmonyDetector) {
+            this.harmonyDetector = new HarmonyDetector(app.theory);
+        } else {
+            this.harmonyDetector.theory = app.theory;
+        }
+
+        const extracted = this.harmonyDetector.extractFromFrettedNotes(noteList || [], app.instrument);
+        const tonicPc = app.theory?.hasRoot?.() ? app.theory.root : null;
+        const analysis = this.harmonyDetector.analyzePitchClassSet(extracted.pcs, tonicPc, extracted.bassPc);
+
+        let harmonyRootPc = null;
+        if (Number.isFinite(analysis?.chord?.rootPc)) {
+            harmonyRootPc = analysis.chord.rootPc;
+        } else if (Number.isFinite(analysis?.scale?.rootPc)) {
+            harmonyRootPc = analysis.scale.rootPc;
+        }
+
+        if (!Number.isFinite(harmonyRootPc)) return new Map();
+
+        const intervalsPresent = new Set(
+            extracted.pcs.map(pc => ((pc - harmonyRootPc) % 12 + 12) % 12)
+        );
+        const degreeContext = {
+            hasPerfectFourth: intervalsPresent.has(5),
+            hasPerfectFifth: intervalsPresent.has(7)
+        };
+
+        const degreeMap = new Map();
+        for (const note of (noteList || [])) {
+            if (!note) continue;
+            const raw = app.instrument.getNoteAt(note.string - 1, note.fret);
+            if (!raw) continue;
+
+            const degreeText = this._getChordDegreeText(harmonyRootPc, raw.index, degreeContext);
+            if (degreeText) {
+                degreeMap.set(`${note.string}:${note.fret}`, degreeText);
+            }
+        }
+
+        return degreeMap;
     }
 
     hasActiveNoteAnimations() {
@@ -192,7 +257,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             fillColor = "#ffffff",
             strokeColor = "black",
             shapeType = "circle",
-            hasShadow = false
+            hasShadow = false,
+            degreeMap = null
         } = opts;
 
         for (let n of (list || [])) {
@@ -242,6 +308,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 shapeType,
                 hasShadow,
                 label,
+                bottomRightLabel: degreeMap?.get(`${n.string}:${n.fret}`) || null,
+                bottomRightLabelColor: color(76, 255, 0),
                 ...animOpts
             });
         }
@@ -262,6 +330,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     drawSelectedNotes() {
         const g = this.g;
         const app = g.app;
+        const degreeMap = this._buildChordDegreeMap(g.selectedNotes || []);
 
         for (let n of (g.selectedNotes || [])) {
             const inFretRange = n.fret >= 0 && n.fret <= g.fretCount;
@@ -304,6 +373,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 hasShadow: false,
                 label,
                 isSelected: true,
+                bottomRightLabel: degreeMap.get(`${n.string}:${n.fret}`) || null,
+                bottomRightLabelColor: color(76, 255, 0),
                 ...animOpts
             });
         }
@@ -1177,48 +1248,76 @@ const list = this._getDispatchedIntervalList(
             return names.join(', ') || '—';
         };
 
-        const pinnedNames = toNameDeduped(pinnedList);
+        // const pinnedNames = toNameDeduped(pinnedList);  // COMMENTED OUT - Pinned overlay hidden
         const selectedNames = toNameDeduped(selectedList);
 
         const tonicPc = app.theory?.hasRoot?.() ? app.theory.root : null;
-        const pinnedExtract = this.harmonyDetector.extractFromFrettedNotes(pinnedList, app.instrument);
+        // const pinnedExtract = this.harmonyDetector.extractFromFrettedNotes(pinnedList, app.instrument);  // COMMENTED OUT
         const selectedExtract = this.harmonyDetector.extractFromFrettedNotes(selectedList, app.instrument);
-        const pinnedAnalysis = this.harmonyDetector.analyzePitchClassSet(pinnedExtract.pcs, tonicPc, pinnedExtract.bassPc);
+        // const pinnedAnalysis = this.harmonyDetector.analyzePitchClassSet(pinnedExtract.pcs, tonicPc, pinnedExtract.bassPc);  // COMMENTED OUT
         const selectedAnalysis = this.harmonyDetector.analyzePitchClassSet(selectedExtract.pcs, tonicPc, selectedExtract.bassPc);
-        const pinnedVoicing = this.harmonyDetector.analyzeVoicing(pinnedList);
+        // const pinnedVoicing = this.harmonyDetector.analyzeVoicing(pinnedList);  // COMMENTED OUT
         const selectedVoicing = this.harmonyDetector.analyzeVoicing(selectedList);
 
         const formatAnalysis = (analysis, voicing) => {
             const base = analysis.label || 'unknown';
             if (!analysis.chord) return base;
 
-            const extras = [voicing.voicingLabel];
-            if (analysis.isTriad) extras.push('triade');
-            return `${base} - ${extras.join(', ')}`;
+            const chord = analysis.chord;
+            const parts = [];
+
+            if (analysis.isTriad) {
+                parts.push('triade');
+                if (voicing.voicingLabel === 'arpege') parts.push('arpege');
+            } else {
+                parts.push(voicing.voicingLabel);
+            }
+
+            if (chord.isInversion) {
+                const ordinals = ['', '1er', '2ème', '3ème'];
+                const ord = ordinals[chord.inversionNumber] || `${chord.inversionNumber}ème`;
+                parts.push(`${ord} renversement`);
+            }
+
+            return `${base} - ${parts.join(', ')}`;
         };
 
-        const pinnedInfo = formatAnalysis(pinnedAnalysis, pinnedVoicing);
+        // const pinnedInfo = formatAnalysis(pinnedAnalysis, pinnedVoicing);  // COMMENTED OUT
         const selectedInfo = formatAnalysis(selectedAnalysis, selectedVoicing);
 
-        const overlayX = g.x + 4;
-        const overlayY = g.y + g.h + 8;
-        const overlayScale = 3;
+        // Only show Selected overlay if there are selected notes
+        if (selectedList.length === 0) return;
+
+        // Calculate median fret from selected notes
+        const frets = selectedList.map(n => n.fret);
+        const minFret = Math.min(...frets);
+        const maxFret = Math.max(...frets);
+
+        // 50% size reduction: overlayScale was 3, now 1.5
+        const overlayScale = 1.5;
         const overlayPadX = 10 * overlayScale;
         const overlayPadY = 8 * overlayScale;
-        const overlayLineGap = 20 * overlayScale;
-        const overlayW = Math.max(360 * overlayScale, Math.min(width - overlayX - 4, 760 * overlayScale));
-        const overlayH = 54 * overlayScale;
+
+        // Position overlay BELOW the neck (fixed Y position)
+        const overlayY = g.y + g.h + 8;
+
+        // Position overlay X at the leftmost fret (minFret)
+        const overlayW = Math.max(280 * overlayScale, Math.min(width - 8, 500 * overlayScale));
+        const overlayH = 28 * overlayScale;  // Reduced height for single line
+        
+        // Get X position from min fret (leftmost)
+        const pos = g.toScreen(minFret, 3);  // Get screen position at min fret, middle string
+        let overlayX = pos?.x || g.x;
+        overlayX = Math.max(g.x, Math.min(overlayX, g.x + g.w - overlayW));
 
         push();
         textAlign(LEFT, TOP);
         textSize(12 * overlayScale);
         noStroke();
-        fill(0, 0, 0, 160);
-        rect(overlayX, overlayY, overlayW, overlayH, 4);
-        fill(100, 200, 255);
-        text(`Pinned: [${pinnedNames}] (${pinnedInfo})`, overlayX + overlayPadX, overlayY + overlayPadY);
-        fill(255, 200, 50);
-        text(`Selected: [${selectedNames}] (${selectedInfo})`, overlayX + overlayPadX, overlayY + overlayPadY + overlayLineGap);
+        // fill(0, 0, 0, 160);
+        // rect(overlayX, overlayY, overlayW, overlayH, 4);
+        fill(100, 220, 100);  // Green color
+        text(`[${selectedNames}] (${selectedInfo})`, overlayX + overlayPadX, overlayY + overlayPadY);
         pop();
     }
 

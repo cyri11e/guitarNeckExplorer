@@ -215,6 +215,27 @@ class NoteRenderer {
         line(x1, y1, x1, y1 - cs);
     }
 
+    drawBottomRightCornerLabel(x, y, R, OFFSET, textValue, labelColor = null) {
+        if (!textValue) return;
+
+        const pad = R * 0.12;
+        const x1 = x - OFFSET + R * 0.5 + pad;
+        const y1 = y - OFFSET + R * 0.5 + pad;
+        const textX = x1 + R * 0.10;
+        const textY = y1 - R * 0.20;
+        const textScale = 2;
+
+        textAlign(LEFT, CENTER);
+        textStyle(BOLD);
+        textSize(R * 0.30 * textScale);
+        noStroke();
+        fill(0, 0, 0, 150);
+        text(textValue, textX + 1, textY + 1);
+        fill(labelColor || color(76, 255, 0));
+        text(textValue, textX, textY);
+        textStyle(NORMAL);
+    }
+
     // ------------------------------------------------------------
     // MAIN DRAW
     // ------------------------------------------------------------
@@ -232,7 +253,9 @@ class NoteRenderer {
             zoomFactor = 1,
             xOffset = 0,
             yOffset = 0,
-            isSelected = false
+            isSelected = false,
+            bottomRightLabel = null,
+            bottomRightLabelColor = null
         } = opts;
 
         x += xOffset;
@@ -406,6 +429,10 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         // 6. Coins de sélection
         if (isSelected) {
             this.drawSelectionCorners(x, y, R, OFFSET);
+        }
+
+        if (bottomRightLabel) {
+            this.drawBottomRightCornerLabel(x, y, R, OFFSET, bottomRightLabel, bottomRightLabelColor);
         }
 
         pop();

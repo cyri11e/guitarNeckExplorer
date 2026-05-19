@@ -155,6 +155,10 @@ _buildEvent(mx, my) {
         );
     }
 
+    _isMarkerDrawGesture(evt) {
+        return !!(this.guitar?.markerMode && evt?.button === LEFT && evt?.shiftKey);
+    }
+
     _handleGlobalMousePressed(evt) {
         if (!this.guitar) {
             console.log("_handleGlobalMousePressed: NO GUITAR");
@@ -172,6 +176,11 @@ _buildEvent(mx, my) {
         }
 
         console.log("_handleGlobalMousePressed: CAPTURED! btn=" + evt.button);
+
+        if (this._isMarkerDrawGesture(evt)) {
+            console.log("_handleGlobalMousePressed: marker draw gesture -> passthrough");
+            return false;
+        }
 
         this.lastX = evt.x;
         this.lastY = evt.y;
