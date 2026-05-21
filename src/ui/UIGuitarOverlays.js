@@ -50,6 +50,11 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
 
         const interval = ((notePc - rootPc) % 12 + 12) % 12;
 
+        // Accord augmente: privilegie #5 plutot que b6 pour l'intervalle 8.
+        if (interval === 8 && context?.preferSharpFive) {
+            return "♯5";
+        }
+
         // Desambiguise le triton (intervalle 6) selon le contexte harmonique.
         // - Si 4 existe deja, on affiche b5 (evite 4 + #4).
         // - Si 5 existe, on affiche #4 (evite 5 + b5 en lydien).
@@ -92,7 +97,8 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         );
         const degreeContext = {
             hasPerfectFourth: intervalsPresent.has(5),
-            hasPerfectFifth: intervalsPresent.has(7)
+            hasPerfectFifth: intervalsPresent.has(7),
+            preferSharpFive: analysis?.chord?.chordKey === "aug"
         };
 
         const degreeMap = new Map();
@@ -1221,6 +1227,110 @@ const list = this._getDispatchedIntervalList(
         text("+", x, y);
     }
 
+    _romanFromChromaticInterval(interval) {
+        const table = {
+            0: "I",
+            1: "♭II",
+            2: "II",
+            3: "♭III",
+            4: "III",
+            5: "IV",
+            6: "♭V",
+            7: "V",
+            8: "♭VI",
+            9: "VI",
+            10: "♭VII",
+            11: "VII"
+        };
+        const i = ((interval % 12) + 12) % 12;
+        return table[i] || null;
+    }
+
+    _applyRomanCase(symbol, lower = false) {
+        const raw = String(symbol ?? "");
+        const m = raw.match(/^([#b♯♭]*)([IVX]+)$/i);
+        if (!m) return raw;
+
+        const acc = m[1] || "";
+        const core = (m[2] || "").toUpperCase();
+        return acc + (lower ? core.toLowerCase() : core);
+    }
+
+    _getEmbeddedTriadQuality(rootPc, pitchClasses, detectedChord = null) {
+        if (!Number.isFinite(rootPc) || !Array.isArray(pitchClasses) || pitchClasses.length === 0) {
+            return null;
+        }
+
+        const rel = new Set(
+            pitchClasses
+                .filter(Number.isFinite)
+                .map(pc => ((pc - rootPc) % 12 + 12) % 12)
+        );
+
+        const hasM3 = rel.has(4);
+        const hasm3 = rel.has(3);
+        const hasP4 = rel.has(5);
+        const hasM2 = rel.has(2);
+        const hasP5 = rel.has(7);
+        const hasb5 = rel.has(6);
+        const hasA5 = rel.has(8);
+
+        if (hasP5 && (hasM2 || hasP4) && !hasM3 && !hasm3) return "sus";
+        if (hasM3 && hasA5) return "aug";
+        if (hasm3 && hasb5) return "dim";
+        if (hasM3 && hasP5) return "maj";
+        if (hasm3 && hasP5) return "min";
+
+        if (detectedChord?.quality === "sus") return "sus";
+        if (detectedChord?.chordKey === "aug") return "aug";
+        if (detectedChord?.chordKey === "dim") return "dim";
+        if (detectedChord?.chordKey === "min") return "min";
+        if (detectedChord?.chordKey === "maj") return "maj";
+
+        return null;
+    }
+
+    _getSelectedRomanDegree(analysis, extracted) {
+        const theory = this.g.app?.theory;
+        if (!theory?.hasRoot?.()) return null;
+
+        const tonicPc = theory.root;
+        const rootPc = analysis?.chord?.rootPc;
+        if (!Number.isFinite(tonicPc) || !Number.isFinite(rootPc)) return null;
+
+        const interval = ((rootPc - tonicPc) % 12 + 12) % 12;
+        const degreeRoman = this._romanFromChromaticInterval(interval);
+        if (!degreeRoman) return null;
+
+        const triadQuality = this._getEmbeddedTriadQuality(
+            rootPc,
+            extracted?.pcs || [],
+            analysis?.chord || null
+        );
+
+        const degreeRomanForQuality = (() => {
+            if (triadQuality === "aug" && degreeRoman === "♭VI") {
+                return "♯V";
+            }
+            return degreeRoman;
+        })();
+
+        if (triadQuality === "sus") {
+            return `${degreeRomanForQuality}sus`;
+        }
+        if (triadQuality === "min") {
+            return this._applyRomanCase(degreeRomanForQuality, true);
+        }
+        if (triadQuality === "dim") {
+            return `${this._applyRomanCase(degreeRomanForQuality, false)}°`;
+        }
+        if (triadQuality === "aug") {
+            return `${this._applyRomanCase(degreeRomanForQuality, false)}+`;
+        }
+
+        return this._applyRomanCase(degreeRomanForQuality, false);
+    }
+
     drawDebugOverlay() {
         const g = this.g;
         const app = g.app;
@@ -1234,23 +1344,6 @@ const list = this._getDispatchedIntervalList(
         const pinnedList = g.pinnedNotes || [];
         const selectedList = g.selectedNotes || [];
 
-        // Noms dédoublonnés par pitch class.
-        const toNameDeduped = (list) => {
-            const seen = new Set();
-            const names = [];
-            for (const note of list) {
-                const raw = app.instrument?.getNoteAt(note.string - 1, note.fret);
-                if (!raw || seen.has(raw.index)) continue;
-                seen.add(raw.index);
-                const label = app.theory?.getNoteLabel(raw.index, 'sharp');
-                names.push(label ? (label.base + (label.alt || '')) : `${raw.index}`);
-            }
-            return names.join(', ') || '—';
-        };
-
-        // const pinnedNames = toNameDeduped(pinnedList);  // COMMENTED OUT - Pinned overlay hidden
-        const selectedNames = toNameDeduped(selectedList);
-
         const tonicPc = app.theory?.hasRoot?.() ? app.theory.root : null;
         // const pinnedExtract = this.harmonyDetector.extractFromFrettedNotes(pinnedList, app.instrument);  // COMMENTED OUT
         const selectedExtract = this.harmonyDetector.extractFromFrettedNotes(selectedList, app.instrument);
@@ -1259,31 +1352,117 @@ const list = this._getDispatchedIntervalList(
         // const pinnedVoicing = this.harmonyDetector.analyzeVoicing(pinnedList);  // COMMENTED OUT
         const selectedVoicing = this.harmonyDetector.analyzeVoicing(selectedList);
 
-        const formatAnalysis = (analysis, voicing) => {
-            const base = analysis.label || 'unknown';
-            if (!analysis.chord) return base;
+        const buildSelectionOverlayInfo = (analysis, selectedNotes) => {
+            const normalizeAccidentals = (text) => String(text ?? "")
+                .replace(/([A-Ga-g])#/g, "$1♯")
+                .replace(/([A-Ga-g])b/g, "$1♭")
+                .replace(/(^|\s)#(?=[IVXivx])/g, "$1♯")
+                .replace(/(^|\s)b(?=[IVXivx])/g, "$1♭");
 
-            const chord = analysis.chord;
-            const parts = [];
+            const getSortedNotePitches = (list) => {
+                const out = [];
+                for (const note of (list || [])) {
+                    const raw = app.instrument?.getNoteAt(note.string - 1, note.fret);
+                    const midi = Number.isFinite(note?.midi)
+                        ? note.midi
+                        : (Number.isFinite(raw?.midi) ? raw.midi : null);
+                    const pitchClass = Number.isFinite(raw?.index)
+                        ? raw.index
+                        : (Number.isFinite(note?.index) ? ((note.index % 12) + 12) % 12 : null);
+                    out.push({ midi, pitchClass });
+                }
 
-            if (analysis.isTriad) {
-                parts.push('triade');
-                if (voicing.voicingLabel === 'arpege') parts.push('arpege');
-            } else {
-                parts.push(voicing.voicingLabel);
+                out.sort((a, b) => {
+                    const aMidi = Number.isFinite(a.midi) ? a.midi : (10_000 + (a.pitchClass ?? 0));
+                    const bMidi = Number.isFinite(b.midi) ? b.midi : (10_000 + (b.pitchClass ?? 0));
+                    return aMidi - bMidi;
+                });
+
+                return out;
+            };
+
+            const getIntervalInfo = (list) => {
+                const sorted = getSortedNotePitches(list);
+                if (sorted.length !== 2) return { short: null, long: null };
+
+                let semitones = null;
+                if (Number.isFinite(sorted[0].midi) && Number.isFinite(sorted[1].midi)) {
+                    semitones = Math.abs(sorted[1].midi - sorted[0].midi);
+                } else if (Number.isFinite(sorted[0].pitchClass) && Number.isFinite(sorted[1].pitchClass)) {
+                    semitones = Math.abs(sorted[1].pitchClass - sorted[0].pitchClass);
+                }
+
+                if (!Number.isFinite(semitones)) return { short: "?", long: "" };
+
+                const interval = app.theory?.getInterval?.(semitones);
+                return {
+                    short: interval?.short || "?",
+                    long: interval?.long || ""
+                };
+            };
+
+            const noteCount = Array.isArray(selectedNotes) ? selectedNotes.length : 0;
+            const rawName = String(analysis?.label || '').trim();
+            const normalized = rawName.toLowerCase();
+            const intervalInfo = noteCount === 2 ? getIntervalInfo(selectedNotes) : { short: null, long: null };
+            const name = (!rawName || normalized === 'unknown' || normalized === '—')
+                ? (noteCount === 1
+                    ? 'note'
+                    : (noteCount === 2 ? (intervalInfo.short || '?') : 'notes'))
+                : normalizeAccidentals(rawName);
+            const details = [];
+
+            if ((!rawName || normalized === 'unknown' || normalized === '—') && noteCount === 2) {
+                if (intervalInfo.long) details.push(intervalInfo.long);
             }
 
-            if (chord.isInversion) {
-                const ordinals = ['', '1er', '2ème', '3ème'];
-                const ord = ordinals[chord.inversionNumber] || `${chord.inversionNumber}ème`;
-                parts.push(`${ord} renversement`);
+            if (analysis?.chord) {
+                if (analysis.isTriad) {
+                    details.push('triade');
+                } else if (analysis.chord.quality) {
+                    details.push(String(analysis.chord.quality));
+                } else {
+                    details.push('accord');
+                }
+
+                if (analysis.chord.isInversion) {
+                    const ordinals = ['', '1er', '2eme', '3eme'];
+                    const ord = ordinals[analysis.chord.inversionNumber] || `${analysis.chord.inversionNumber}eme`;
+                    details.push(`${ord} renversement`);
+                }
+            } else if (analysis?.scale) {
+                const tonicSet = app.theory?.hasRoot?.();
+                const modeIndex = Number.isInteger(analysis.scale.modeIndex)
+                    ? (analysis.scale.modeIndex + 1)
+                    : null;
+                const familyLabel = String(analysis.scale.familyLabel || '').trim();
+
+                if (tonicSet && modeIndex && familyLabel) {
+                    details.push(`mode ${modeIndex} de la ${familyLabel}`);
+                } else {
+                    const rawScale = String(
+                        analysis.scale.modeName
+                        || analysis.scale.familyLabel
+                        || analysis.scale.label
+                        || ''
+                    ).trim();
+
+                    if (rawScale) {
+                        details.push(rawScale);
+                    }
+                }
             }
 
-            return `${base} - ${parts.join(', ')}`;
+            return {
+                name,
+                details: normalizeAccidentals(details.join(' • ')) || ' '
+            };
         };
 
-        // const pinnedInfo = formatAnalysis(pinnedAnalysis, pinnedVoicing);  // COMMENTED OUT
-        const selectedInfo = formatAnalysis(selectedAnalysis, selectedVoicing);
+        const overlayInfo = buildSelectionOverlayInfo(selectedAnalysis, selectedList);
+        const selectedRomanDegree = this._getSelectedRomanDegree(selectedAnalysis, selectedExtract);
+        const hasRecognizedHarmony = !!(selectedAnalysis?.chord || selectedAnalysis?.scale);
+        const showRomanBlock = hasRecognizedHarmony && !!selectedRomanDegree;
 
         // Only show Selected overlay if there are selected notes
         if (selectedList.length === 0) return;
@@ -1291,33 +1470,64 @@ const list = this._getDispatchedIntervalList(
         // Calculate median fret from selected notes
         const frets = selectedList.map(n => n.fret);
         const minFret = Math.min(...frets);
-        const maxFret = Math.max(...frets);
 
-        // 50% size reduction: overlayScale was 3, now 1.5
         const overlayScale = 1.5;
-        const overlayPadX = 10 * overlayScale;
-        const overlayPadY = 8 * overlayScale;
+        const blockPadX = 10 * overlayScale;
+        const blockPadY = 6 * overlayScale;
+        const blockGapX = 8 * overlayScale;
+        const blockGapY = 6 * overlayScale;
 
         // Position overlay BELOW the neck (fixed Y position)
         const overlayY = g.y + g.h + 8;
 
-        // Position overlay X at the leftmost fret (minFret)
-        const overlayW = Math.max(280 * overlayScale, Math.min(width - 8, 500 * overlayScale));
-        const overlayH = 28 * overlayScale;  // Reduced height for single line
+        const lineNameText = showRomanBlock
+            ? `${overlayInfo.name} (${selectedRomanDegree})`
+            : overlayInfo.name;
+        const lineDetailsText = overlayInfo.details;
         
         // Get X position from min fret (leftmost)
         const pos = g.toScreen(minFret, 3);  // Get screen position at min fret, middle string
         let overlayX = pos?.x || g.x;
-        overlayX = Math.max(g.x, Math.min(overlayX, g.x + g.w - overlayW));
 
         push();
-        textAlign(LEFT, TOP);
-        textSize(12 * overlayScale);
+        const textUnit = 12 * overlayScale;
+        const nameTextSize = textUnit * 2;
+        const detailsTextSize = textUnit * 0.9;
+
+        textSize(nameTextSize);
+        textFont("sans-serif");
         noStroke();
-        // fill(0, 0, 0, 160);
-        // rect(overlayX, overlayY, overlayW, overlayH, 4);
-        fill(100, 220, 100);  // Green color
-        text(`[${selectedNames}] (${selectedInfo})`, overlayX + overlayPadX, overlayY + overlayPadY);
+
+        const nameW = textWidth(lineNameText);
+        const nameH = textAscent() + textDescent();
+
+        textSize(detailsTextSize);
+        const detailsW = textWidth(lineDetailsText);
+        const detailsH = textAscent() + textDescent();
+
+        const rightW = nameW + blockPadX * 2;
+
+        const rightPadTop = blockPadY;
+        const rightPadBottom = blockPadY;
+        const totalH = rightPadTop + nameH + rightPadBottom;
+        const totalW = rightW;
+
+        overlayX = Math.max(g.x, Math.min(overlayX, g.x + g.w - totalW));
+
+        const rightX = overlayX;
+        const rightY = overlayY;
+
+        fill(76, 255, 0);
+        textAlign(LEFT, TOP);
+
+        let textY = rightY + rightPadTop;
+        textSize(nameTextSize);
+        text(lineNameText, rightX + blockPadX, textY);
+
+        // Infos complementaires en haut-gauche, style overlay de raccourcis.
+        textSize(detailsTextSize);
+        textAlign(LEFT, TOP);
+        text(lineDetailsText, 1, 1);
         pop();
     }
 

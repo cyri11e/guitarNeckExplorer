@@ -156,7 +156,19 @@ _buildEvent(mx, my) {
     }
 
     _isMarkerDrawGesture(evt) {
-        return !!(this.guitar?.markerMode && evt?.button === LEFT && evt?.shiftKey);
+        return !!(this.guitar?.markerMode && evt?.button === LEFT);
+    }
+
+    _resetGlobalGuitarInteractionState() {
+        this.brushActive = false;
+        this.eraseActive = false;
+        this.dragActive = false;
+        this.rectangleSelectionActive = false;
+        this.selectionStartX = null;
+        this.selectionStartY = null;
+        this.selectionEndX = null;
+        this.selectionEndY = null;
+        this.leftDownHit = null;
     }
 
     _handleGlobalMousePressed(evt) {
@@ -172,6 +184,13 @@ _buildEvent(mx, my) {
         // Ne pas capturer si un contrôle UI non-guitare est visé.
         if (this._hasTopControlHit(evt)) {
             console.log("_handleGlobalMousePressed: HAS TOP CONTROL HIT");
+            return false;
+        }
+
+        // En mode marker, la guitare gere directement les clics (pas d'interactions notes globales).
+        if (this.guitar?.markerMode) {
+            this._resetGlobalGuitarInteractionState();
+            console.log("_handleGlobalMousePressed: marker mode -> passthrough");
             return false;
         }
 
@@ -225,6 +244,11 @@ _buildEvent(mx, my) {
     _handleGlobalMouseMoved(evt) {
         if (!this.guitar) return false;
 
+        if (this.guitar.markerMode) {
+            this._resetGlobalGuitarInteractionState();
+            return false;
+        }
+
         if (this.eraseActive) {
             const hit = this.guitar.fromScreen(evt.x, evt.y);
             if (hit) {
@@ -240,6 +264,11 @@ _buildEvent(mx, my) {
 
     _handleGlobalMouseDragged(evt) {
         if (!this.guitar) return false;
+
+        if (this.guitar.markerMode) {
+            this._resetGlobalGuitarInteractionState();
+            return false;
+        }
 
         if (this.selectionStartX != null && this.selectionStartY != null) {
             const dx = evt.x - this.selectionStartX;
@@ -275,6 +304,11 @@ _buildEvent(mx, my) {
     }
 
     _handleGlobalMouseReleased(evt) {
+        if (this.guitar?.markerMode) {
+            this._resetGlobalGuitarInteractionState();
+            return false;
+        }
+
         if (this.guitar && this.selectionStartX != null && this.selectionStartY != null) {
             if (this.rectangleSelectionActive) {
                 const rect = {
@@ -352,6 +386,47 @@ _buildEvent(mx, my) {
 
                 this.guitar.invalidate();
             } else {
+                const releaseHit = this.guitar.fromScreen(evt.x, evt.y);
+                const sameNote = !!(
+                    this.leftDownHit &&
+                    releaseHit &&
+                    this.leftDownHit.fret === releaseHit.fret &&
+                    this.leftDownHit.string === releaseHit.string
+                );
+
+                // CTRL + clic: toggle direct de la selection pour la note cliquée,
+                // sans dependre du seuil drag/rectangle.
+                if (evt.ctrlKey && sameNote && releaseHit) {
+                    const keyFret = releaseHit.fret;
+                    const keyString = releaseHit.string;
+
+                    const selectedIdx = this.guitar.selectedNotes.findIndex(
+                        n => n.fret === keyFret && n.string === keyString
+                    );
+
+                    if (selectedIdx >= 0) {
+                        // selected -> pinned
+                        this.guitar.selectedNotes.splice(selectedIdx, 1);
+
+                        const pinnedExists = this.guitar.pinnedNotes.some(
+                            n => n.fret === keyFret && n.string === keyString
+                        );
+                        if (!pinnedExists) {
+                            this.guitar.pinnedNotes.push({ fret: keyFret, string: keyString });
+                        }
+                    } else {
+                        // pinned -> selected
+                        this.guitar.pinnedNotes = this.guitar.pinnedNotes.filter(
+                            n => !(n.fret === keyFret && n.string === keyString)
+                        );
+
+                        this.guitar.selectedNotes.push({ fret: keyFret, string: keyString });
+                    }
+
+                    this.guitar.invalidate();
+                }
+                // Sans CTRL, comportement existant.
+                else 
                 // Si selectedNotes actives: clic confirme la sélection (remet les notes dans pinnedNotes)
                 if (this.guitar.selectedNotes && this.guitar.selectedNotes.length > 0) {
                     for (let note of this.guitar.selectedNotes) {
@@ -367,14 +442,6 @@ _buildEvent(mx, my) {
                     // Pas de return ici — on laisse le cleanup s'exécuter normalement ci-dessous
                 } else {
                     // Sinon: clic simple toggle pinnedNotes
-                    const releaseHit = this.guitar.fromScreen(evt.x, evt.y);
-                    const sameNote = !!(
-                        this.leftDownHit &&
-                        releaseHit &&
-                        this.leftDownHit.fret === releaseHit.fret &&
-                        this.leftDownHit.string === releaseHit.string
-                    );
-
                     if (sameNote && releaseHit) {
                         const idx = this.guitar.pinnedNotes.findIndex(
                             n => n.fret === releaseHit.fret && n.string === releaseHit.string
@@ -390,15 +457,7 @@ _buildEvent(mx, my) {
             }
         }
 
-        this.brushActive = false;
-        this.eraseActive = false;
-        this.dragActive = false;
-        this.rectangleSelectionActive = false;
-        this.selectionStartX = null;
-        this.selectionStartY = null;
-        this.selectionEndX = null;
-        this.selectionEndY = null;
-        this.leftDownHit = null;
+        this._resetGlobalGuitarInteractionState();
         return false;
     }
 

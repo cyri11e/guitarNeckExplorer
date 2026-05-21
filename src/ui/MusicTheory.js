@@ -320,8 +320,15 @@ getLabelFromFull(full, mode) {
     // INTERVALLES
     // -----------------------------
     getInterval(semitones) {
-        semitones = ((semitones % 12) + 12) % 12;
-        return this.INTERVALS.find(i => i.semitones === semitones);
+        const abs = Math.abs(Number(semitones) || 0);
+
+        // Conserver explicitement l'octave au lieu de la ramener a l'unisson.
+        if (abs > 0 && abs % 12 === 0) {
+            return this.INTERVALS.find(i => i.semitones === 12);
+        }
+
+        const folded = ((abs % 12) + 12) % 12;
+        return this.INTERVALS.find(i => i.semitones === folded);
     }
 
     // -----------------------------

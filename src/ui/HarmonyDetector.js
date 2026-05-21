@@ -34,7 +34,7 @@ class HarmonyDetector {
                 key: "major",
                 baseIntervals: [0, 2, 4, 5, 7, 9, 11],
                 familyLabel: "gamme majeure",
-                modes: ["ionien", "dorien", "phrygien", "lydien", "mixolydien", "aeolien", "locrien"]
+                modes: ["ionien", "dorien", "phrygien", "lydien", "mixolydien", "éolien", "locrien"]
             },
             {
                 key: "harmonicMinor",
@@ -46,7 +46,7 @@ class HarmonyDetector {
                 key: "melodicMinor",
                 baseIntervals: [0, 2, 3, 5, 7, 9, 11],
                 familyLabel: "gamme mineure melodique",
-                modes: ["mineure melodique", "dorien b2", "lydien augmente", "lydien dominant", "mixolydien b6", "locrien #2", "altere"]
+                modes: ["mineure melodique", "dorien b2", "lydien augmenté", "lydien dominant", "mixolydien b6", "locrien #2", "altere"]
             },
             {
                 key: "pentatonic",

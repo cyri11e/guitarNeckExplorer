@@ -984,9 +984,18 @@ fromScreen(x, y) {
    mousePressed(evt) {
     this._lastEvt = evt;
 
-    // --- MODE MARKER ---
+    // --- MODE MARKER (clic gauche direct) ---
     if (this.markerMode) {
-        //console.log("[MARKER] mousePressed capturé");
+        //console.log("[MARKER] mousePressed capture");
+
+        // Neutralise tout etat de clic/drag herite du mode normal.
+        this.isPressed = false;
+        this.dragging = false;
+        this.wasDragged = false;
+
+        if (evt?.button !== LEFT) {
+            return true;
+        }
 
         const pos = this.fromScreen(evt.x, evt.y);
         if (!pos) {
@@ -1024,6 +1033,10 @@ fromScreen(x, y) {
 
     
     mouseDragged(evt) {
+            if (this.markerMode) {
+                return true;
+            }
+
         if (this.isPressed) {
             this.wasDragged = true;
         }
@@ -1031,6 +1044,20 @@ fromScreen(x, y) {
     }
     
     mouseReleased(evt) {
+            if (this.markerMode) {
+                // Bloque strictement le pipeline onClick du composant parent en mode marker.
+                this.isPressed = false;
+                this.dragging = false;
+                this.wasDragged = false;
+                return true;
+            }
+
+        // Ne jamais declencher onClick si ce composant n'a pas recu mousePressed localement.
+        // Evite les toggles fantomes via un _lastEvt stale (ex: dernier point marker).
+        if (!this.isPressed && !this.dragging) {
+            return false;
+        }
+
         const res = super.mouseReleased(evt);
         return res;
     }
@@ -1090,7 +1117,6 @@ fromScreen(x, y) {
     onClick() {
 
      
-
     if (this.markerMode) {
         //console.log("[MARKER] onClick ignoré (mode marker actif)");
         return false;
@@ -1171,7 +1197,31 @@ keyPressed(k, kc) {
             return true;
         }
 
-        // pas d'autres shortcuts pour l’instant
+        // Déplacement des marqueurs uniquement (pas des notes)
+        switch (kc) {
+            case LEFT_ARROW:
+                this._moveMarkerSegmentsFrets(-1);
+                this.invalidate();
+                return true;
+
+            case RIGHT_ARROW:
+                this._moveMarkerSegmentsFrets(+1);
+                this.invalidate();
+                return true;
+
+            case UP_ARROW:
+                this._moveMarkerSegmentsStrings(+1);
+                this.invalidate();
+                return true;
+
+            case DOWN_ARROW:
+                this._moveMarkerSegmentsStrings(-1);
+                this.invalidate();
+                return true;
+        }
+
+        // pas d'autres interactions notes en mode marker
+        return false;
     }
 
     // SHIFT : change l’aspect du hover

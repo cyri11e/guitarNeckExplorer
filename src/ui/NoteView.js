@@ -229,8 +229,8 @@ class NoteRenderer {
         textStyle(BOLD);
         textSize(R * 0.30 * textScale);
         noStroke();
-        fill(0, 0, 0, 150);
-        text(textValue, textX + 1, textY + 1);
+            fill(0, 0, 0, 220);
+            text(textValue, textX + 1.5, textY + 1.5);
         fill(labelColor || color(76, 255, 0));
         text(textValue, textX, textY);
         textStyle(NORMAL);
