@@ -236,6 +236,21 @@ class NoteRenderer {
         textStyle(NORMAL);
     }
 
+    drawNoTonicHint(x, y, R, OFFSET, strokeColor) {
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
+        textSize(R * 0.36);
+
+        const hx = x - OFFSET;
+        const hy = y - OFFSET + R * 0.02;
+
+        fill(140);
+        text("?", hx, hy);
+
+        textStyle(NORMAL);
+    }
+
     // ------------------------------------------------------------
     // MAIN DRAW
     // ------------------------------------------------------------
@@ -425,6 +440,10 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
 
         // 5. Label
         this.drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset, yOffset);
+
+        if (label?.noTonicHint === true) {
+            this.drawNoTonicHint(x, y, R, OFFSET, strokeColor);
+        }
 
         // 6. Coins de sélection
         if (isSelected) {

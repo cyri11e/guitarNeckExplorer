@@ -6,6 +6,10 @@ window.addEventListener("keydown", (e) => {
     }
 }, { passive: false });
 
+window.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+}, { passive: false });
+
 window.addEventListener("keydown", (e) => {
     if (e.key === "Alt") {
         document.body.style.cursor = "move";

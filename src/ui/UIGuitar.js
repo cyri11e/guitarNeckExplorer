@@ -58,7 +58,7 @@ class Guitar extends UIComponent {
         //  Ajout : flag anti-clic-après-drag
         this.wasDragged = false;
 
-        this.displayMode = cfg.displayMode ?? "note";     // note | degree | none
+        this.displayMode = cfg.displayMode ?? "note";     // mode par défaut pour les nouvelles notes
         this.labelType   = cfg.labelType   ?? "noteEN";   // noteEN | noteFR
         this.hoverMode   = "cursor"; // "cursor" | "note" | "octave"
 
@@ -111,6 +111,15 @@ this.anim.setPreset("snappy");
         this.chordRadarPointer = null;
         this.chordRadarRadiusT = 0.35;
         this.chordRadarRadiusStep = 0.08;
+
+        this.contextMenu = {
+            visible: false,
+            stage: "root",
+            x: 0,
+            y: 0,
+            fret: null,
+            string: null
+        };
     }
 
     _computeGeometryStamp() {
@@ -263,6 +272,748 @@ setInlayStyle(type) {
     this.invalidate();
 }
 
+    _normalizeDisplayMode(mode) {
+        const allowed = ["note", "degree", "none"];
+        return allowed.includes(mode) ? mode : "note";
+    }
+
+    _noteModeToKnobIndex(mode) {
+        return ["note", "degree", "none"].indexOf(this._normalizeDisplayMode(mode));
+    }
+
+    _getStoredNoteAt(fret, string) {
+        return (
+            this.selectedNotes.find(n => n.fret === fret && n.string === string) ||
+            this.pinnedNotes.find(n => n.fret === fret && n.string === string) ||
+            null
+        );
+    }
+
+    _getNoteDisplayMode(note) {
+        return this._normalizeDisplayMode(note?.displayMode ?? this.displayMode);
+    }
+
+    _getNoteLabelMode(note) {
+        const mode = this._getNoteDisplayMode(note);
+        return mode === "note" ? this.labelType : mode;
+    }
+
+    _createStoredNote(note = {}, fallbackDisplayMode = this.displayMode) {
+        return {
+            ...note,
+            displayMode: this._normalizeDisplayMode(note.displayMode ?? fallbackDisplayMode)
+        };
+    }
+
+    _setStoredNoteDisplayMode(fret, string, mode) {
+        const nextMode = this._normalizeDisplayMode(mode);
+        const note = this._getStoredNoteAt(fret, string);
+        if (!note) return false;
+        note.displayMode = nextMode;
+        return true;
+    }
+
+    _syncDisplayModeKnob(mode) {
+        const knob = this.app?.components?.find(c => c.name === "knob2");
+        const index = this._noteModeToKnobIndex(mode);
+        if (!knob || index < 0 || knob.state === index) return;
+        knob.setIndex(index);
+    }
+
+    _cycleStoredNoteDisplayMode(fret, string) {
+        const note = this._getStoredNoteAt(fret, string);
+        if (!note) return null;
+
+        const modes = ["note", "degree", "none"];
+        const currentIndex = Math.max(0, modes.indexOf(this._normalizeDisplayMode(note.displayMode)));
+        const nextMode = modes[(currentIndex + 1) % modes.length];
+
+        note.displayMode = nextMode;
+        this.setDisplayMode(nextMode);
+        this._syncDisplayModeKnob(nextMode);
+        this.invalidate();
+        return nextMode;
+    }
+
+    _getContextMenuItems(stage = this.contextMenu?.stage) {
+        if (stage === "quality") {
+            return [
+                {
+                    leftId: "majorLeft",
+                    rightId: "majorRight",
+                    label: "majeur"
+                },
+                {
+                    leftId: "minorLeft",
+                    rightId: "minorRight",
+                    label: "mineur"
+                }
+            ];
+        }
+
+        if (stage === "scale") {
+            return [
+                { id: "scaleType:diatonic", label: "diatonique" },
+                { id: "scaleType:pentatonic", label: "pentatonique" }
+            ];
+        }
+
+        if (stage === "scaleFamily") {
+            return [
+                { id: "scaleFamily:major", label: "majeure" },
+                { id: "scaleFamily:minor", label: "mineure" }
+            ];
+        }
+
+        if (stage === "scaleModes") {
+            if (this.contextMenu?.scaleType === "pentatonic") {
+                return [
+                    { id: "scaleMode:pentatonicMajor", label: "penta majeure" },
+                    { id: "scaleMode:pentatonicMinor", label: "penta mineure" }
+                ];
+            }
+
+            if (this.contextMenu?.scaleFamily === "major") {
+                return [
+                    { id: "scaleMode:lydien", label: "lydien" },
+                    { id: "scaleMode:ionien", label: "ionien" },
+                    { id: "scaleMode:mixolydien", label: "mixolydien" }
+                ];
+            }
+
+            if (this.contextMenu?.scaleFamily === "minor") {
+                return [
+                    { id: "scaleMode:dorien", label: "dorien" },
+                    { id: "scaleMode:eolien", label: "eolien" },
+                    { id: "scaleMode:phrygien", label: "phrygien" }
+                ];
+            }
+
+            return [];
+        }
+
+        if (stage === "scaleLayout") {
+            return [
+                {
+                    leftId: "scaleLayout:box:left",
+                    rightId: "scaleLayout:box:right",
+                    label: "box"
+                },
+                {
+                    leftId: "scaleLayout:diagonal:left",
+                    rightId: "scaleLayout:diagonal:right",
+                    label: "diagonale"
+                }
+            ];
+        }
+
+        return [
+            { id: "chord", label: "accord" },
+            { id: "scale", label: "gamme" }
+        ];
+    }
+
+    _getContextMenuLayout() {
+        if (!this.contextMenu?.visible) return null;
+
+        const stage = this.contextMenu?.stage;
+        const anchorX = Number.isFinite(this.contextMenu?.x) ? this.contextMenu.x : 0;
+        const anchorY = Number.isFinite(this.contextMenu?.y) ? this.contextMenu.y : 0;
+        const items = this._getContextMenuItems();
+        const itemHeight = 24;
+        const margin = 6;
+
+        if (stage === "quality" || stage === "scaleLayout") {
+            const maxDisplayChars = items.reduce((maxLen, item) => {
+                const len = String(`← ${String(item?.label ?? "")} →`).length;
+                return Math.max(maxLen, len);
+            }, 0);
+
+            // Compact dual layout: width follows rendered label length while preserving left/right hit zones.
+            const totalContentWidth = Math.max(92, (maxDisplayChars * 8) + 18);
+            const colWidth = Math.max(36, Math.ceil(totalContentWidth * 0.5));
+            const colGap = 0;
+            const width = (colWidth * 2) + 12;
+            const height = items.length * itemHeight;
+            const x = constrain(anchorX - width * 0.5, margin, max(margin, windowWidth - width - margin));
+            const y = constrain(anchorY - height * 0.5, margin, max(margin, windowHeight - height - margin));
+
+            return {
+                mode: "dual",
+                x,
+                y,
+                width,
+                height,
+                itemHeight,
+                items,
+                colWidth,
+                colGap,
+                leftX: x + 6,
+                rightX: x + 6 + colWidth + colGap
+            };
+        }
+
+        const maxLabelChars = items.reduce((maxLen, item) => {
+            const len = String(item?.label ?? "").length;
+            return Math.max(maxLen, len);
+        }, 0);
+
+        // Keep the menu as compact as the longest label plus small side paddings.
+        const width = Math.max(52, (maxLabelChars * 8) + 16);
+        const height = items.length * itemHeight;
+        const x = constrain(anchorX - width * 0.5, margin, max(margin, windowWidth - width - margin));
+        const y = constrain(anchorY - height * 0.5, margin, max(margin, windowHeight - height - margin));
+
+        return { mode: "single", x, y, width, height, itemHeight, items };
+    }
+
+    _contextMenuContains(x, y) {
+        const layout = this._getContextMenuLayout();
+        if (!layout) return false;
+        return x >= layout.x && x <= (layout.x + layout.width) && y >= layout.y && y <= (layout.y + layout.height);
+    }
+
+    _openContextMenuForHit(hit, evt) {
+        if (!hit || !evt) return;
+
+        const anchor = this.toScreen(hit.fret, hit.string);
+        this.contextMenu = {
+            visible: true,
+            stage: "root",
+            side: "right",
+            scaleType: null,
+            scaleFamily: null,
+            scaleMode: null,
+            x: Number.isFinite(anchor?.x) ? anchor.x : evt.x,
+            y: Number.isFinite(anchor?.y) ? anchor.y : evt.y,
+            fret: hit.fret,
+            string: hit.string
+        };
+        this.invalidate();
+    }
+
+    _closeContextMenu() {
+        if (!this.contextMenu?.visible) return;
+        this.contextMenu.visible = false;
+        this.invalidate();
+    }
+
+    _setContextMenuStage(stage) {
+        if (!this.contextMenu) return;
+        this.contextMenu.stage = stage;
+        this.invalidate();
+    }
+
+    _getContextMenuActionAt(x, y) {
+        const layout = this._getContextMenuLayout();
+        if (!layout) return null;
+
+        const inside = x >= layout.x && x <= (layout.x + layout.width) && y >= layout.y && y <= (layout.y + layout.height);
+        if (!inside) return null;
+
+        const idx = floor((y - layout.y) / layout.itemHeight);
+        const row = layout.items[idx];
+        if (!row) return null;
+
+        if (layout.mode === "dual") {
+            const leftMinX = layout.leftX;
+            const leftMaxX = leftMinX + layout.colWidth;
+            const rightMinX = layout.rightX;
+            const rightMaxX = rightMinX + layout.colWidth;
+
+            if (x >= leftMinX && x <= leftMaxX) return row.leftId || null;
+            if (x >= rightMinX && x <= rightMaxX) return row.rightId || null;
+            return null;
+        }
+
+        return row.id || null;
+    }
+
+    _getBarreChordShapeFromString(rootString) {
+
+        if (rootString === 1) {
+            return {
+                rootString: 1,
+                major: [
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 2 },
+                    { stringOffset: 3, fretOffset: 1 },
+                    { stringOffset: 4, fretOffset: 0 },
+                    { stringOffset: 5, fretOffset: 0 }
+                ],
+                minor: [
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 2 },
+                    { stringOffset: 3, fretOffset: 0 },
+                    { stringOffset: 4, fretOffset: 0 },
+                    { stringOffset: 5, fretOffset: 0 }
+                ]
+            };
+        }
+
+        if (rootString === 2) {
+            return {
+                rootString: 2,
+                major: [
+                    { stringOffset: -1, fretOffset: 0 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 2 },
+                    { stringOffset: 3, fretOffset: 2 },
+                    { stringOffset: 4, fretOffset: 0 }
+                ],
+                minor: [
+                    { stringOffset: -1, fretOffset: 0 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 2 },
+                    { stringOffset: 3, fretOffset: 1 },
+                    { stringOffset: 4, fretOffset: 0 }
+                ]
+            };
+        }
+
+        if (rootString === 3) {
+            return {
+                rootString: 3,
+                major: [
+                    { stringOffset: -2, fretOffset: 2 },
+                    { stringOffset: -1, fretOffset: 0 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 3 },
+                    { stringOffset: 3, fretOffset: 2 }
+                ],
+                minor: [
+                    { stringOffset: -2, fretOffset: 1 },
+                    { stringOffset: -1, fretOffset: 0 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 3 },
+                    { stringOffset: 3, fretOffset: 1 }
+                ]
+            };
+        }
+
+        if (rootString === 4) {
+            return {
+                rootString: 4,
+                major: [
+                    { stringOffset: -3, fretOffset: 3 },
+                    { stringOffset: -2, fretOffset: 2 },
+                    { stringOffset: -1, fretOffset: 0 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 0 },
+                    { stringOffset: 2, fretOffset: 3 }
+                ],
+                minor: [
+                    { stringOffset: -3, fretOffset: 3 },
+                    { stringOffset: -2, fretOffset: 1 },
+                    { stringOffset: -1, fretOffset: 0 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 0 },
+                    { stringOffset: 2, fretOffset: 3 }
+                ]
+            };
+        }
+
+        if (rootString === 5) {
+            return {
+                rootString: 5,
+                major: [
+                    { stringOffset: -4, fretOffset: -1 },
+                    { stringOffset: -3, fretOffset: 2 },
+                    { stringOffset: -2, fretOffset: 1 },
+                    { stringOffset: -1, fretOffset: -1 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: -1 }
+                ],
+                minor: [
+                    { stringOffset: -4, fretOffset: -2 },
+                    { stringOffset: -3, fretOffset: 2 },
+                    { stringOffset: -2, fretOffset: 0 },
+                    { stringOffset: -1, fretOffset: -1 },
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: -2 }
+                ]
+            };
+        }
+
+        if (rootString === 6) {
+            return {
+                rootString: 1,
+                major: [
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 2 },
+                    { stringOffset: 3, fretOffset: 1 },
+                    { stringOffset: 4, fretOffset: 0 },
+                    { stringOffset: 5, fretOffset: 0 }
+                ],
+                minor: [
+                    { stringOffset: 0, fretOffset: 0 },
+                    { stringOffset: 1, fretOffset: 2 },
+                    { stringOffset: 2, fretOffset: 2 },
+                    { stringOffset: 3, fretOffset: 0 },
+                    { stringOffset: 4, fretOffset: 0 },
+                    { stringOffset: 5, fretOffset: 0 }
+                ]
+            };
+        }
+
+        return null;
+    }
+
+    _getContextChordShapeId(rootString, side = "right") {
+        const map = {
+            1: ["G", "E"],
+            2: ["C", "A"],
+            3: ["E", "D"],
+            4: ["A", "G"],
+            5: ["D", "C"],
+            6: ["G", "E"]
+        };
+
+        const pair = map[rootString];
+        if (!pair) return null;
+        return side === "left" ? pair[0] : pair[1];
+    }
+
+    _getRecipeRootStringByShape(shapeId) {
+        const map = {
+            E: 1,
+            A: 2,
+            D: 3,
+            G: 4,
+            C: 5
+        };
+        return map[shapeId] || null;
+    }
+
+    _findClosestRootFretForShape(targetPc, recipeRootString, referenceFret, side = "right") {
+        const instrument = this.app?.instrument;
+        if (!instrument || !Number.isFinite(targetPc)) return null;
+
+        const candidates = [];
+        for (let fret = 0; fret <= this.fretCount; fret++) {
+            const raw = instrument.getNoteAt(recipeRootString - 1, fret);
+            if (!raw) continue;
+            if (raw.index === targetPc) candidates.push(fret);
+        }
+
+        if (candidates.length === 0) return null;
+
+        const leftSide = side === "left";
+        const preferred = candidates.filter(f => leftSide ? f <= referenceFret : f >= referenceFret);
+        const pool = preferred.length > 0 ? preferred : candidates;
+
+        let best = pool[0];
+        let bestDist = Math.abs(best - referenceFret);
+        for (let i = 1; i < pool.length; i++) {
+            const f = pool[i];
+            const dist = Math.abs(f - referenceFret);
+            if (dist < bestDist) {
+                best = f;
+                bestDist = dist;
+            }
+        }
+
+        return best;
+    }
+
+    _applyContextChordQuality(quality, sideArg = null) {
+        const clickedFret = this.contextMenu?.fret;
+        const clickedString = this.contextMenu?.string;
+        const side = sideArg === "left"
+            ? "left"
+            : (sideArg === "right" ? "right" : (this.contextMenu?.side === "left" ? "left" : "right"));
+        if (clickedFret == null || clickedString == null) return false;
+
+        const shapeId = this._getContextChordShapeId(clickedString, side);
+        const recipeRootString = this._getRecipeRootStringByShape(shapeId) || clickedString;
+        const shape = this._getBarreChordShapeFromString(recipeRootString);
+        if (!shape) return false;
+
+        let rootFret = clickedFret;
+        const clickedRaw = this.app?.instrument?.getNoteAt?.(clickedString - 1, clickedFret);
+        if (clickedRaw) {
+            const anchored = this._findClosestRootFretForShape(clickedRaw.index, recipeRootString, clickedFret, side);
+            if (Number.isFinite(anchored)) {
+                rootFret = anchored;
+            }
+        }
+
+        const recipe = quality === "minor" ? shape.minor : shape.major;
+        const targets = [];
+
+        for (const step of recipe) {
+            const targetString = shape.rootString + step.stringOffset;
+            if (targetString < 1 || targetString > this.strings.length) continue;
+
+            targets.push({
+                targetString,
+                targetFret: rootFret + step.fretOffset
+            });
+        }
+
+        if (targets.length === 0) return false;
+
+        const minTargetFret = targets.reduce((minFret, t) => Math.min(minFret, t.targetFret), Infinity);
+        const fretShift = minTargetFret < 0 ? -minTargetFret : 0;
+        let changed = false;
+
+        for (const target of targets) {
+            const targetString = target.targetString;
+            const targetFret = target.targetFret + fretShift;
+            if (targetFret < 0 || targetFret > this.fretCount) continue;
+
+            const added = this._addAnimatedNote(this.pinnedNotes, targetFret, targetString, "pin", {
+                displayMode: this.displayMode
+            });
+            changed = changed || added;
+        }
+
+        if (changed) {
+            this.invalidate();
+        }
+
+        return changed;
+    }
+
+    _getScaleIntervalsByMode(modeId) {
+        const map = {
+            lydien:     [0, 2, 4, 6, 7, 9, 11],
+            ionien:     [0, 2, 4, 5, 7, 9, 11],
+            mixolydien: [0, 2, 4, 5, 7, 9, 10],
+            dorien:     [0, 2, 3, 5, 7, 9, 10],
+            eolien:     [0, 2, 3, 5, 7, 8, 10],
+            phrygien:   [0, 1, 3, 5, 7, 8, 10],
+            pentatonicmajor: [0, 2, 4, 7, 9],
+            pentatonicminor: [0, 3, 5, 7, 10]
+        };
+        return map[String(modeId || "").toLowerCase()] || null;
+    }
+
+    _countLetterDuplicates(noteNames) {
+        const counts = Object.create(null);
+        for (const name of noteNames || []) {
+            const letter = String(name || "").trim().charAt(0).toUpperCase();
+            if (!/[A-G]/.test(letter)) continue;
+            counts[letter] = (counts[letter] || 0) + 1;
+        }
+
+        let duplicates = 0;
+        for (const key of Object.keys(counts)) {
+            if (counts[key] > 1) duplicates += (counts[key] - 1);
+        }
+        return duplicates;
+    }
+
+    _pickUseFlatsForScale(rootPc, intervals) {
+        const theory = this.theory;
+        if (!theory || typeof theory.getNote !== "function") return null;
+
+        const pcs = (intervals || [])
+            .map(semitones => ((Number(rootPc) + Number(semitones)) % 12 + 12) % 12)
+            .filter(Number.isFinite);
+        if (pcs.length === 0) return null;
+
+        const sharpNames = pcs.map(pc => theory.getNote(pc)?.sharp).filter(Boolean);
+        const flatNames = pcs.map(pc => theory.getNote(pc)?.flat).filter(Boolean);
+
+        const sharpDup = this._countLetterDuplicates(sharpNames);
+        const flatDup = this._countLetterDuplicates(flatNames);
+
+        if (sharpDup < flatDup) return false;
+        if (flatDup < sharpDup) return true;
+        return null;
+    }
+
+    _autoAssignContextScaleTonic(rootFret, rootString, intervals = null) {
+        const theory = this.theory;
+        const instrument = this.app?.instrument;
+        if (!theory || !instrument) return;
+
+        const rootRaw = instrument.getNoteAt?.(rootString - 1, rootFret);
+        if (!rootRaw || !Number.isFinite(rootRaw.index)) return;
+
+        if (!theory.hasRoot?.()) {
+            theory.setRoot(rootRaw.index);
+            this.onChange?.({
+                type: "root",
+                index: rootRaw.index
+            });
+        }
+
+        // Choisit ♯/♭ selon l'orthographe la plus cohérente de la gamme (moins de doublons de lettres).
+        const preferredUseFlats = this._pickUseFlatsForScale(rootRaw.index, intervals);
+        if (typeof preferredUseFlats === "boolean") {
+            theory.useFlats = preferredUseFlats;
+            const accidentalSwitch = this.app?.components?.find(c => c.name === "metalSwitch1");
+            const targetState = preferredUseFlats ? 0 : 1;
+            if (accidentalSwitch && accidentalSwitch.state !== targetState) {
+                accidentalSwitch.setState(targetState);
+            }
+        }
+    }
+
+    _applyContextScaleSelection(modeId, layoutId, side = "right") {
+        const rootFret = this.contextMenu?.fret;
+        const rootString = this.contextMenu?.string;
+        if (rootFret == null || rootString == null) return false;
+
+        const intervals = this._getScaleIntervalsByMode(modeId);
+        if (!intervals || intervals.length === 0) return false;
+
+        this._autoAssignContextScaleTonic(rootFret, rootString, intervals);
+
+        if (typeof MultiNotes !== "function") return false;
+        const dispatcher = new MultiNotes(this);
+
+        const hovered = { fret: rootFret, string: rootString };
+        const mode = layoutId === "diagonal"
+            ? "Diagonal"
+            : (side === "left" ? "BoxL" : "BoxR");
+
+        const way = side === "left" ? "down" : "up";
+        const octaveShown = layoutId === "diagonal" ? 2 : "T";
+
+        const generated = dispatcher.dispatch(mode, intervals, hovered, way, octaveShown) || [];
+
+        let changed = false;
+        for (const pos of generated) {
+            if (!pos || !Number.isFinite(pos.fret) || !Number.isFinite(pos.string)) continue;
+            if (pos.string < 1 || pos.string > this.strings.length) continue;
+            if (pos.fret < 0 || pos.fret > this.fretCount) continue;
+
+            const added = this._addAnimatedNote(this.pinnedNotes, pos.fret, pos.string, "pin", {
+                displayMode: this.displayMode
+            });
+            changed = changed || added;
+        }
+
+        if (changed) this.invalidate();
+        return changed;
+    }
+
+    _handleContextMenuClick(evt) {
+        if (!this.contextMenu?.visible || !evt) return false;
+
+        const action = this._getContextMenuActionAt(evt.x, evt.y);
+
+        if (!action) {
+            this._closeContextMenu();
+            return true;
+        }
+
+        if (evt.button !== LEFT) {
+            this._closeContextMenu();
+            return true;
+        }
+
+        if (action === "chord") {
+            this._setContextMenuStage("quality");
+            return true;
+        }
+
+        if (action === "scale") {
+            if (this.contextMenu) {
+                this.contextMenu.scaleType = null;
+                this.contextMenu.scaleFamily = null;
+                this.contextMenu.scaleMode = null;
+            }
+            this._setContextMenuStage("scale");
+            return true;
+        }
+
+        if (action === "scaleType:diatonic") {
+            if (this.contextMenu) {
+                this.contextMenu.scaleType = "diatonic";
+                this.contextMenu.scaleFamily = null;
+                this.contextMenu.scaleMode = null;
+            }
+            this._setContextMenuStage("scaleFamily");
+            return true;
+        }
+
+        if (action === "scaleType:pentatonic") {
+            if (this.contextMenu) {
+                this.contextMenu.scaleType = "pentatonic";
+                this.contextMenu.scaleFamily = null;
+                this.contextMenu.scaleMode = null;
+            }
+            this._setContextMenuStage("scaleModes");
+            return true;
+        }
+
+        if (action === "scaleFamily:major") {
+            if (this.contextMenu) {
+                this.contextMenu.scaleFamily = "major";
+                this.contextMenu.scaleMode = null;
+            }
+            this._setContextMenuStage("scaleModes");
+            return true;
+        }
+
+        if (action === "scaleFamily:minor") {
+            if (this.contextMenu) {
+                this.contextMenu.scaleFamily = "minor";
+                this.contextMenu.scaleMode = null;
+            }
+            this._setContextMenuStage("scaleModes");
+            return true;
+        }
+
+        if (typeof action === "string" && action.startsWith("scaleMode:")) {
+            if (this.contextMenu) {
+                this.contextMenu.scaleMode = action.slice("scaleMode:".length);
+            }
+            this._setContextMenuStage("scaleLayout");
+            return true;
+        }
+
+        if (action === "scaleLayout:box:left"
+            || action === "scaleLayout:box:right"
+            || action === "scaleLayout:diagonal:left"
+            || action === "scaleLayout:diagonal:right") {
+            const modeId = this.contextMenu?.scaleMode;
+            const layoutId = action.includes(":box:") ? "box" : "diagonal";
+            const side = action.endsWith(":left") ? "left" : "right";
+            this._applyContextScaleSelection(modeId, layoutId, side);
+            this._closeContextMenu();
+            return true;
+        }
+
+        if (action === "majorLeft") {
+            this._applyContextChordQuality("major", "left");
+            this._closeContextMenu();
+            return true;
+        }
+
+        if (action === "majorRight") {
+            this._applyContextChordQuality("major", "right");
+            this._closeContextMenu();
+            return true;
+        }
+
+        if (action === "minorLeft") {
+            this._applyContextChordQuality("minor", "left");
+            this._closeContextMenu();
+            return true;
+        }
+
+        if (action === "minorRight") {
+            this._applyContextChordQuality("minor", "right");
+            this._closeContextMenu();
+            return true;
+        }
+
+        this._closeContextMenu();
+        return true;
+    }
+
 
 setNextIntervalMode() {
 
@@ -277,9 +1028,9 @@ setNextIntervalMode() {
 
 
     setDisplayMode(mode) {
-        const allowed = ["note", "degree", "none"];
-        if (!allowed.includes(mode)) return;
-        this.displayMode = mode;
+        const nextMode = this._normalizeDisplayMode(mode);
+        if (nextMode === this.displayMode) return;
+        this.displayMode = nextMode;
         this.invalidate();
     }
 
@@ -561,17 +1312,26 @@ fromScreen(x, y) {
         return this.selectedNotes.some(n => n.fret === fret && n.string === string);
     }
 
-    _addAnimatedNote(list, fret, string, burstType) {
+    _addAnimatedNote(list, fret, string, burstType, noteData = null) {
         const now = millis();
         const idx = list.findIndex(n => n.fret === fret && n.string === string);
 
         if (idx >= 0) {
             // Note déjà présente: relance seulement le pop-in.
             list[idx].animStart = now;
+            if (noteData?.displayMode != null) {
+                list[idx].displayMode = this._normalizeDisplayMode(noteData.displayMode);
+            }
             return false;
         }
 
-        list.push({ fret, string, animStart: now });
+        list.push({
+            ...(noteData || {}),
+            fret,
+            string,
+            animStart: now,
+            displayMode: this._normalizeDisplayMode(noteData?.displayMode)
+        });
 
         this.interactionBursts.push({
             fret,
@@ -616,7 +1376,7 @@ fromScreen(x, y) {
             const key = `${string}:${fret}`;
             if (seen.has(key)) continue;
             seen.add(key);
-            out.push({ fret, string });
+            out.push(this._createStoredNote(n));
         }
 
         return out;
@@ -658,6 +1418,7 @@ fromScreen(x, y) {
             const existing = currentMap.get(key);
 
             if (existing) {
+                existing.displayMode = this._normalizeDisplayMode(n.displayMode ?? existing.displayMode);
                 if (replayExisting) {
                     // Ne ré-animer que si la note ne vient PAS du pad précédent
                     const wasInPreviousPad = prevMap.has(key);
@@ -670,6 +1431,7 @@ fromScreen(x, y) {
                 next.push(existing);
             } else {
                 next.push({
+                    ...this._createStoredNote(n),
                     fret: n.fret,
                     string: n.string,
                     animStart: now,
@@ -754,7 +1516,7 @@ fromScreen(x, y) {
 
         } else {
             // Pin
-            this._addAnimatedNote(this.pinnedNotes, fret, string, "pin");
+            this._addAnimatedNote(this.pinnedNotes, fret, string, "pin", { displayMode: this.displayMode });
         }
         this.invalidate();
     }
@@ -768,7 +1530,7 @@ fromScreen(x, y) {
 
         } else {
             // Sélection
-            this._addAnimatedNote(this.selectedNotes, fret, string, "select");
+            this._addAnimatedNote(this.selectedNotes, fret, string, "select", { displayMode: this.displayMode });
         }
 
         this.invalidate();
@@ -836,7 +1598,8 @@ fromScreen(x, y) {
 
         this._chainAddQueue = notes.map(n => ({
             string: n.string,
-            fret: n.fret
+            fret: n.fret,
+            displayMode: this._normalizeDisplayMode(n.displayMode ?? this.displayMode)
         }));
         this._chainAddTarget = usePinned ? "pinned" : "selected";
 
@@ -861,7 +1624,7 @@ fromScreen(x, y) {
                 : this.selectedNotes;
 
             const burstType = this._chainAddTarget === "pinned" ? "pin" : "select";
-            this._addAnimatedNote(target, n.fret, n.string, burstType);
+            this._addAnimatedNote(target, n.fret, n.string, burstType, n);
 
             this.invalidate();
         }, stepMs);
@@ -869,6 +1632,7 @@ fromScreen(x, y) {
 
     _moveFrets(list, delta) {
         return list.map(n => ({
+            ...n,
             fret: n.fret + delta,
             string: n.string
         }));
@@ -905,7 +1669,11 @@ fromScreen(x, y) {
                 remaining--;
             }
 
-            return { fret, string };
+            return {
+                ...n,
+                fret,
+                string
+            };
         });
     }
 
@@ -1064,6 +1832,17 @@ fromScreen(x, y) {
     
     mouseMoved(evt) {
 
+        if (this.contextMenu?.visible) {
+            const hadHover = !!this.hoveredNote || this.isHovered;
+            this.hoveredNote = null;
+            this.chordRadarPointer = null;
+            this.isHovered = false;
+            if (hadHover) {
+                this.invalidate();
+            }
+            return false;
+        }
+
         super.mouseMoved?.(evt);
 
         const prevInside = this.isHovered;
@@ -1125,6 +1904,10 @@ fromScreen(x, y) {
         const evt = this._lastEvt;
         if (!evt) return false;
 
+        if (this.contextMenu?.visible) {
+            return this._handleContextMenuClick(evt);
+        }
+
         // --- MODE MARKER : on ignore complètement onClick ---
         if (this.markerMode) return false;
 
@@ -1134,6 +1917,24 @@ fromScreen(x, y) {
         if (!hit) return false;
 
         const { fret, string } = hit;
+
+        if (evt.button === RIGHT) {
+            const note = this._getStoredNoteAt(fret, string);
+            if (note) {
+                this._cycleStoredNoteDisplayMode(fret, string);
+            } else {
+                this._openContextMenuForHit(hit, evt);
+            }
+            return true;
+        }
+
+        const storedNote = this._getStoredNoteAt(fret, string);
+        if (storedNote && this._normalizeDisplayMode(storedNote.displayMode) === "none") {
+            this._removeWithPopOut(this.pinnedNotes, fret, string, "pinned");
+            this._removeWithPopOut(this.selectedNotes, fret, string, "selected");
+            this.invalidate();
+            return true;
+        }
 
         // 1) NOTIFIER LES RÈGLES
         this.onChange?.({

@@ -81,7 +81,12 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
 
         const extracted = this.harmonyDetector.extractFromFrettedNotes(noteList || [], app.instrument);
         const tonicPc = app.theory?.hasRoot?.() ? app.theory.root : null;
-        const analysis = this.harmonyDetector.analyzePitchClassSet(extracted.pcs, tonicPc, extracted.bassPc);
+        const analysis = this.harmonyDetector.analyzePitchClassSet(
+            extracted.pcs,
+            tonicPc,
+            extracted.bassPc,
+            { noteCount: extracted.noteCount }
+        );
 
         let harmonyRootPc = null;
         if (Number.isFinite(analysis?.chord?.rootPc)) {
@@ -206,10 +211,16 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
 
         let label = null;
         if (raw) {
+            const labelMode = this.g._getNoteLabelMode?.(note) ?? (this.g.displayMode === "note" ? this.g.labelType : this.g.displayMode);
             label = app.theory.getNoteLabel(
                 raw.index,
-                this.g.displayMode === "note" ? this.g.labelType : this.g.displayMode
+                labelMode
             );
+
+            const hasRoot = app.theory?.hasRoot?.() ?? false;
+            if (label && labelMode === "degree" && !hasRoot && label.base === "") {
+                label.noTonicHint = true;
+            }
 
             const full = app.theory.getFullNote(raw.index);
             if (label && full) label.chroma = full.chroma;
@@ -283,12 +294,16 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
             if (!raw) continue;
 
+            const labelMode = g._getNoteLabelMode?.(n) ?? (g.displayMode === "note" ? g.labelType : g.displayMode);
             const label = app.theory.getNoteLabel(
                 raw.index,
-                g.displayMode === "note"
-                    ? g.labelType
-                    : g.displayMode
+                labelMode
             );
+
+            const hasRoot = app.theory?.hasRoot?.() ?? false;
+            if (labelMode === "degree" && !hasRoot && label.base === "") {
+                label.noTonicHint = true;
+            }
 
             const full = app.theory.getFullNote(raw.index);
             label.chroma = full.chroma;
@@ -349,10 +364,16 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
             const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
             if (!raw) continue;
 
+            const labelMode = g._getNoteLabelMode?.(n) ?? (g.displayMode === "note" ? g.labelType : g.displayMode);
             const label = app.theory.getNoteLabel(
                 raw.index,
-                g.displayMode === "note" ? g.labelType : g.displayMode
+                labelMode
             );
+
+            const hasRoot = app.theory?.hasRoot?.() ?? false;
+            if (labelMode === "degree" && !hasRoot && label.base === "") {
+                label.noTonicHint = true;
+            }
 
             const full = app.theory.getFullNote(raw.index);
             label.chroma = full.chroma;
@@ -527,6 +548,11 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         const g = this.g;
         const app = g.app;
 
+        if (g.contextMenu?.visible) {
+            this.intervalOverlayNotes = [];
+            return;
+        }
+
         if (g.markerMode) return;
         if (g.isChordRadarOverlayActive?.()) {
             this.intervalOverlayNotes = [];
@@ -579,7 +605,9 @@ const list = this._getDispatchedIntervalList(
 
             let label;
 
-            switch (g.displayMode) {
+            const hoverMode = g._getNoteDisplayMode?.(g._getStoredNoteAt?.(h.fret, h.string)) ?? g.displayMode;
+
+            switch (hoverMode) {
 
                 case "note":
                     label = app.theory.getNoteLabel(raw.index, g.labelType);
@@ -633,8 +661,10 @@ const list = this._getDispatchedIntervalList(
 
             let label;
 
+            const hoverMode = g._getNoteDisplayMode?.(g._getStoredNoteAt?.(h.fret, h.string)) ?? g.displayMode;
+
             // MULTINOTE + MODE DEGREE → afficher "1"
-            if (intervals.length > 0 && g.displayMode === "degree") {
+            if (intervals.length > 0 && hoverMode === "degree") {
 
                 label = {
                     base: "1",
@@ -647,7 +677,7 @@ const list = this._getDispatchedIntervalList(
 
                 label = app.theory.getNoteLabel(
                     baseIndex,
-                    g.displayMode === "note" ? g.labelType : g.displayMode
+                    g._getNoteLabelMode?.(g._getStoredNoteAt?.(h.fret, h.string)) ?? (hoverMode === "note" ? g.labelType : hoverMode)
                 );
                 
             }
@@ -1348,16 +1378,53 @@ const list = this._getDispatchedIntervalList(
         // const pinnedExtract = this.harmonyDetector.extractFromFrettedNotes(pinnedList, app.instrument);  // COMMENTED OUT
         const selectedExtract = this.harmonyDetector.extractFromFrettedNotes(selectedList, app.instrument);
         // const pinnedAnalysis = this.harmonyDetector.analyzePitchClassSet(pinnedExtract.pcs, tonicPc, pinnedExtract.bassPc);  // COMMENTED OUT
-        const selectedAnalysis = this.harmonyDetector.analyzePitchClassSet(selectedExtract.pcs, tonicPc, selectedExtract.bassPc);
+        const selectedAnalysis = this.harmonyDetector.analyzePitchClassSet(
+            selectedExtract.pcs,
+            tonicPc,
+            selectedExtract.bassPc,
+            { noteCount: selectedExtract.noteCount }
+        );
         // const pinnedVoicing = this.harmonyDetector.analyzeVoicing(pinnedList);  // COMMENTED OUT
         const selectedVoicing = this.harmonyDetector.analyzeVoicing(selectedList);
 
-        const buildSelectionOverlayInfo = (analysis, selectedNotes) => {
+        const buildSelectionOverlayInfo = (analysis, selectedNotes, extracted) => {
             const normalizeAccidentals = (text) => String(text ?? "")
                 .replace(/([A-Ga-g])#/g, "$1♯")
                 .replace(/([A-Ga-g])b/g, "$1♭")
                 .replace(/(^|\s)#(?=[IVXivx])/g, "$1♯")
                 .replace(/(^|\s)b(?=[IVXivx])/g, "$1♭");
+
+            const getChordQualifier = (chord) => {
+                const key = String(chord?.chordKey || "").toLowerCase();
+                const quality = String(chord?.quality || "").toLowerCase();
+                const keyNoSlash = key.split("/")[0];
+
+                const majorKeys = new Set(["maj", "7", "maj7", "6", "add9", "7no5", "maj7no5"]);
+                const minorKeys = new Set(["min", "min7", "mmaj7", "min6", "madd9", "m7no5"]);
+                const diminishedKeys = new Set(["dim", "dim7", "m7b5"]);
+
+                if (key.includes("sus") || quality.includes("sus")) return "suspendue";
+                if (keyNoSlash.includes("aug") || quality.includes("aug")) return "augmentee";
+                if (diminishedKeys.has(keyNoSlash) || quality.includes("dim")) return "diminuee";
+                if (minorKeys.has(keyNoSlash) || quality === "m7" || quality === "mmaj7") return "mineure";
+                if (majorKeys.has(keyNoSlash) || quality === "triad" || quality === "7" || quality === "maj7" || quality === "6" || quality === "add9" || quality === "7sus") return "majeure";
+
+                return "";
+            };
+
+            const getChordStructure = (chord, extractedInfo) => {
+                const templateToneCount = Number.isFinite(chord?.toneCount) ? chord.toneCount : null;
+                const pcCount = Array.isArray(extractedInfo?.pcs) ? extractedInfo.pcs.length : null;
+                const toneCount = templateToneCount ?? pcCount ?? 0;
+                const key = String(chord?.chordKey || "").toLowerCase();
+
+                // 7(no5) et variantes restent des tetrades meme si la quinte est absente.
+                if (key.includes("7")) return "tetrade";
+
+                if (toneCount >= 4) return "tetrade";
+                if (toneCount === 3) return "triade";
+                return "accord";
+            };
 
             const getSortedNotePitches = (list) => {
                 const out = [];
@@ -1405,10 +1472,20 @@ const list = this._getDispatchedIntervalList(
             const rawName = String(analysis?.label || '').trim();
             const normalized = rawName.toLowerCase();
             const intervalInfo = noteCount === 2 ? getIntervalInfo(selectedNotes) : { short: null, long: null };
-            const name = (!rawName || normalized === 'unknown' || normalized === '—')
-                ? (noteCount === 1
-                    ? 'note'
-                    : (noteCount === 2 ? (intervalInfo.short || '?') : 'notes'))
+            const hasDetectedHarmony = !!(analysis?.chord || analysis?.scale);
+            const isUnknownName = !rawName || normalized === 'unknown' || normalized === '—';
+            const fullNameRaw = (() => {
+                if (analysis?.chord?.symbol) return String(analysis.chord.symbol);
+                if (analysis?.scale?.label) return String(analysis.scale.label);
+                return '';
+            })();
+            const fullName = normalizeAccidentals(String(fullNameRaw || '').trim());
+            const simpleName = normalizeAccidentals(String(fullNameRaw || '').split('/')[0].trim());
+
+            const name = isUnknownName
+                ? (hasDetectedHarmony
+                    ? rawName
+                    : (noteCount === 2 ? (intervalInfo.short || '?') : ''))
                 : normalizeAccidentals(rawName);
             const details = [];
 
@@ -1417,18 +1494,16 @@ const list = this._getDispatchedIntervalList(
             }
 
             if (analysis?.chord) {
-                if (analysis.isTriad) {
-                    details.push('triade');
-                } else if (analysis.chord.quality) {
-                    details.push(String(analysis.chord.quality));
-                } else {
-                    details.push('accord');
-                }
+                const structure = getChordStructure(analysis.chord, extracted);
+                const qualifier = getChordQualifier(analysis.chord);
+                details.push(qualifier ? `${structure} ${qualifier}` : structure);
 
                 if (analysis.chord.isInversion) {
                     const ordinals = ['', '1er', '2eme', '3eme'];
                     const ord = ordinals[analysis.chord.inversionNumber] || `${analysis.chord.inversionNumber}eme`;
                     details.push(`${ord} renversement`);
+                } else {
+                    details.push('etat fondamental');
                 }
             } else if (analysis?.scale) {
                 const tonicSet = app.theory?.hasRoot?.();
@@ -1455,17 +1530,27 @@ const list = this._getDispatchedIntervalList(
 
             return {
                 name,
+                simpleName: simpleName || name,
+                fullName: fullName,
                 details: normalizeAccidentals(details.join(' • ')) || ' '
             };
         };
 
-        const overlayInfo = buildSelectionOverlayInfo(selectedAnalysis, selectedList);
+        const overlayInfo = buildSelectionOverlayInfo(selectedAnalysis, selectedList, selectedExtract);
         const selectedRomanDegree = this._getSelectedRomanDegree(selectedAnalysis, selectedExtract);
         const hasRecognizedHarmony = !!(selectedAnalysis?.chord || selectedAnalysis?.scale);
         const showRomanBlock = hasRecognizedHarmony && !!selectedRomanDegree;
 
         // Only show Selected overlay if there are selected notes
         if (selectedList.length === 0) return;
+
+        const getCategoryLabel = () => {
+            if (selectedList.length === 2) return "intervalle";
+            if (selectedAnalysis?.scale) return "gamme";
+            if (selectedAnalysis?.chord) return "accord";
+            return "";
+        };
+        const rightBadge = getCategoryLabel();
 
         // Calculate median fret from selected notes
         const frets = selectedList.map(n => n.fret);
@@ -1480,13 +1565,21 @@ const list = this._getDispatchedIntervalList(
         // Position overlay BELOW the neck (fixed Y position)
         const overlayY = g.y + g.h + 8;
 
+        const baseSimpleName = overlayInfo.simpleName || overlayInfo.name;
         const lineNameText = showRomanBlock
-            ? `${overlayInfo.name} (${selectedRomanDegree})`
-            : overlayInfo.name;
-        const lineDetailsText = overlayInfo.details;
+            ? `${baseSimpleName} (${selectedRomanDegree})`
+            : baseSimpleName;
+
+        const leftHudParts = [];
+        if (overlayInfo.fullName) leftHudParts.push(overlayInfo.fullName);
+        if (overlayInfo.details && overlayInfo.details.trim()) leftHudParts.push(overlayInfo.details.trim());
+        const lineDetailsText = leftHudParts.join(' • ');
+
+        if (!lineNameText) return;
         
         // Get X position from min fret (leftmost)
-        const pos = g.toScreen(minFret, 3);  // Get screen position at min fret, middle string
+        const leftAnchorFret = Math.max(0, minFret - 1);
+        const pos = g.toScreen(leftAnchorFret, 3);  // Decale d'une frette vers la gauche
         let overlayX = pos?.x || g.x;
 
         push();
@@ -1527,7 +1620,14 @@ const list = this._getDispatchedIntervalList(
         // Infos complementaires en haut-gauche, style overlay de raccourcis.
         textSize(detailsTextSize);
         textAlign(LEFT, TOP);
-        text(lineDetailsText, 1, 1);
+        const hudMargin = 10;
+        text(lineDetailsText, hudMargin, hudMargin);
+
+        // Mention de categorie en haut a droite, meme niveau/style que l'overlay gauche.
+        if (rightBadge) {
+            textAlign(RIGHT, TOP);
+            text(rightBadge, windowWidth - hudMargin, hudMargin);
+        }
         pop();
     }
 
@@ -1556,6 +1656,95 @@ const list = this._getDispatchedIntervalList(
         strokeWeight(3);
         rect(x, y, w, h);
         
+        pop();
+    }
+
+    drawContextMenu() {
+        const g = this.g;
+        const layout = g._getContextMenuLayout?.();
+        if (!layout) return;
+
+        push();
+        rectMode(CORNER);
+        textFont("sans-serif");
+        textSize(13);
+        textAlign(LEFT, CENTER);
+
+        fill(0, 0, 0, 210);
+        stroke(76, 255, 0, 220);
+        strokeWeight(1.5);
+        rect(layout.x, layout.y, layout.width, layout.height, 8);
+
+        if (layout.mode === "dual") {
+            for (let i = 0; i < layout.items.length; i++) {
+                const row = layout.items[i];
+                const y = layout.y + i * layout.itemHeight;
+                const rowTop = y;
+                const rowBottom = y + layout.itemHeight;
+                const leftMinX = layout.leftX;
+                const leftMaxX = leftMinX + layout.colWidth;
+                const rightMinX = layout.rightX;
+                const rightMaxX = rightMinX + layout.colWidth;
+                const hoverInRow = mouseY >= rowTop && mouseY <= rowBottom;
+                const hoverLeft = hoverInRow && mouseX >= leftMinX && mouseX <= leftMaxX;
+                const hoverRight = hoverInRow && mouseX >= rightMinX && mouseX <= rightMaxX;
+
+                if (i > 0) {
+                    stroke(76, 255, 0, 80);
+                    line(layout.x + 6, y, layout.x + layout.width - 6, y);
+                }
+
+                if (hoverLeft) {
+                    stroke(76, 255, 0, 220);
+                    strokeWeight(1);
+                    fill(76, 255, 0, 120);
+                    rect(leftMinX, rowTop + 2, layout.colWidth, layout.itemHeight - 4, 4);
+                }
+
+                if (hoverRight) {
+                    stroke(76, 255, 0, 220);
+                    strokeWeight(1);
+                    fill(76, 255, 0, 120);
+                    rect(rightMinX, rowTop + 2, layout.colWidth, layout.itemHeight - 4, 4);
+                }
+
+                if (layout.colGap > 0) {
+                    stroke(76, 255, 0, 90);
+                    line(layout.rightX - layout.colGap * 0.5, y + 3, layout.rightX - layout.colGap * 0.5, y + layout.itemHeight - 3);
+                }
+
+                noStroke();
+                fill(76, 255, 0);
+                textAlign(CENTER, CENTER);
+                text(`← ${row.label || ""} →`, layout.x + layout.width * 0.5, y + layout.itemHeight * 0.5);
+                textAlign(LEFT, CENTER);
+            }
+        } else {
+            for (let i = 0; i < layout.items.length; i++) {
+                const item = layout.items[i];
+                const y = layout.y + i * layout.itemHeight;
+                const rowTop = y;
+                const rowBottom = y + layout.itemHeight;
+                const hoverRow = mouseY >= rowTop && mouseY <= rowBottom && mouseX >= layout.x && mouseX <= (layout.x + layout.width);
+
+                if (i > 0) {
+                    stroke(76, 255, 0, 80);
+                    line(layout.x + 6, y, layout.x + layout.width - 6, y);
+                }
+
+                if (hoverRow) {
+                    stroke(76, 255, 0, 220);
+                    strokeWeight(1);
+                    fill(76, 255, 0, 120);
+                    rect(layout.x + 2, rowTop + 2, layout.width - 4, layout.itemHeight - 4, 4);
+                }
+
+                noStroke();
+                fill(hoverRow ? color(0, 0, 0) : color(76, 255, 0));
+                text(item.label, layout.x + 9, y + layout.itemHeight * 0.5);
+            }
+        }
+
         pop();
     }
 
@@ -1596,6 +1785,9 @@ const list = this._getDispatchedIntervalList(
 
         // 7) Rectangle de sélection (interaction globale)
         this.drawSelectionRectangle();
+
+        // 7b) Menu contextuel guitare
+        this.drawContextMenu();
 
         // 8) Debug overlay
         this.drawDebugOverlay();

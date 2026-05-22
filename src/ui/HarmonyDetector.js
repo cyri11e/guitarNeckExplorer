@@ -14,6 +14,8 @@ class HarmonyDetector {
             { key: "aug",     intervals: [0, 4, 8],     suffix: "aug",      label: "triad" },
             { key: "sus2",    intervals: [0, 2, 7],     suffix: "sus2",     label: "sus" },
             { key: "sus4",    intervals: [0, 5, 7],     suffix: "sus4",     label: "sus" },
+            { key: "7sus2",   intervals: [0, 2, 7, 10], suffix: "7sus2",    label: "7sus" },
+            { key: "7sus4",   intervals: [0, 5, 7, 10], suffix: "7sus4",    label: "7sus" },
             { key: "7",       intervals: [0, 4, 7, 10], suffix: "7",        label: "7" },
             { key: "maj7",    intervals: [0, 4, 7, 11], suffix: "maj7",     label: "maj7" },
             { key: "min7",    intervals: [0, 3, 7, 10], suffix: "m7",       label: "m7" },
@@ -101,18 +103,20 @@ class HarmonyDetector {
         return this.extractFromFrettedNotes(noteList, instrument).pcs;
     }
 
-    // Extracteur complet: retourne { pcs, bassPc }.
+    // Extracteur complet: retourne { pcs, bassPc, noteCount }.
     // bassPc = pitch class de la note au midi le plus grave.
     extractFromFrettedNotes(noteList, instrument) {
         const seenPc = new Set();
         const pcs = [];
         let bassMidi = Infinity;
         let bassPc = null;
+        let noteCount = 0;
 
         for (const n of (noteList || [])) {
             if (!n) continue;
             const raw = instrument?.getNoteAt?.(n.string - 1, n.fret);
             if (!raw) continue;
+            noteCount += 1;
 
             if (!seenPc.has(raw.index)) {
                 seenPc.add(raw.index);
@@ -126,7 +130,7 @@ class HarmonyDetector {
         }
 
         pcs.sort((a, b) => a - b);
-        return { pcs, bassPc };
+        return { pcs, bassPc, noteCount };
     }
 
     analyzeVoicing(noteList) {
@@ -154,8 +158,13 @@ class HarmonyDetector {
         };
     }
 
-    detectChord(pitchClasses, bassPc = null) {
+    detectChord(pitchClasses, bassPc = null, options = {}) {
         const pcs = this._toSortedUnique(pitchClasses);
+        const noteCount = Number.isFinite(options?.noteCount) ? options.noteCount : pcs.length;
+        const hasDoubledNote = noteCount > pcs.length;
+
+        // Sensibilite minimale: 3 notes jouees pour reconnaitre un accord.
+        if (noteCount < 3) return null;
         if (pcs.length < 2) return null;
 
         const hasBass = Number.isFinite(bassPc);
@@ -167,6 +176,10 @@ class HarmonyDetector {
             const rel = this._relativeIntervals(pcs, rootPc);
             for (const tpl of this.chordTemplates) {
                 if (!this._sameSet(rel, tpl.intervals)) continue;
+
+                // Un powerchord ne doit etre valide que si une note est doublee.
+                if (tpl.key === "5" && !hasDoubledNote) continue;
+
                 allMatches.push({ rootPc, tpl });
             }
         }
@@ -319,7 +332,7 @@ class HarmonyDetector {
         };
     }
 
-    analyzePitchClassSet(pitchClasses, tonicPc = null, bassPc = null) {
+    analyzePitchClassSet(pitchClasses, tonicPc = null, bassPc = null, options = {}) {
         const pcs = this._toSortedUnique(pitchClasses);
         if (pcs.length === 0) {
             return {
@@ -330,7 +343,7 @@ class HarmonyDetector {
             };
         }
 
-        const chord = this.detectChord(pcs, bassPc);
+        const chord = this.detectChord(pcs, bassPc, options);
         const scale = this.detectScale(pcs, tonicPc);
 
         let label = "unknown";

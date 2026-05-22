@@ -276,6 +276,88 @@ dispatchBox(intervals, hovered, way, octaveShown, minDf, maxDf) {
     dispatchDiagonal(intervals, hovered, way, octaveShown) {
         const T = this.g.app.instrument;
 
+        const normalized = (intervals || [])
+            .map(i => ((Number(i) % 12) + 12) % 12)
+            .sort((a, b) => a - b);
+        const key = normalized.join(",");
+        const isPentatonic = key === "0,2,4,7,9" || key === "0,3,5,7,10";
+
+        // Penta diagonale 3+2:
+        // - saut de ton (2) => meme corde
+        // - saut de m3 (3) => changement de corde
+        if (isPentatonic) {
+            const base = T.getNoteAt(hovered.string - 1, hovered.fret);
+            if (!base) return [];
+
+            const results = [{
+                string: hovered.string,
+                fret: hovered.fret,
+                note: base
+            }];
+
+            let currentString = hovered.string;
+            let prevMidi = base.midi;
+            let prevFret = hovered.fret;
+            const stringStep = way === "up" ? 1 : -1;
+
+            const ascJumps = [];
+            for (let i = 1; i < normalized.length; i++) {
+                ascJumps.push(normalized[i] - normalized[i - 1]);
+            }
+            ascJumps.push(12 - normalized[normalized.length - 1]);
+
+            const jumps = way === "up" ? ascJumps : [...ascJumps].reverse();
+            let jumpIndex = 0;
+            const maxSteps = Math.max(12, T.tuning.length * 12);
+
+            for (let stepCount = 0; stepCount < maxSteps; stepCount++) {
+                const jump = jumps[jumpIndex % jumps.length];
+                jumpIndex++;
+
+                // Regle penta 3+2: m3 => changement de corde; ton => meme corde.
+                if (jump >= 3) {
+                    currentString += stringStep;
+                }
+
+                if (currentString < 1 || currentString > T.tuning.length) break;
+
+                const targetMidi = prevMidi + (way === "up" ? jump : -jump);
+                const mids = T.findOctavedMidi(targetMidi, 0) || [];
+
+                const directionFiltered = mids
+                    .filter(m => way === "up" ? m > prevMidi : m < prevMidi)
+                    .sort((a, b) => way === "up" ? a - b : b - a);
+
+                const searchPool = directionFiltered.length > 0
+                    ? directionFiltered
+                    : mids.slice().sort((a, b) => Math.abs(a - targetMidi) - Math.abs(b - targetMidi));
+
+                let bestPos = null;
+                let bestScore = Infinity;
+
+                for (const midi of searchPool) {
+                    const pos = T.findNoteOnStringByMidi(currentString - 1, midi);
+                    if (!pos) continue;
+
+                    const pitchDist = Math.abs((pos.note?.midi ?? midi) - targetMidi);
+                    const fretDist = Math.abs(pos.fret - prevFret);
+                    const score = (pitchDist * 100) + fretDist;
+                    if (score < bestScore) {
+                        bestPos = pos;
+                        bestScore = score;
+                    }
+                }
+
+                if (!bestPos) continue;
+
+                results.push(bestPos);
+                prevMidi = bestPos.note?.midi ?? targetMidi;
+                prevFret = bestPos.fret;
+            }
+
+            return results;
+        }
+
         let results = [];
         let currentRoot = hovered;
 
@@ -365,47 +447,84 @@ dispatch3NPS(intervals, hovered, way, octaveShown = 1) {
 
     const startMidi = base.midi;
 
-    // octaveShown = bande d’octave, toujours positif ici
-    const octave =
-        octaveShown === "T"
-            ? 0
-            : octaveShown;
+    // 3NPS piloté par pitch-classes de la gamme pour garder le mode intact
+    // et couvrir toutes les cordes dans le sens demandé.
+    const rootPc = base.index;
+    const scalePcs = new Set(
+        intervals.map(i => ((rootPc + i) % 12 + 12) % 12)
+    );
 
-    const step = way === "up" ? +1 : -1;
+    if (way === "up") {
+        let currentString = hovered.string;
+        let cursorMidi = startMidi;
+        let firstGroup = true;
 
-    // séquence neutre, toujours POSITIVE (0, 4, 7, 12, 16, 19, etc.)
-    const seq = [];
-    for (let o = 0; o < octaveShown; o++) {
-        for (let interval of intervals) {
-            seq.push(interval + 12 * o);
+        while (currentString >= 1 && currentString <= T.tuning.length) {
+            const candidates = [];
+
+            for (let fret = 0; fret <= T.fretCount; fret++) {
+                const raw = T.getNoteAt(currentString - 1, fret);
+                if (!raw) continue;
+                if (!scalePcs.has(raw.index)) continue;
+
+                const isAboveCursor = firstGroup ? (raw.midi >= cursorMidi) : (raw.midi > cursorMidi);
+                if (!isAboveCursor) continue;
+
+                candidates.push({
+                    string: currentString,
+                    fret,
+                    note: raw
+                });
+            }
+
+            candidates.sort((a, b) => a.note.midi - b.note.midi);
+            const group = candidates.slice(0, 3);
+            if (group.length < 3) break;
+
+            results.push(...group);
+            cursorMidi = group[group.length - 1].note.midi;
+            firstGroup = false;
+
+            // Ascendant: après 3 notes, on passe à la corde plus aiguë.
+            currentString += 1;
         }
+
+        return results;
     }
 
+    // Branche gauche: 3 notes descendantes par corde, puis corde plus grave.
     let currentString = hovered.string;
-    let notesOnString = 0;
+    let cursorMidi = startMidi;
+    let firstGroup = true;
 
-    for (let interval of seq) {
+    while (currentString >= 1 && currentString <= T.tuning.length) {
+        const candidates = [];
 
-        if (currentString < 1 || currentString > T.tuning.length)
-            break;
+        for (let fret = 0; fret <= T.fretCount; fret++) {
+            const raw = T.getNoteAt(currentString - 1, fret);
+            if (!raw) continue;
+            if (!scalePcs.has(raw.index)) continue;
 
-        //  ICI on met le SENS
-        const signedInterval = (way === "up" ? interval : -interval);
+            const isBelowCursor = firstGroup ? (raw.midi <= cursorMidi) : (raw.midi < cursorMidi);
+            if (!isBelowCursor) continue;
 
-        const midiNeutral = T.intervalToMidi(startMidi, signedInterval);
-        const octaved = T.findOctavedMidi(midiNeutral, octave);
-        const finalMidi = octaved[0];
-
-        const pos = T.findNoteOnStringByMidi(currentString - 1, finalMidi);
-        if (!pos) continue;
-
-        results.push(pos);
-        notesOnString++;
-
-        if (notesOnString === 3) {
-            currentString += step;
-            notesOnString = 0;
+            candidates.push({
+                string: currentString,
+                fret,
+                note: raw
+            });
         }
+
+        candidates.sort((a, b) => b.note.midi - a.note.midi);
+        const group = candidates.slice(0, 3);
+        if (group.length < 3) break;
+
+        results.push(...group);
+        cursorMidi = group[group.length - 1].note.midi;
+        firstGroup = false;
+
+        // Corde plus grave après 3 notes.
+        currentString -= 1;
     }
 
     return results;

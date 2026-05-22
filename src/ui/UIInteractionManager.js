@@ -11,7 +11,7 @@ class UIInteractionManager {
         // ============================================================
         this.guitar = null;       // détectée automatiquement
         this.brushActive = false; // clic gauche = pinceau
-        this.eraseActive = false; // clic droit = gomme
+        this.eraseActive = false;
         this.dragActive = false;  // CTRL = drag du manche
 
         this.lastX = 0;
@@ -172,6 +172,16 @@ _buildEvent(mx, my) {
     }
 
     _handleGlobalMousePressed(evt) {
+        if (this.guitar?.contextMenu?.visible) {
+            if (this.guitar._contextMenuContains?.(evt.x, evt.y)) {
+                this.guitar._lastEvt = evt;
+                this.guitar._handleContextMenuClick?.(evt);
+            } else {
+                this.guitar._closeContextMenu?.();
+            }
+            return true;
+        }
+
         if (!this.guitar) {
             console.log("_handleGlobalMousePressed: NO GUITAR");
             return false;
@@ -191,6 +201,10 @@ _buildEvent(mx, my) {
         if (this.guitar?.markerMode) {
             this._resetGlobalGuitarInteractionState();
             console.log("_handleGlobalMousePressed: marker mode -> passthrough");
+            return false;
+        }
+
+        if (this.guitar?.contextMenu?.visible) {
             return false;
         }
 
@@ -225,17 +239,7 @@ _buildEvent(mx, my) {
 
         // Clic droit = gomme
         if (evt.button === RIGHT) {
-            this.eraseActive = true;
-            this.brushActive = false;
-            this.dragActive = false;
-            const hit = this.guitar.fromScreen(evt.x, evt.y);
-            if (hit) {
-                this.guitar._removeWithPopOut(this.guitar.pinnedNotes, hit.fret, hit.string, "pinned");
-                this.guitar._removeWithPopOut(this.guitar.selectedNotes, hit.fret, hit.string, "selected");
-                this.guitar.invalidate();
-            }
-            this.app?.bringRootToFront?.(this.guitar);
-            return true;
+            return false;
         }
 
         return false;
@@ -329,16 +333,20 @@ _buildEvent(mx, my) {
 
                         if (selectedIdx >= 0) {
                             // Retire de selected -> remet en pinned
+                            const movedNote = this.guitar.selectedNotes[selectedIdx];
                             this.guitar.selectedNotes.splice(selectedIdx, 1);
 
                             const pinnedExists = this.guitar.pinnedNotes.some(
                                 p => p.fret === n.fret && p.string === n.string
                             );
                             if (!pinnedExists) {
-                                this.guitar.pinnedNotes.push({ fret: n.fret, string: n.string });
+                                this.guitar.pinnedNotes.push(this.guitar._createStoredNote(movedNote || n));
                             }
                         } else {
                             // Ajoute à selected -> retire de pinned
+                            const movedNote = this.guitar.pinnedNotes.find(
+                                p => p.fret === n.fret && p.string === n.string
+                            );
                             this.guitar.pinnedNotes = this.guitar.pinnedNotes.filter(
                                 p => !(p.fret === n.fret && p.string === n.string)
                             );
@@ -347,7 +355,7 @@ _buildEvent(mx, my) {
                                 s => s.fret === n.fret && s.string === n.string
                             );
                             if (!selectedExists) {
-                                this.guitar.selectedNotes.push({ fret: n.fret, string: n.string });
+                                this.guitar.selectedNotes.push(this.guitar._createStoredNote(movedNote || n));
                             }
                         }
                     }
@@ -370,12 +378,12 @@ _buildEvent(mx, my) {
                         if (rectKeys.has(key)) {
                             if (!seenSelected.has(key)) {
                                 seenSelected.add(key);
-                                nextSelected.push({ fret: n.fret, string: n.string });
+                                nextSelected.push(this.guitar._createStoredNote(n));
                             }
                         } else {
                             if (!seenPinned.has(key)) {
                                 seenPinned.add(key);
-                                nextPinned.push({ fret: n.fret, string: n.string });
+                                nextPinned.push(this.guitar._createStoredNote(n));
                             }
                         }
                     }
@@ -387,6 +395,9 @@ _buildEvent(mx, my) {
                 this.guitar.invalidate();
             } else {
                 const releaseHit = this.guitar.fromScreen(evt.x, evt.y);
+                const releaseStoredNote = releaseHit
+                    ? this.guitar._getStoredNoteAt(releaseHit.fret, releaseHit.string)
+                    : null;
                 const sameNote = !!(
                     this.leftDownHit &&
                     releaseHit &&
@@ -406,21 +417,25 @@ _buildEvent(mx, my) {
 
                     if (selectedIdx >= 0) {
                         // selected -> pinned
+                        const movedNote = this.guitar.selectedNotes[selectedIdx];
                         this.guitar.selectedNotes.splice(selectedIdx, 1);
 
                         const pinnedExists = this.guitar.pinnedNotes.some(
                             n => n.fret === keyFret && n.string === keyString
                         );
                         if (!pinnedExists) {
-                            this.guitar.pinnedNotes.push({ fret: keyFret, string: keyString });
+                            this.guitar.pinnedNotes.push(this.guitar._createStoredNote(movedNote || releaseHit));
                         }
                     } else {
                         // pinned -> selected
+                        const movedNote = this.guitar.pinnedNotes.find(
+                            n => n.fret === keyFret && n.string === keyString
+                        );
                         this.guitar.pinnedNotes = this.guitar.pinnedNotes.filter(
                             n => !(n.fret === keyFret && n.string === keyString)
                         );
 
-                        this.guitar.selectedNotes.push({ fret: keyFret, string: keyString });
+                        this.guitar.selectedNotes.push(this.guitar._createStoredNote(movedNote || { fret: keyFret, string: keyString }));
                     }
 
                     this.guitar.invalidate();
@@ -434,7 +449,7 @@ _buildEvent(mx, my) {
                             n => n.fret === note.fret && n.string === note.string
                         );
                         if (!exists) {
-                            this.guitar.pinnedNotes.push({ fret: note.fret, string: note.string });
+                            this.guitar.pinnedNotes.push(this.guitar._createStoredNote(note));
                         }
                     }
                     this.guitar.selectedNotes = [];
@@ -449,7 +464,7 @@ _buildEvent(mx, my) {
                         if (idx >= 0) {
                             this.guitar._removeWithPopOut(this.guitar.pinnedNotes, releaseHit.fret, releaseHit.string, "pinned");
                         } else {
-                            this.guitar.pinnedNotes.push({ fret: releaseHit.fret, string: releaseHit.string });
+                            this.guitar.pinnedNotes.push(this.guitar._createStoredNote({ fret: releaseHit.fret, string: releaseHit.string }));
                         }
                         this.guitar.invalidate();
                     }
@@ -663,8 +678,9 @@ _buildEvent(mx, my) {
             const inRect = (pos.x >= rect.x1 && pos.x <= rect.x2 && pos.y >= rect.y1 && pos.y <= rect.y2);
             
             if (inRect) {
+                if (note.displayMode === "none") continue;
                 console.log(`  ✓ Selected note: fret=${note.fret}, string=${note.string}, pos={x:${pos.x}, y:${pos.y}}`);
-                notes.push({ fret: note.fret, string: note.string });
+                notes.push(this.guitar._createStoredNote(note));
             } else {
                 console.log(`  - Outside rect: fret=${note.fret}, string=${note.string}, pos={x:${pos.x}, y:${pos.y}}`);
             }

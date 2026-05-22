@@ -497,7 +497,8 @@ guitar.invalidate();
 
     // Si la root vient de la guitare
     if (source === guitar) {
-        cof.rootIndex = evt.index;
+        const segIndex = Array.isArray(cof.chroma) ? cof.chroma.indexOf(evt.index) : -1;
+        cof.rootIndex = segIndex >= 0 ? segIndex : null;
         cof.invalidate();
     }
 },
@@ -1209,10 +1210,10 @@ guitar.invalidate();
     // -----------------------------------------
     const snap = {
         title,
-        pinnedNotes: [...guitar.pinnedNotes],
-        selectedNotes: [...guitar.selectedNotes],
+        pinnedNotes: deepClone(guitar.pinnedNotes),
+        selectedNotes: deepClone(guitar.selectedNotes),
         root: hasRoot ? guitar.theory.root : null,
-        markerSegments: [...guitar.markerSegments]
+        markerSegments: deepClone(guitar.markerSegments)
     };
 
     guitar.snapshots.push(snap);
