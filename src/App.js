@@ -83,6 +83,10 @@ class App {
                     comp = new TRRecPads(cfg); 
                     break;
 
+                case "trRecTab":
+                    comp = new TRRecTablature(cfg);
+                    break;
+
                 default:
                     console.warn("Type inconnu:", cfg.type, "pour", key);
                     continue;

@@ -40,8 +40,8 @@ class SnapshotButton extends UIComponent {
     // -----------------------------
     // INTERACTION
     // -----------------------------
-    onShortcut() {
-        this.trigger();
+    onShortcut(evt = null) {
+        this.trigger(evt);
     }
 
     onClick() {
@@ -49,7 +49,9 @@ class SnapshotButton extends UIComponent {
         return true;
     }
 
-trigger() {
+trigger(triggerMeta = null) {
+    this.lastTriggerMeta = triggerMeta;
+
     if (this.stateCount <= 2) {
         this.state = this.state ? 0 : 1;
         this.invalidateNow?.();

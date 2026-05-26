@@ -635,17 +635,24 @@ _buildEvent(mx, my) {
 
     handleShortcut(k, code) {
         const lower = k.toLowerCase();
+        const shortcutEvt = {
+            key: k,
+            code,
+            ctrlKey: keyIsDown(CONTROL),
+            shiftKey: keyIsDown(SHIFT),
+            altKey: keyIsDown(ALT)
+        };
 
         for (let i = this.components.length - 1; i >= 0; i--) {
             const c = this.components[i];
 
             if (c.shortcutKey && lower === c.shortcutKey.toLowerCase()) {
-                c.onShortcut?.();
+                c.onShortcut?.(shortcutEvt);
                 return true;
             }
 
             if (c.shortcutCode && code === c.shortcutCode) {
-                c.onShortcut?.();
+                c.onShortcut?.(shortcutEvt);
                 return true;
             }
         }

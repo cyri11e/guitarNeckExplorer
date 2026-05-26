@@ -534,6 +534,26 @@ trRecPads: {
     shortcutKey: "T"
 },
 
+trRecTabPanel: {
+    type: "panel",
+    xp: 30,
+    yp: 30,
+    sp: 22,
+    aspectRatio: 3.4,
+    children: ["trRecTab"]
+},
+
+trRecTab: {
+    type: "trRecTab",
+    xp: 0,
+    yp: 0,
+    sp: 100,
+    aspectRatio: 3.4,
+    stepsPerBar: 4,
+    visibleBars: 5,
+    description: "Tablature sequenceur"
+},
+
 
     // // Exemple futur : un knob
     // Knob_freq: {

@@ -2076,22 +2076,26 @@ keyPressed(k, kc) {
     }
 
     // --- ARROWS ---
-    // Les flèches ne bougent QUE les selectedNotes (la sélection courante)
+    // Priorité aux selectedNotes; sinon on déplace les pinnedNotes.
     switch (kc) {
         case LEFT_ARROW:
-            this.moveSelectedFrets(-1);
+            if (this.selectedNotes.length > 0) this.moveSelectedFrets(-1);
+            else if (this.pinnedNotes.length > 0) this.movePinnedFrets(-1);
             return true;
 
         case RIGHT_ARROW:
-            this.moveSelectedFrets(+1);
+            if (this.selectedNotes.length > 0) this.moveSelectedFrets(+1);
+            else if (this.pinnedNotes.length > 0) this.movePinnedFrets(+1);
             return true;
 
         case UP_ARROW:
-            this.moveSelectedStrings(+1);
+            if (this.selectedNotes.length > 0) this.moveSelectedStrings(+1);
+            else if (this.pinnedNotes.length > 0) this.movePinnedStrings(+1);
             return true;
 
         case DOWN_ARROW:
-            this.moveSelectedStrings(-1);
+            if (this.selectedNotes.length > 0) this.moveSelectedStrings(-1);
+            else if (this.pinnedNotes.length > 0) this.movePinnedStrings(-1);
             return true;
     }
 

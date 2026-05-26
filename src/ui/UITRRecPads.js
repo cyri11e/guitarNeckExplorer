@@ -30,6 +30,7 @@ class TRRecPads extends UIComponent {
 
         // playhead externe
         this.playIndex = 0;
+        this.selectedGroupStart = 0;
 
         // drag & drop pads
         this.dragSourceIndex = null;
@@ -45,7 +46,8 @@ class TRRecPads extends UIComponent {
             highlight: false,
             flash: 0,
             item: null,
-            itemIndex: null
+            itemIndex: null,
+            tabFrets: null
         };
     }
 
@@ -62,7 +64,10 @@ class TRRecPads extends UIComponent {
             ...this.createEmptyStep(),
             etat: this._normalizeEtat(step?.etat),
             item: step?.item ?? null,
-            itemIndex: step?.itemIndex ?? null
+            itemIndex: step?.itemIndex ?? null,
+            tabFrets: (step?.tabFrets && typeof step.tabFrets === "object")
+                ? JSON.parse(JSON.stringify(step.tabFrets))
+                : null
         };
     }
 
@@ -139,6 +144,35 @@ class TRRecPads extends UIComponent {
         this.measureIndex = clamped;
         this.states = this.measures[this.measureIndex];
         this.playIndex = 0;
+        this.selectedGroupStart = 0;
+        this.invalidate();
+    }
+
+    selectSubMeasure(groupIndex, options = {}) {
+        const syncPlayhead = options.syncPlayhead !== false;
+        const groupsPerMeasure = Math.max(1, Math.floor(this.padCount / 4));
+        const safeGroup = constrain(groupIndex, 0, groupsPerMeasure - 1);
+        const start = safeGroup * 4;
+
+        this.selectedGroupStart = start;
+
+        if (syncPlayhead) {
+            this.playIndex = start;
+        }
+
+        if (Array.isArray(this.states)) {
+            for (const step of this.states) {
+                if (step) step.highlight = false;
+            }
+        }
+
+        this.onChange?.({
+            type: "submeasure-select",
+            measureIndex: this.measureIndex,
+            groupIndex: safeGroup,
+            startIndex: start
+        });
+
         this.invalidate();
     }
 
@@ -239,7 +273,8 @@ this.onChange?.({
     type: "padChange",
     padIndex: idx,
     stepState: pad ? pad.etat : 0,
-    snapshotIndex: pad ? pad.itemIndex : null
+    snapshotIndex: pad ? pad.itemIndex : null,
+    tabFrets: pad?.tabFrets ?? null
 });
 
 
@@ -271,7 +306,10 @@ this.onChange?.({
             highlight: false,
             flash: 0,
             item: arr[i]?.item ?? null,
-            itemIndex: arr[i]?.itemIndex ?? null
+            itemIndex: arr[i]?.itemIndex ?? null,
+            tabFrets: (arr[i]?.tabFrets && typeof arr[i].tabFrets === "object")
+                ? JSON.parse(JSON.stringify(arr[i].tabFrets))
+                : null
         }));
 
         if (!this.measures || this.measures.length === 0) {
@@ -569,6 +607,21 @@ this.onChange?.({
         const sw = max(1, min(padW, padH) * 0.12);
         const isDraggingPads = this.dragSourceIndex != null && this.dragDidMove;
         const isCopyDrag = isDraggingPads && keyIsDown(CONTROL);
+        const selectedGroup = Math.floor((this.selectedGroupStart ?? 0) / 4);
+
+        if (selectedGroup >= 0 && selectedGroup < this.gridRows) {
+            const selectedY = gridY + selectedGroup * cellH;
+            noFill();
+            stroke(255, 220, 120, 210);
+            strokeWeight(max(1, this.h * 0.01));
+            rect(
+                gridX + cellW * 0.04,
+                selectedY + cellH * 0.08,
+                gridW - cellW * 0.08,
+                cellH * 0.84,
+                this.h * 0.03
+            );
+        }
 
         for (let i = 0; i < this.padCount; i++) {
 

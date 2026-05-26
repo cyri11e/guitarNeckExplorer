@@ -4,6 +4,10 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Alt") {
         e.preventDefault();
     }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+    }
 }, { passive: false });
 
 window.addEventListener("contextmenu", (e) => {

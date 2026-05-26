@@ -20,6 +20,45 @@ function normalizeStepEtat(value) {
     return 0;
 }
 
+function sanitizeTabFrets(tabFrets) {
+    if (!tabFrets || typeof tabFrets !== "object") return null;
+
+    const out = {};
+    for (const [k, v] of Object.entries(tabFrets)) {
+        const stringNumber = Number(k);
+        const fret = Number(v);
+        if (!Number.isFinite(stringNumber) || !Number.isFinite(fret)) continue;
+        if (stringNumber < 1 || stringNumber > 6) continue;
+        if (fret < 0) continue;
+        out[String(stringNumber)] = Math.round(fret);
+    }
+
+    return Object.keys(out).length > 0 ? out : null;
+}
+
+function buildSnapshotFromTabFrets(tabFrets) {
+    const safeTabFrets = sanitizeTabFrets(tabFrets);
+    const selectedNotes = [];
+
+    if (safeTabFrets) {
+        for (const [stringKey, fretValue] of Object.entries(safeTabFrets)) {
+            selectedNotes.push({
+                string: Number(stringKey),
+                fret: Number(fretValue),
+                displayMode: "note"
+            });
+        }
+    }
+
+    return {
+        title: "__tab__",
+        pinnedNotes: [],
+        selectedNotes,
+        root: null,
+        markerSegments: []
+    };
+}
+
 function sanitizeSnapshot(snap) {
     const src = snap || {};
     return {
@@ -29,6 +68,66 @@ function sanitizeSnapshot(snap) {
         root: src.root ?? null,
         markerSegments: Array.isArray(src.markerSegments) ? deepClone(src.markerSegments) : []
     };
+}
+
+function queueSnapshotInNextFreeTRRecSlot(trRec, snapshotIndex, snapshotTitle) {
+    if (!trRec || !Number.isInteger(snapshotIndex)) return false;
+
+    if (!Array.isArray(trRec.measures) || trRec.measures.length === 0) {
+        trRec.measures = [trRec.createEmptyMeasure()];
+        trRec.measureIndex = 0;
+        trRec.states = trRec.measures[0];
+    }
+
+    const padCount = Number.isFinite(trRec.padCount) ? trRec.padCount : 16;
+    const startMeasure = Number.isFinite(trRec.measureIndex) ? trRec.measureIndex : 0;
+    const selectedStart = Number.isFinite(trRec.selectedGroupStart) ? trRec.selectedGroupStart : 0;
+    const playStart = Number.isFinite(trRec.playIndex) ? trRec.playIndex : 0;
+    const startIndex = Math.max(0, Math.min(padCount - 1, Math.max(selectedStart, playStart)));
+
+    let targetMeasure = -1;
+    let targetStep = -1;
+
+    for (let measureIndex = startMeasure; measureIndex < trRec.measures.length; measureIndex++) {
+        const measure = trRec.measures[measureIndex];
+        if (!Array.isArray(measure)) continue;
+
+        const stepStart = (measureIndex === startMeasure) ? startIndex : 0;
+        for (let stepIndex = stepStart; stepIndex < padCount; stepIndex++) {
+            const step = measure[stepIndex];
+            if (!step || normalizeStepEtat(step.etat) === 0) {
+                targetMeasure = measureIndex;
+                targetStep = stepIndex;
+                break;
+            }
+        }
+
+        if (targetMeasure >= 0) break;
+    }
+
+    if (targetMeasure < 0) {
+        trRec.measures.push(trRec.createEmptyMeasure());
+        targetMeasure = trRec.measures.length - 1;
+        targetStep = 0;
+    }
+
+    const measure = trRec.measures[targetMeasure];
+    const step = typeof trRec.createEmptyStep === "function"
+        ? trRec.createEmptyStep()
+        : { etat: 0, highlight: false, flash: 0, item: null, itemIndex: null, tabFrets: null };
+
+    step.etat = 1;
+    step.item = snapshotTitle;
+    step.itemIndex = snapshotIndex;
+    step.tabFrets = null;
+    measure[targetStep] = step;
+
+    if (targetMeasure === trRec.measureIndex) {
+        trRec.states = measure;
+    }
+
+    trRec.invalidate?.();
+    return true;
 }
 
 function createTRRecExportPayload(components) {
@@ -53,6 +152,11 @@ function createTRRecExportPayload(components) {
             }
 
             const out = { etat, itemIndex };
+
+            const tabFrets = sanitizeTabFrets(step?.tabFrets);
+            if (tabFrets) {
+                out.tabFrets = tabFrets;
+            }
 
             if (itemIndex == null && step?.item != null) {
                 out.item = String(step.item);
@@ -193,6 +297,7 @@ function applyTRRecImportPayload(components, payload) {
             step.item = (newItemIndex != null)
                 ? lcd2.items[newItemIndex]
                 : (raw.item ?? null);
+            step.tabFrets = sanitizeTabFrets(raw.tabFrets);
 
             return step;
         });
@@ -1229,6 +1334,14 @@ guitar.invalidate();
         lcd2.invalidate();
     }
 
+    const triggerMeta = source.lastTriggerMeta || null;
+    if (triggerMeta?.ctrlKey) {
+        const trRec = components.find(c => c.name === "trRecPads");
+        queueSnapshotInNextFreeTRRecSlot(trRec, guitar.snapshots.length - 1, snap.title);
+    }
+
+    source.lastTriggerMeta = null;
+
     console.log("Snapshot ajouté :", snap.title);
 },
 
@@ -1717,6 +1830,17 @@ guitar.invalidate();
             popInDuration: 0,
             includeMarkers: true,
             replayExisting: false,
+            animProfile: "sequence"
+        });
+        return;
+    }
+
+    const tabFrets = sanitizeTabFrets(evt.tabFrets);
+    if (tabFrets) {
+        guitar.applySnapshotAnimated(buildSnapshotFromTabFrets(tabFrets), {
+            popInDuration: 170,
+            includeMarkers: true,
+            replayExisting: true,
             animProfile: "sequence"
         });
         return;
