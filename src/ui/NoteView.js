@@ -127,6 +127,36 @@ class NoteRenderer {
         }
     }
 
+    drawCursorOrbit(x, y, R, OFFSET, shapeType) {
+        if (shapeType !== "circle") return;
+
+        const cx = x - OFFSET;
+        const cy = y - OFFSET;
+        const orbitR = R * 0.53;
+        const t = millis() * 0.0045;
+
+        // Arcs jaunes rotatifs
+        noFill();
+        stroke(255, 214, 20, 230);
+        strokeWeight(max(1, R * 0.07));
+        arc(cx, cy, orbitR * 2, orbitR * 2, t, t + PI * 0.32);
+        arc(cx, cy, orbitR * 2, orbitR * 2, t + PI * 0.98, t + PI * 1.30);
+
+        // Pointilles dynamiques autour de la couronne
+        noStroke();
+        const dotCount = 8;
+        for (let i = 0; i < dotCount; i++) {
+            const a = t + (TWO_PI * i / dotCount);
+            const px = cx + cos(a) * orbitR;
+            const py = cy + sin(a) * orbitR;
+            const pulse = 0.55 + 0.45 * sin(t * 2.1 + i * 0.85);
+            const dotAlpha = 120 + 120 * pulse;
+            const dotR = R * (0.03 + 0.03 * pulse);
+            fill(255, 214, 20, dotAlpha);
+            circle(px, py, dotR * 2);
+        }
+    }
+
     // ------------------------------------------------------------
     // 4. LABEL (texte + altérations)
     // ------------------------------------------------------------
@@ -263,6 +293,7 @@ class NoteRenderer {
             hasShadow = false,
             label = null,
             cursor = null,
+            cursorOrbit = false,
             ghost = false, 
             overlayAlpha = null,
             zoomFactor = 1,
@@ -437,6 +468,11 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
 
         // 4. Contour interne
         this.drawInner(x, y, shapeType, R, OFFSET, blanc);
+
+        // 4b. Animation orbitale du curseur
+        if (cursorOrbit) {
+            this.drawCursorOrbit(x, y, R, OFFSET, shapeType);
+        }
 
         // 5. Label
         this.drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset, yOffset);

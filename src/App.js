@@ -163,6 +163,8 @@ for (const comp of this.components) {
         this.lastFPS = 0;
         this._lastTime = millis();
         this._frameCounter = 0;
+        this._isDisplaying = false;
+        this._invalidatedWhileDisplaying = false;
     }
 
     _assignAutomaticZIndex() {
@@ -250,6 +252,9 @@ for (const comp of this.components) {
     }
 
     display() {
+        this._isDisplaying = true;
+        this._invalidatedWhileDisplaying = false;
+
         // FPS
         this._frameCounter++;
         const now = millis();
@@ -268,7 +273,8 @@ for (const comp of this.components) {
 
         if (this.debug) this.drawDebugHUD();
 
-        this.needsRedraw = false;
+        this._isDisplaying = false;
+        this.needsRedraw = this._invalidatedWhileDisplaying;
     }
 
     drawDebugHUD() {
@@ -307,6 +313,11 @@ for (const comp of this.components) {
 
 
 invalidate() {
+    if (this._isDisplaying) {
+        this._invalidatedWhileDisplaying = true;
+        return;
+    }
+
     this.needsRedraw = true;
 }
 

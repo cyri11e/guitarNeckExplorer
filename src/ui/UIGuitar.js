@@ -335,6 +335,23 @@ setInlayStyle(type) {
         return nextMode;
     }
 
+    _setSelectedNotesDisplayMode(mode) {
+        const nextMode = this._normalizeDisplayMode(mode);
+        if (!Array.isArray(this.selectedNotes) || this.selectedNotes.length === 0) {
+            return false;
+        }
+
+        for (const note of this.selectedNotes) {
+            if (!note) continue;
+            note.displayMode = nextMode;
+        }
+
+        this.setDisplayMode(nextMode);
+        this._syncDisplayModeKnob(nextMode);
+        this.invalidate();
+        return true;
+    }
+
     _getContextMenuItems(stage = this.contextMenu?.stage) {
         if (stage === "quality") {
             return [
@@ -1921,7 +1938,15 @@ fromScreen(x, y) {
         if (evt.button === RIGHT) {
             const note = this._getStoredNoteAt(fret, string);
             if (note) {
-                this._cycleStoredNoteDisplayMode(fret, string);
+                // Clic droit sur une note d'une selection multiple: applique le cycle a toute la selection.
+                if (this.isSelected(fret, string) && this.selectedNotes.length > 1) {
+                    const modes = ["note", "degree", "none"];
+                    const currentIndex = Math.max(0, modes.indexOf(this._normalizeDisplayMode(note.displayMode)));
+                    const nextMode = modes[(currentIndex + 1) % modes.length];
+                    this._setSelectedNotesDisplayMode(nextMode);
+                } else {
+                    this._cycleStoredNoteDisplayMode(fret, string);
+                }
             } else {
                 this._openContextMenuForHit(hit, evt);
             }
@@ -2032,12 +2057,14 @@ keyPressed(k, kc) {
         return true;
     }
 
-    const usePinned = keyIsDown(SHIFT);
+    // Priorité absolue: si des notes sont sélectionnées, Backspace/Delete agissent uniquement sur elles.
+    const hasSelectedNotes = this.selectedNotes.length > 0;
+    const targetSelected = hasSelectedNotes || keyIsDown(SHIFT);
 
     // --- BACKSPACE / DELETE (pinned / selected) ---
     if (kc === BACKSPACE) {
 
-        if (usePinned) {
+        if (targetSelected) {
             // efface la dernière selected
             if (this.selectedNotes.length > 0) {
                 const n = this.selectedNotes[this.selectedNotes.length - 1];
@@ -2058,7 +2085,7 @@ keyPressed(k, kc) {
 
     if (kc === DELETE) {
 
-        if (usePinned) {
+        if (targetSelected) {
             // efface toutes les selected
             if (this.selectedNotes.length > 0) {
                 this._clearWithPopOut(this.selectedNotes, "selected");

@@ -416,26 +416,35 @@ _buildEvent(mx, my) {
                     );
 
                     if (selectedIdx >= 0) {
-                        // selected -> pinned
+                        // selected -> pinned (animé)
                         const movedNote = this.guitar.selectedNotes[selectedIdx];
-                        this.guitar.selectedNotes.splice(selectedIdx, 1);
+                        this.guitar._removeWithPopOut(this.guitar.selectedNotes, keyFret, keyString, "selected");
 
                         const pinnedExists = this.guitar.pinnedNotes.some(
                             n => n.fret === keyFret && n.string === keyString
                         );
                         if (!pinnedExists) {
-                            this.guitar.pinnedNotes.push(this.guitar._createStoredNote(movedNote || releaseHit));
+                            this.guitar._addAnimatedNote(
+                                this.guitar.pinnedNotes,
+                                keyFret,
+                                keyString,
+                                "pin",
+                                movedNote || releaseHit
+                            );
                         }
                     } else {
-                        // pinned -> selected
+                        // pinned -> selected (animé)
                         const movedNote = this.guitar.pinnedNotes.find(
                             n => n.fret === keyFret && n.string === keyString
                         );
-                        this.guitar.pinnedNotes = this.guitar.pinnedNotes.filter(
-                            n => !(n.fret === keyFret && n.string === keyString)
+                        this.guitar._removeWithPopOut(this.guitar.pinnedNotes, keyFret, keyString, "pinned");
+                        this.guitar._addAnimatedNote(
+                            this.guitar.selectedNotes,
+                            keyFret,
+                            keyString,
+                            "select",
+                            movedNote || { fret: keyFret, string: keyString }
                         );
-
-                        this.guitar.selectedNotes.push(this.guitar._createStoredNote(movedNote || { fret: keyFret, string: keyString }));
                     }
 
                     this.guitar.invalidate();
@@ -458,14 +467,8 @@ _buildEvent(mx, my) {
                 } else {
                     // Sinon: clic simple toggle pinnedNotes
                     if (sameNote && releaseHit) {
-                        const idx = this.guitar.pinnedNotes.findIndex(
-                            n => n.fret === releaseHit.fret && n.string === releaseHit.string
-                        );
-                        if (idx >= 0) {
-                            this.guitar._removeWithPopOut(this.guitar.pinnedNotes, releaseHit.fret, releaseHit.string, "pinned");
-                        } else {
-                            this.guitar.pinnedNotes.push(this.guitar._createStoredNote({ fret: releaseHit.fret, string: releaseHit.string }));
-                        }
+                        // Utiliser le toggle natif de la guitare pour conserver les animations de pin/popOut.
+                        this.guitar.togglePinnedNote(releaseHit.fret, releaseHit.string);
                         this.guitar.invalidate();
                     }
                 }

@@ -684,8 +684,16 @@ const list = this._getDispatchedIntervalList(
 
             this.drawNote(pos.x, pos.y, {
                 ...style,
-                label
+                label,
+                zoomFactor: 2,
+                cursorOrbit: true,
+                fillColor: "#fe0000",
+                strokeColor: "#ffffff",
+                overlayAlpha: null
             });
+
+            // Maintient l'animation orbitale active même sans mouvement souris.
+            g.invalidate();
 
             return;
         }
