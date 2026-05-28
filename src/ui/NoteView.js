@@ -132,35 +132,77 @@ class NoteRenderer {
 
         const cx = x - OFFSET;
         const cy = y - OFFSET;
-        const orbitR = R * 0.53;
-        const t = millis() * 0.0045;
+        const orbitR = R * 0.55;
 
-        // Arcs jaunes rotatifs
+        const bpmCtrl = this.g?.app?.components?.find?.(c => c.name === "bpmCtrl") || null;
+        const bpm = Number.isFinite(bpmCtrl?.value) ? bpmCtrl.value : 80;
+        const isPlaying = !!bpmCtrl?.isPlaying;
+
+        // Mode nerveux: vitesse toujours liee au BPM (meme hors lecture)
+        // pour rendre les changements de tempo immediatement visibles.
+        const revPerSec = constrain(bpm / 60, 0.2, 8);
+        const t = (millis() / 1000) * TWO_PI * revPerSec;
+
+        // Arc lumineux en degrade rotatif (sans pointilles).
         noFill();
-        stroke(255, 214, 20, 230);
-        strokeWeight(max(1, R * 0.07));
-        arc(cx, cy, orbitR * 2, orbitR * 2, t, t + PI * 0.32);
-        arc(cx, cy, orbitR * 2, orbitR * 2, t + PI * 0.98, t + PI * 1.30);
+        const headA = t;
+        const trail = PI * 0.42;
+        const segCount = 12;
 
-        // Pointilles dynamiques autour de la couronne
+        for (let i = 0; i < segCount; i++) {
+            const u0 = i / segCount;
+            const u1 = (i + 1) / segCount;
+
+            const a0 = headA - trail * u1;
+            const a1 = headA - trail * u0;
+
+            // Degrade de luminosite: queue faible -> tete intense
+            const alpha = lerp(28, 240, 1 - u0);
+            const sw = lerp(R * 0.03, R * 0.095, 1 - u0);
+            const green = lerp(170, 232, 1 - u0);
+
+            stroke(255, green, 20, alpha);
+            strokeWeight(max(1, sw));
+            arc(cx, cy, orbitR * 2, orbitR * 2, a0, a1);
+        }
+
+        // Halo externe subtil pour l'effet neon.
+        stroke(255, 214, 20, 45);
+        strokeWeight(max(1, R * 0.12));
+        arc(cx, cy, orbitR * 2, orbitR * 2, headA - trail, headA);
+
+        // Tete brillante pour mieux voir la rotation.
         noStroke();
-        const dotCount = 8;
-        for (let i = 0; i < dotCount; i++) {
-            const a = t + (TWO_PI * i / dotCount);
-            const px = cx + cos(a) * orbitR;
-            const py = cy + sin(a) * orbitR;
-            const pulse = 0.55 + 0.45 * sin(t * 2.1 + i * 0.85);
-            const dotAlpha = 120 + 120 * pulse;
-            const dotR = R * (0.03 + 0.03 * pulse);
-            fill(255, 214, 20, dotAlpha);
-            circle(px, py, dotR * 2);
+        const hx = cx + cos(headA) * orbitR;
+        const hy = cy + sin(headA) * orbitR;
+
+        // Pulse visuel cale sur le tick BPM pendant la lecture.
+        let pulse = 0;
+        if (isPlaying) {
+            const tickElapsed = max(0, millis() - (bpmCtrl?.lastTickTime ?? 0));
+            const beatMs = max(1, 60000 / max(1, bpm));
+            const p = constrain(tickElapsed / (beatMs * 0.35), 0, 1);
+            pulse = 1 - p;
+        }
+
+        const headAlpha = lerp(210, 255, pulse);
+        const headSize = R * lerp(0.11, 0.17, pulse);
+
+        fill(255, 232, 90, headAlpha);
+        circle(hx, hy, headSize);
+
+        if (pulse > 0.01) {
+            noFill();
+            stroke(255, 228, 80, 120 * pulse);
+            strokeWeight(max(1, R * 0.07));
+            circle(hx, hy, headSize * (1.3 + pulse * 0.7));
         }
     }
 
     // ------------------------------------------------------------
     // 4. LABEL (texte + altérations)
     // ------------------------------------------------------------
-    drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset = 0, yOffset = 0) {
+    drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset = 0, yOffset = 0, emphasizeFlat = false) {
         const { base, alt, type } = label;
 
         noStroke();
@@ -198,6 +240,8 @@ class NoteRenderer {
             let ax = x - OFFSET;
             let ay = y - OFFSET - R * 0.15;
 
+            const isFlat = (alt === "♭" || alt === "b");
+
             ax += this.style.altAdjustX ?? 0;
             ay += this.style.altAdjustY ?? 0;
 
@@ -208,9 +252,23 @@ class NoteRenderer {
             fill(shapeType === "square" ? colors.textShadowSquare : colors.textShadowCircle);
             text(alt, ax + 1, ay + 1);
 
+            if (isFlat && emphasizeFlat) {
+                // Ombre renforcee pour distinguer le bemol sur fonds clairs.
+                fill(0, 0, 0, 170);
+                text(alt, ax + 2, ay + 2);
+            }
+
             // Altération
+            if (isFlat && emphasizeFlat) {
+                stroke(0, 0, 0, 180);
+                strokeWeight(max(1, R * 0.05));
+            } else {
+                noStroke();
+            }
+
             fill(shapeType === "square" ? colors.blanc : strokeColor);
             text(alt, ax, ay);
+            noStroke();
         }
 
         textStyle(NORMAL);
@@ -475,7 +533,20 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         }
 
         // 5. Label
-        this.drawLabel(x, y, shapeType, R, OFFSET, label, strokeColor, ghost, colors, xOffset, yOffset);
+        this.drawLabel(
+            x,
+            y,
+            shapeType,
+            R,
+            OFFSET,
+            label,
+            strokeColor,
+            ghost,
+            colors,
+            xOffset,
+            yOffset,
+            cursorOrbit
+        );
 
         if (label?.noTonicHint === true) {
             this.drawNoTonicHint(x, y, R, OFFSET, strokeColor);

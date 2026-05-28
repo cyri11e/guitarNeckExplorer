@@ -605,7 +605,7 @@ const list = this._getDispatchedIntervalList(
 
             let label;
 
-            const hoverMode = g._getNoteDisplayMode?.(g._getStoredNoteAt?.(h.fret, h.string)) ?? g.displayMode;
+            const hoverMode = g._normalizeDisplayMode?.(g.displayMode) ?? g.displayMode;
 
             switch (hoverMode) {
 
@@ -661,7 +661,7 @@ const list = this._getDispatchedIntervalList(
 
             let label;
 
-            const hoverMode = g._getNoteDisplayMode?.(g._getStoredNoteAt?.(h.fret, h.string)) ?? g.displayMode;
+            const hoverMode = g._normalizeDisplayMode?.(g.displayMode) ?? g.displayMode;
 
             // MULTINOTE + MODE DEGREE → afficher "1"
             if (intervals.length > 0 && hoverMode === "degree") {
@@ -677,7 +677,7 @@ const list = this._getDispatchedIntervalList(
 
                 label = app.theory.getNoteLabel(
                     baseIndex,
-                    g._getNoteLabelMode?.(g._getStoredNoteAt?.(h.fret, h.string)) ?? (hoverMode === "note" ? g.labelType : hoverMode)
+                    hoverMode === "note" ? g.labelType : hoverMode
                 );
                 
             }
@@ -685,7 +685,7 @@ const list = this._getDispatchedIntervalList(
             this.drawNote(pos.x, pos.y, {
                 ...style,
                 label,
-                zoomFactor: 2,
+                zoomFactor: 1.85,
                 cursorOrbit: true,
                 fillColor: "#fe0000",
                 strokeColor: "#ffffff",
