@@ -139,6 +139,27 @@ class TRRecTablature extends UIComponent {
         return out;
     }
 
+    _normalizeAccidentals(text) {
+        return String(text ?? "")
+            .replace(/([A-Ga-g])#/g, "$1♯")
+            .replace(/([A-Ga-g])b/g, "$1♭")
+            .trim();
+    }
+
+    _getStepChordName(stepData) {
+        if (!stepData || stepData.etat !== 1) return "";
+
+        const snapshotIndex = Number(stepData.itemIndex);
+        if (!Number.isInteger(snapshotIndex)) return "";
+
+        const snapshots = Array.isArray(this._guitar?.snapshots) ? this._guitar.snapshots : [];
+        if (snapshotIndex < 0 || snapshotIndex >= snapshots.length) return "";
+
+        const snap = snapshots[snapshotIndex] || null;
+        const harmonyName = this._normalizeAccidentals(snap?.harmonyName || "");
+        return harmonyName;
+    }
+
     _buildSnapshotStringMap(snapshot) {
         const map = new Map();
         const selected = Array.isArray(snapshot?.selectedNotes) ? snapshot.selectedNotes : [];
@@ -178,7 +199,8 @@ class TRRecTablature extends UIComponent {
     }
 
     _getLayout(visibleBarCount) {
-        const padTop = this.h * 0.15;
+        // Plus d'air en partie haute + lignes un peu plus compactes verticalement.
+        const padTop = this.h * 0.40;
         const padBottom = this.h * 0.09;
         const padLeft = this.w * 0.075;
         const padRight = this.w * 0.03;
@@ -289,6 +311,7 @@ class TRRecTablature extends UIComponent {
         const totalSteps = layout.totalSteps;
         const stepW = layout.stepW;
         const rowH = layout.rowH;
+        const fretTextSize = this.h * 0.085;
 
         const stringLabels = this._getStringLabels();
 
@@ -346,6 +369,26 @@ class TRRecTablature extends UIComponent {
             const stringMap = this._stepToStringMap(s);
             if (!stringMap || stringMap.size === 0) continue;
 
+            const stepChordName = this._getStepChordName(s);
+            if (stepChordName) {
+                const chordX = x + stepW * 0.5;
+                const chordY = gridY - rowH * 1.18;
+
+                textAlign(CENTER, CENTER);
+                textSize(this.h * 0.115);
+
+                const labelPadX = this.w * 0.01;
+                const labelW = textWidth(stepChordName) + labelPadX * 2;
+                const labelH = this.h * 0.055;
+
+                noStroke();
+                fill(250, 250, 246, 220);
+                rect(chordX - labelW * 0.5, chordY - labelH * 0.5, labelW, labelH, labelH * 0.32);
+
+                fill(18);
+                text(stepChordName, chordX, chordY);
+            }
+
             for (let row = 0; row < stringCount; row++) {
                 const stringNumber = stringCount - row;
                 if (!stringMap.has(stringNumber)) continue;
@@ -354,9 +397,9 @@ class TRRecTablature extends UIComponent {
                 const y = gridY + row * rowH;
 
                 const fretText = String(max(0, Math.round(fret)));
-                textSize(rowH * 0.56);
+                textSize(fretTextSize);
                 const bubbleW = max(stepW * 0.64, textWidth(fretText) + this.h * 0.08);
-                const bubbleH = rowH * 0.82;
+                const bubbleH = max(rowH * 0.82, fretTextSize * 1.38);
                 const bubbleX = x + (stepW - bubbleW) * 0.5;
                 const bubbleY = y - bubbleH * 0.5;
 
@@ -368,7 +411,7 @@ class TRRecTablature extends UIComponent {
                 strokeWeight(max(1, this.h * 0.0025));
                 fill(20);
                 textAlign(CENTER, CENTER);
-                textSize(rowH * 0.56);
+                textSize(fretTextSize);
                 text(fretText, x + stepW * 0.5, y + rowH * 0.01);
             }
         }

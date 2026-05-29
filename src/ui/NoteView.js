@@ -274,16 +274,17 @@ class NoteRenderer {
         textStyle(NORMAL);
     }
 
-    drawSelectionCorners(x, y, R, OFFSET) {
-        const cs = R * 0.34;
-        const pad = R * 0.12;
+    drawSelectionCorners(x, y, R, OFFSET, pulse = 0) {
+        const pulseClamped = constrain(pulse, 0, 1);
+        const cs = R * lerp(0.34, 0.46, pulseClamped);
+        const pad = R * lerp(0.12, 0.18, pulseClamped);
         const x0 = x - OFFSET - R * 0.5 - pad;
         const x1 = x - OFFSET + R * 0.5 + pad;
         const y0 = y - OFFSET - R * 0.5 - pad;
         const y1 = y - OFFSET + R * 0.5 + pad;
 
         stroke(76, 255, 0);
-        strokeWeight(max(1.2, R * 0.08));
+        strokeWeight(max(1.2, R * lerp(0.08, 0.12, pulseClamped)));
         noFill();
 
         // coin haut-gauche
@@ -328,7 +329,7 @@ class NoteRenderer {
         noStroke();
         textAlign(CENTER, CENTER);
         textStyle(BOLD);
-        textSize(R * 0.36);
+        textSize(R * 0.42);
 
         const hx = x - OFFSET;
         const hy = y - OFFSET + R * 0.02;
@@ -350,6 +351,8 @@ class NoteRenderer {
             shapeType = "circle",
             hasShadow = false,
             label = null,
+            hideLabel = false,
+            transparentFill = false,
             cursor = null,
             cursorOrbit = false,
             ghost = false, 
@@ -358,6 +361,7 @@ class NoteRenderer {
             xOffset = 0,
             yOffset = 0,
             isSelected = false,
+            selectionCornerPulse = 0,
             bottomRightLabel = null,
             bottomRightLabelColor = null
         } = opts;
@@ -478,6 +482,8 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
 
         const colors = this.getColors(ghost, effectiveOverlayAlpha);
         const { blanc, noir } = colors;
+        const woodTone = String(this.g?.woodColor ?? "").toLowerCase();
+        const isDarkFretboard = (woodTone === "rosewood" || woodTone === "ebony" || woodTone === "rose");
 
         if (effectiveOverlayAlpha != null) {
             strokeColor = this.toLocalColor(strokeColor, effectiveOverlayAlpha);
@@ -506,12 +512,16 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         }
 
         // 2. Fond
-        fill(fillColor);
+        if (transparentFill) {
+            noFill();
+        } else {
+            fill(fillColor);
+        }
         stroke(strokeColor);
         strokeWeight(STROKE);
 
-        if (base === "") {
-            fill(this.g.woodColor == 'rosewood' ? blanc : noir);
+        if (!transparentFill && base === "") {
+            fill(isDarkFretboard ? blanc : noir);
         }
 
         if (shapeType === "square") {
@@ -525,7 +535,22 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         this.drawOuter(x, y, shapeType, R, OFFSET, noir, STROKE, cursor, colors.cursorColor);
 
         // 4. Contour interne
-        this.drawInner(x, y, shapeType, R, OFFSET, blanc);
+        const innerContourColor = (base === "" && isDarkFretboard) ? noir : blanc;
+        this.drawInner(x, y, shapeType, R, OFFSET, innerContourColor);
+
+        // Pour les blank dots blancs: conserver la couronne noire + fin liseré blanc visible a l'exterieur.
+        if (base === "" && isDarkFretboard) {
+            noFill();
+            stroke(blanc);
+            strokeWeight(max(1.0, STROKE * 0.55));
+
+            if (shapeType === "square") {
+                rectMode(CENTER);
+                rect(x - OFFSET, y - OFFSET, R * 1.06, R * 1.06, R * 0.22);
+            } else {
+                circle(x - OFFSET, y - OFFSET, R * 1.06);
+            }
+        }
 
         // 4b. Animation orbitale du curseur
         if (cursorOrbit) {
@@ -533,28 +558,30 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         }
 
         // 5. Label
-        this.drawLabel(
-            x,
-            y,
-            shapeType,
-            R,
-            OFFSET,
-            label,
-            strokeColor,
-            ghost,
-            colors,
-            xOffset,
-            yOffset,
-            cursorOrbit
-        );
+        if (!hideLabel) {
+            this.drawLabel(
+                x,
+                y,
+                shapeType,
+                R,
+                OFFSET,
+                label,
+                strokeColor,
+                ghost,
+                colors,
+                xOffset,
+                yOffset,
+                cursorOrbit
+            );
 
-        if (label?.noTonicHint === true) {
-            this.drawNoTonicHint(x, y, R, OFFSET, strokeColor);
+            if (label?.noTonicHint === true) {
+                this.drawNoTonicHint(x, y, R, OFFSET, strokeColor);
+            }
         }
 
         // 6. Coins de sélection
         if (isSelected) {
-            this.drawSelectionCorners(x, y, R, OFFSET);
+            this.drawSelectionCorners(x, y, R, OFFSET, selectionCornerPulse);
         }
 
         if (bottomRightLabel) {

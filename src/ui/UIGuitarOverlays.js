@@ -393,6 +393,20 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 }
             }
 
+            let selectionCornerPulse = 0;
+            if (n.selectionPulseStart) {
+                const pulseElapsed = millis() - n.selectionPulseStart;
+                const pulseDuration = n.selectionPulseDuration ?? 260;
+                const pulseT = constrain(pulseElapsed / pulseDuration, 0, 1);
+
+                if (pulseT < 1) {
+                    selectionCornerPulse = 1 - pulseT;
+                } else {
+                    delete n.selectionPulseStart;
+                    delete n.selectionPulseDuration;
+                }
+            }
+
             this.drawNote(pos.x, pos.y, {
                 fillColor: "#fcb900",
                 strokeColor: "black",
@@ -400,9 +414,51 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 hasShadow: false,
                 label,
                 isSelected: true,
+                selectionCornerPulse,
                 bottomRightLabel: degreeMap.get(`${n.string}:${n.fret}`) || null,
                 bottomRightLabelColor: color(76, 255, 0),
                 ...animOpts
+            });
+        }
+    }
+
+    drawRectangleSelectionPreview() {
+        const g = this.g;
+        const app = g.app;
+        const ui = app?.ui;
+
+        if (!ui?.rectangleSelectionActive) return;
+
+        const preview = Array.isArray(ui.rectanglePreviewNotes) ? ui.rectanglePreviewNotes : [];
+        if (preview.length === 0) return;
+
+        const degreeMap = this._buildChordDegreeMap(preview);
+
+        for (const n of preview) {
+            const pos = g.toScreen(n.fret, n.string);
+            if (!pos) continue;
+
+            const raw = app.instrument.getNoteAt(n.string - 1, n.fret);
+            if (!raw) continue;
+
+            const labelMode = g._getNoteLabelMode?.(n) ?? (g.displayMode === "note" ? g.labelType : g.displayMode);
+            const label = app.theory.getNoteLabel(raw.index, labelMode);
+            if (!label) continue;
+
+            const full = app.theory.getFullNote(raw.index);
+            if (full) label.chroma = full.chroma;
+
+            this.drawNote(pos.x, pos.y, {
+                fillColor: color(252, 185, 0, 120),
+                strokeColor: color(0, 0, 0, 190),
+                shapeType: "circle",
+                hasShadow: false,
+                label,
+                isSelected: true,
+                selectionCornerPulse: 0.25,
+                bottomRightLabel: degreeMap.get(`${n.string}:${n.fret}`) || null,
+                bottomRightLabelColor: color(76, 255, 0),
+                overlayAlpha: 170
             });
         }
     }
@@ -547,6 +603,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     drawHoverDot() {
         const g = this.g;
         const app = g.app;
+        const ui = app?.ui;
 
         if (g.contextMenu?.visible) {
             this.intervalOverlayNotes = [];
@@ -656,6 +713,10 @@ const list = this._getDispatchedIntervalList(
         // MODE C : CURSOR → un seul dot sous la souris
         if (g.hoverMode === "cursor") {
 
+            if (ui?.rectangleSelectionActive) {
+                return;
+            }
+
             const pos = g.toScreen(h.fret, h.string);
             if (!pos) return;
 
@@ -682,13 +743,20 @@ const list = this._getDispatchedIntervalList(
                 
             }
 
+            const hasUnderlyingDot = !!g._getStoredNoteAt?.(h.fret, h.string);
+            const isBlankCursor = String(label?.base ?? "") === "";
+            const hideJumboFill = hasUnderlyingDot || isBlankCursor;
+
             this.drawNote(pos.x, pos.y, {
                 ...style,
                 label,
+                hideLabel: hideJumboFill,
+                transparentFill: hideJumboFill,
                 zoomFactor: 1.85,
                 cursorOrbit: true,
-                fillColor: "#fe0000",
+                fillColor: hideJumboFill ? color(0, 0, 0, 0) : "#fe0000",
                 strokeColor: "#ffffff",
+                hasShadow: hideJumboFill ? false : style.hasShadow,
                 overlayAlpha: null
             });
 
@@ -1381,6 +1449,7 @@ const list = this._getDispatchedIntervalList(
 
         const pinnedList = g.pinnedNotes || [];
         const selectedList = g.selectedNotes || [];
+        g.selectionHarmonyName = "";
 
         const tonicPc = app.theory?.hasRoot?.() ? app.theory.root : null;
         // const pinnedExtract = this.harmonyDetector.extractFromFrettedNotes(pinnedList, app.instrument);  // COMMENTED OUT
@@ -1574,6 +1643,9 @@ const list = this._getDispatchedIntervalList(
         const overlayY = g.y + g.h + 8;
 
         const baseSimpleName = overlayInfo.simpleName || overlayInfo.name;
+        g.selectionHarmonyName = selectedAnalysis?.chord
+            ? String(baseSimpleName || "")
+            : "";
         const lineNameText = showRomanBlock
             ? `${baseSimpleName} (${selectedRomanDegree})`
             : baseSimpleName;
@@ -1674,14 +1746,26 @@ const list = this._getDispatchedIntervalList(
 
         push();
         rectMode(CORNER);
-        textFont("sans-serif");
-        textSize(13);
+        textFont("Trebuchet MS");
+        textSize(16);
         textAlign(LEFT, CENTER);
 
-        fill(0, 0, 0, 210);
-        stroke(76, 255, 0, 220);
-        strokeWeight(1.5);
-        rect(layout.x, layout.y, layout.width, layout.height, 8);
+        const simonPalette = [
+            [236, 86, 86],
+            [247, 186, 74],
+            [88, 150, 255],
+            [224, 118, 255]
+        ];
+
+        fill(10, 12, 18, 188);
+        stroke(255, 255, 255, 46);
+        strokeWeight(2.2);
+        rect(layout.x, layout.y, layout.width, layout.height, 24);
+
+        noFill();
+        stroke(255, 255, 255, 20);
+        strokeWeight(1.4);
+        rect(layout.x + 5, layout.y + 5, layout.width - 10, layout.height - 10, 20);
 
         if (layout.mode === "dual") {
             for (let i = 0; i < layout.items.length; i++) {
@@ -1696,35 +1780,34 @@ const list = this._getDispatchedIntervalList(
                 const hoverInRow = mouseY >= rowTop && mouseY <= rowBottom;
                 const hoverLeft = hoverInRow && mouseX >= leftMinX && mouseX <= leftMaxX;
                 const hoverRight = hoverInRow && mouseX >= rightMinX && mouseX <= rightMaxX;
+                const leftCol = simonPalette[(i * 2) % simonPalette.length];
+                const rightCol = simonPalette[(i * 2 + 1) % simonPalette.length];
 
-                if (i > 0) {
-                    stroke(76, 255, 0, 80);
-                    line(layout.x + 6, y, layout.x + layout.width - 6, y);
-                }
+                const leftPad = 3;
+                const rightPad = 3;
+                const leftW = layout.colWidth - leftPad * 2;
+                const rightW = layout.colWidth - rightPad * 2;
+                const buttonH = layout.itemHeight - 6;
+                const radius = buttonH * 0.5;
 
-                if (hoverLeft) {
-                    stroke(76, 255, 0, 220);
-                    strokeWeight(1);
-                    fill(76, 255, 0, 120);
-                    rect(leftMinX, rowTop + 2, layout.colWidth, layout.itemHeight - 4, 4);
-                }
+                stroke(255, 255, 255, hoverLeft ? 190 : 58);
+                strokeWeight(hoverLeft ? 2.2 : 1.2);
+                fill(leftCol[0], leftCol[1], leftCol[2], hoverLeft ? 238 : 186);
+                rect(leftMinX + leftPad, rowTop + 3, leftW, buttonH, radius);
 
-                if (hoverRight) {
-                    stroke(76, 255, 0, 220);
-                    strokeWeight(1);
-                    fill(76, 255, 0, 120);
-                    rect(rightMinX, rowTop + 2, layout.colWidth, layout.itemHeight - 4, 4);
-                }
-
-                if (layout.colGap > 0) {
-                    stroke(76, 255, 0, 90);
-                    line(layout.rightX - layout.colGap * 0.5, y + 3, layout.rightX - layout.colGap * 0.5, y + layout.itemHeight - 3);
-                }
+                stroke(255, 255, 255, hoverRight ? 190 : 58);
+                strokeWeight(hoverRight ? 2.2 : 1.2);
+                fill(rightCol[0], rightCol[1], rightCol[2], hoverRight ? 238 : 186);
+                rect(rightMinX + rightPad, rowTop + 3, rightW, buttonH, radius);
 
                 noStroke();
-                fill(76, 255, 0);
+                fill(255, 255, 255, 236);
                 textAlign(CENTER, CENTER);
-                text(`← ${row.label || ""} →`, layout.x + layout.width * 0.5, y + layout.itemHeight * 0.5);
+                text("←", leftMinX + layout.colWidth * 0.5, y + layout.itemHeight * 0.5);
+                text("→", rightMinX + layout.colWidth * 0.5, y + layout.itemHeight * 0.5);
+
+                fill(255, 255, 255, 248);
+                text(row.label || "", layout.x + layout.width * 0.5, y + layout.itemHeight * 0.5);
                 textAlign(LEFT, CENTER);
             }
         } else {
@@ -1734,22 +1817,23 @@ const list = this._getDispatchedIntervalList(
                 const rowTop = y;
                 const rowBottom = y + layout.itemHeight;
                 const hoverRow = mouseY >= rowTop && mouseY <= rowBottom && mouseX >= layout.x && mouseX <= (layout.x + layout.width);
+                const col = simonPalette[i % simonPalette.length];
+                const padX = 8;
+                const padY = 3;
+                const buttonW = layout.width - padX * 2;
+                const buttonH = layout.itemHeight - padY * 2;
+                const radius = buttonH * 0.5;
 
-                if (i > 0) {
-                    stroke(76, 255, 0, 80);
-                    line(layout.x + 6, y, layout.x + layout.width - 6, y);
-                }
-
-                if (hoverRow) {
-                    stroke(76, 255, 0, 220);
-                    strokeWeight(1);
-                    fill(76, 255, 0, 120);
-                    rect(layout.x + 2, rowTop + 2, layout.width - 4, layout.itemHeight - 4, 4);
-                }
+                stroke(255, 255, 255, hoverRow ? 200 : 60);
+                strokeWeight(hoverRow ? 2.2 : 1.3);
+                fill(col[0], col[1], col[2], hoverRow ? 240 : 188);
+                rect(layout.x + padX, rowTop + padY, buttonW, buttonH, radius);
 
                 noStroke();
-                fill(hoverRow ? color(0, 0, 0) : color(76, 255, 0));
-                text(item.label, layout.x + 9, y + layout.itemHeight * 0.5);
+                fill(255, 255, 255, 245);
+                textAlign(CENTER, CENTER);
+                text(item.label, layout.x + layout.width * 0.5, y + layout.itemHeight * 0.5);
+                textAlign(LEFT, CENTER);
             }
         }
 
@@ -1776,6 +1860,7 @@ const list = this._getDispatchedIntervalList(
         // 2) Notes utilisateur
         this.drawPinnedNotes();
         this.drawSelectedNotes();
+        this.drawRectangleSelectionPreview();
         this.drawPopOutNotes();
 
         // 3) Animations (bursts)

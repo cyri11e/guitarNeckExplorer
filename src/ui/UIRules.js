@@ -55,18 +55,21 @@ function buildSnapshotFromTabFrets(tabFrets) {
         pinnedNotes: [],
         selectedNotes,
         root: null,
-        markerSegments: []
+        markerSegments: [],
+        harmonyName: null
     };
 }
 
 function sanitizeSnapshot(snap) {
     const src = snap || {};
+    const harmonyName = String(src.harmonyName ?? "").trim();
     return {
         title: String(src.title ?? "Snapshot"),
         pinnedNotes: Array.isArray(src.pinnedNotes) ? deepClone(src.pinnedNotes) : [],
         selectedNotes: Array.isArray(src.selectedNotes) ? deepClone(src.selectedNotes) : [],
         root: src.root ?? null,
-        markerSegments: Array.isArray(src.markerSegments) ? deepClone(src.markerSegments) : []
+        markerSegments: Array.isArray(src.markerSegments) ? deepClone(src.markerSegments) : [],
+        harmonyName: harmonyName || null
     };
 }
 
@@ -1318,7 +1321,8 @@ guitar.invalidate();
         pinnedNotes: deepClone(guitar.pinnedNotes),
         selectedNotes: deepClone(guitar.selectedNotes),
         root: hasRoot ? guitar.theory.root : null,
-        markerSegments: deepClone(guitar.markerSegments)
+        markerSegments: deepClone(guitar.markerSegments),
+        harmonyName: String(guitar.selectionHarmonyName || "").trim() || null
     };
 
     guitar.snapshots.push(snap);

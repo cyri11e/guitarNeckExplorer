@@ -437,8 +437,8 @@ setInlayStyle(type) {
         const anchorX = Number.isFinite(this.contextMenu?.x) ? this.contextMenu.x : 0;
         const anchorY = Number.isFinite(this.contextMenu?.y) ? this.contextMenu.y : 0;
         const items = this._getContextMenuItems();
-        const itemHeight = 24;
-        const margin = 6;
+        const itemHeight = 34;
+        const margin = 10;
 
         if (stage === "quality" || stage === "scaleLayout") {
             const maxDisplayChars = items.reduce((maxLen, item) => {
@@ -447,10 +447,10 @@ setInlayStyle(type) {
             }, 0);
 
             // Compact dual layout: width follows rendered label length while preserving left/right hit zones.
-            const totalContentWidth = Math.max(92, (maxDisplayChars * 8) + 18);
-            const colWidth = Math.max(36, Math.ceil(totalContentWidth * 0.5));
-            const colGap = 0;
-            const width = (colWidth * 2) + 12;
+            const totalContentWidth = Math.max(152, (maxDisplayChars * 11) + 36);
+            const colWidth = Math.max(68, Math.ceil(totalContentWidth * 0.5));
+            const colGap = 10;
+            const width = (colWidth * 2) + colGap + 20;
             const height = items.length * itemHeight;
             const x = constrain(anchorX - width * 0.5, margin, max(margin, windowWidth - width - margin));
             const y = constrain(anchorY - height * 0.5, margin, max(margin, windowHeight - height - margin));
@@ -465,8 +465,8 @@ setInlayStyle(type) {
                 items,
                 colWidth,
                 colGap,
-                leftX: x + 6,
-                rightX: x + 6 + colWidth + colGap
+                leftX: x + 10,
+                rightX: x + 10 + colWidth + colGap
             };
         }
 
@@ -476,7 +476,7 @@ setInlayStyle(type) {
         }, 0);
 
         // Keep the menu as compact as the longest label plus small side paddings.
-        const width = Math.max(52, (maxLabelChars * 8) + 16);
+        const width = Math.max(140, (maxLabelChars * 11) + 42);
         const height = items.length * itemHeight;
         const x = constrain(anchorX - width * 0.5, margin, max(margin, windowWidth - width - margin));
         const y = constrain(anchorY - height * 0.5, margin, max(margin, windowHeight - height - margin));

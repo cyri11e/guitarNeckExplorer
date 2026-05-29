@@ -5,6 +5,7 @@ class UIInteractionManager {
         this.shortcuts = {};
         this.captureOwner = null;
         this.mouseIsDown = false;
+        this.rightDragCapture = false;
 
         // ============================================================
         // INTERACTIONS GUITARE (globales)
@@ -25,6 +26,7 @@ class UIInteractionManager {
         this.selectionEndX = null;
         this.selectionEndY = null;
         this.selectionMovedThreshold = 8;
+        this.rectanglePreviewNotes = [];
         this.leftDownHit = null;
     }
 
@@ -105,12 +107,11 @@ _buildEvent(mx, my) {
 }
 
     _findAltTarget(evt) {
-        for (const root of this._getTopLevelByZDesc()) {
-            if (!root?.containsRect?.(evt)) continue;
-            if (!(root.isDraggable || root.isZoomable)) continue;
-            return root;
-        }
-        return null;
+        const g = this.guitar;
+        if (!g) return null;
+        if (!g.containsRect?.(evt)) return null;
+        if (!(g.isDraggable || g.isZoomable)) return null;
+        return g;
     }
 
     _startAltCapture(evt) {
@@ -135,6 +136,31 @@ _buildEvent(mx, my) {
         this.captureOwner.dragging = false;
         this.captureOwner = null;
         this.altCapture = false;
+        return true;
+    }
+
+    _findRightDragTarget(evt) {
+        for (const root of this._getTopLevelByZDesc()) {
+            if (!root?.containsRect?.(evt)) continue;
+            if (root instanceof Guitar) continue;
+            if (!(root.isDraggable || root.isZoomable)) continue;
+            return root;
+        }
+        return null;
+    }
+
+    _startRightDragCapture(evt) {
+        const target = this._findRightDragTarget(evt);
+        if (!target) return false;
+
+        UIComponent.prototype.mousePressed.call(target, evt);
+        this.captureOwner = target;
+        this.rightDragCapture = true;
+
+        if (target.bringToFrontOnPress === true) {
+            this.app?.bringRootToFront?.(target);
+        }
+
         return true;
     }
 
@@ -164,11 +190,24 @@ _buildEvent(mx, my) {
         this.eraseActive = false;
         this.dragActive = false;
         this.rectangleSelectionActive = false;
+        this.rectanglePreviewNotes = [];
         this.selectionStartX = null;
         this.selectionStartY = null;
         this.selectionEndX = null;
         this.selectionEndY = null;
         this.leftDownHit = null;
+    }
+
+    _markSelectionFinalizePulse(list) {
+        if (!Array.isArray(list) || list.length === 0) return;
+        const now = millis();
+        const duration = 260;
+
+        for (const n of list) {
+            if (!n) continue;
+            n.selectionPulseStart = now;
+            n.selectionPulseDuration = duration;
+        }
     }
 
     _handleGlobalMousePressed(evt) {
@@ -221,7 +260,8 @@ _buildEvent(mx, my) {
         // Clic gauche: on attend le release pour valider un clic simple,
         // ou on bascule en sélection rectangulaire si déplacement.
         if (evt.button === LEFT) {
-            this.leftDownHit = this.guitar.fromScreen(evt.x, evt.y);
+            const hit = this.guitar.fromScreen(evt.x, evt.y);
+            this.leftDownHit = hit;
             this.selectionStartX = evt.x;
             this.selectionStartY = evt.y;
             this.selectionEndX = evt.x;
@@ -287,6 +327,17 @@ _buildEvent(mx, my) {
                 this.rectangleSelectionActive = true;
                 this.selectionEndX = evt.x;
                 this.selectionEndY = evt.y;
+                const rect = {
+                    x1: Math.min(this.selectionStartX, this.selectionEndX),
+                    y1: Math.min(this.selectionStartY, this.selectionEndY),
+                    x2: Math.max(this.selectionStartX, this.selectionEndX),
+                    y2: Math.max(this.selectionStartY, this.selectionEndY)
+                };
+                const notesInRect = this._getNoteListInRectangle(rect);
+                const overlayNotesInRect = this._getIntervalOverlayNotesInRectangle(rect);
+                this.rectanglePreviewNotes = overlayNotesInRect.length > 0
+                    ? overlayNotesInRect
+                    : notesInRect;
                 console.log("Rectangle active! End:", { x: evt.x, y: evt.y });
                 this.guitar.invalidate();
                 return true;
@@ -323,6 +374,24 @@ _buildEvent(mx, my) {
                 };
 
                 const notesInRect = this._getNoteListInRectangle(rect);
+                const overlayNotesInRect = this._getIntervalOverlayNotesInRectangle(rect);
+
+                // Multi-curseur actif:
+                // on epingle les notes furtives de la zone au relachement.
+                if (overlayNotesInRect.length > 0) {
+                    for (const n of overlayNotesInRect) {
+                        const pinnedExists = this.guitar.pinnedNotes.some(
+                            p => p.fret === n.fret && p.string === n.string
+                        );
+                        if (!pinnedExists) {
+                            this.guitar._addAnimatedNote(this.guitar.pinnedNotes, n.fret, n.string, "pin", n);
+                        }
+                    }
+
+                    this.guitar.invalidate();
+                    this._resetGlobalGuitarInteractionState();
+                    return false;
+                }
 
                 if (evt.ctrlKey) {
                     // CTRL: toggle par lot dans la sélection courante.
@@ -391,6 +460,8 @@ _buildEvent(mx, my) {
                     this.guitar.pinnedNotes = nextPinned;
                     this.guitar.selectedNotes = nextSelected;
                 }
+
+                this._markSelectionFinalizePulse(this.guitar.selectedNotes);
 
                 this.guitar.invalidate();
             } else {
@@ -499,9 +570,14 @@ _buildEvent(mx, my) {
         const evt = this._buildEvent(mx, my);
         console.log("UIInteractionManager.mousePressed:", { mx, my });
 
-        if (evt.altKey) {
+        if (evt.altKey && this._startAltCapture(evt)) {
             console.log("→ AltCapture mode");
-            return this._startAltCapture(evt);
+            return true;
+        }
+
+        if (evt.button === RIGHT && this._startRightDragCapture(evt)) {
+            console.log("→ RightDragCapture mode");
+            return true;
         }
 
         // 1) Interactions guitare
@@ -534,6 +610,11 @@ _buildEvent(mx, my) {
             return UIComponent.prototype.mouseDragged.call(this.captureOwner, evt) || false;
         }
 
+        if (this.rightDragCapture && this.captureOwner) {
+            const dragEvt = { ...evt, altKey: true };
+            return UIComponent.prototype.mouseDragged.call(this.captureOwner, dragEvt) || false;
+        }
+
         // 1) Interactions guitare
         if (this._handleGlobalMouseDragged(evt)) {
             console.log("→ Handled by _handleGlobalMouseDragged");
@@ -559,6 +640,16 @@ _buildEvent(mx, my) {
 
         if (this.altCapture) {
             return this._releaseAltCapture();
+        }
+
+        if (this.rightDragCapture) {
+            if (this.captureOwner) {
+                this.captureOwner.isPressed = false;
+                this.captureOwner.dragging = false;
+            }
+            this.captureOwner = null;
+            this.rightDragCapture = false;
+            return true;
         }
 
         // 1) Interactions guitare
@@ -699,6 +790,38 @@ _buildEvent(mx, my) {
         console.log("_getNoteListInRectangle: total selected =", notes.length, notes);
 
         return notes;
+    }
+
+    _getIntervalOverlayNotesInRectangle(rect) {
+        if (!this.guitar) return [];
+
+        const overlayNotes = this.guitar.overlays?.intervalOverlayNotes || [];
+        if (!Array.isArray(overlayNotes) || overlayNotes.length === 0) return [];
+
+        const out = [];
+        const seen = new Set();
+
+        for (const n of overlayNotes) {
+            if (!n) continue;
+
+            const key = `${n.string}:${n.fret}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const pos = this.guitar.toScreen(n.fret, n.string);
+            if (!pos) continue;
+
+            const inRect = (pos.x >= rect.x1 && pos.x <= rect.x2 && pos.y >= rect.y1 && pos.y <= rect.y2);
+            if (!inRect) continue;
+
+            out.push(this.guitar._createStoredNote({
+                fret: n.fret,
+                string: n.string,
+                displayMode: this.guitar.displayMode
+            }));
+        }
+
+        return out;
     }
 
     // ============================================================
