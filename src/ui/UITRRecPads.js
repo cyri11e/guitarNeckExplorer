@@ -676,7 +676,7 @@ this.onChange?.({
                         const maxChars = Math.floor(padW / (txtSize * 0.55));
                         let display = label;
                         if (display.length > maxChars) {
-                            display = display.substring(0, maxChars - 1) + "ÔÇª";
+                            display = display.substring(0, maxChars - 1) + "...";
                         }
 
                         text(display, x + padW / 2, y + padH / 2);
@@ -703,7 +703,7 @@ this.onChange?.({
                         const maxChars = Math.floor(padW / (txtSize * 0.55));
                         let display = label;
                         if (display.length > maxChars) {
-                            display = display.substring(0, maxChars - 1) + "ÔÇª";
+                            display = display.substring(0, maxChars - 1) + "...";
                         }
 
                         text(display, x + padW / 2, y + padH / 2);

@@ -363,7 +363,8 @@ class NoteRenderer {
             isSelected = false,
             selectionCornerPulse = 0,
             bottomRightLabel = null,
-            bottomRightLabelColor = null
+            bottomRightLabelColor = null,
+            holdPulse = null
         } = opts;
 
         x += xOffset;
@@ -385,6 +386,11 @@ class NoteRenderer {
         fillColor = this.toLocalColor(fillColor);
 
         let R = this.g.getThickness() * 0.17 * zoomFactor;
+        let seqAttackHaloAlpha = 0;
+        let seqAttackHaloScale = 1;
+        let seqHoldHaloAlpha = 0;
+        let seqHoldHaloScale = 1;
+        let seqHoldHaloColor = color(255, 255, 255);
 
 // ------------------------------------------------------------
 // ANIMATION : POP-IN
@@ -416,20 +422,25 @@ if (opts.anim && opts.anim.type === "popSeq") {
     const t = constrain(opts.anim.t, 0, 1);
     const popSeqCfg = this.g.anim?.note?.popSeq || {};
 
-    // Sequence replay: pop plus court et plus compact
-    const s = popSeqCfg.backOutS ?? 1.3;
+    // Sequence replay: attaque plus marquee (retrigger tres lisible)
+    const s = popSeqCfg.backOutS ?? 3.2;
     const u = t - 1;
     const backOut = 1 + (s + 1) * u * u * u + s * u * u;
 
-    const startScale = popSeqCfg.startScale ?? 0.55;
+    const startScale = popSeqCfg.startScale ?? 0.22;
     const popScale = lerp(startScale, 1, backOut);
     R *= popScale;
 
-    y -= R * (popSeqCfg.lift ?? 0.10) * (1 - t);
+    y -= R * (popSeqCfg.lift ?? 0.22) * (1 - t);
 
-    const popAlpha = lerp(popSeqCfg.alphaStart ?? 170, popSeqCfg.alphaEnd ?? 255, t);
+    const popAlpha = lerp(popSeqCfg.alphaStart ?? 90, popSeqCfg.alphaEnd ?? 255, t);
     const popColor = this.toLocalColor(fillColor, popAlpha);
     fillColor = popColor;
+
+    const attack = 1 - t;
+    const attackEase = Math.pow(attack, 0.5);
+    seqAttackHaloAlpha = (popSeqCfg.haloAlpha ?? 190) * attackEase;
+    seqAttackHaloScale = 1 + (popSeqCfg.haloScale ?? 0.55) * attackEase;
 }
 
 if (opts.anim && opts.anim.type === "popOut") {
@@ -480,6 +491,23 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
     }
 }
 
+if (holdPulse?.active) {
+    const startedAt = Number.isFinite(holdPulse.startedAt) ? holdPulse.startedAt : millis();
+    const frequency = Number.isFinite(holdPulse.frequency) ? holdPulse.frequency : 16;
+    const alphaMin = Number.isFinite(holdPulse.alphaMin) ? holdPulse.alphaMin : 45;
+    const alphaMax = Number.isFinite(holdPulse.alphaMax) ? holdPulse.alphaMax : 190;
+    const pulseScale = Number.isFinite(holdPulse.scale) ? holdPulse.scale : 0.34;
+
+    seqHoldHaloColor = this.toLocalColor(holdPulse.color ?? color(255, 255, 255));
+
+    const tSec = (millis() - startedAt) / 1000;
+    const osc = (Math.sin(tSec * frequency * TWO_PI) + 1) * 0.5;
+    const vib = Math.pow(osc, 0.55);
+
+    seqHoldHaloAlpha = lerp(alphaMin, alphaMax, vib);
+    seqHoldHaloScale = 1 + pulseScale * vib;
+}
+
         const colors = this.getColors(ghost, effectiveOverlayAlpha);
         const { blanc, noir } = colors;
         const woodTone = String(this.g?.woodColor ?? "").toLowerCase();
@@ -509,6 +537,28 @@ if (opts.anim && opts.anim.type === "popOutSeq") {
         // 1. Ombre
         if (hasShadow) {
             this.drawShadow(x, y, shapeType, R, OFFSET, colors.shadowColor);
+        }
+
+        if (seqHoldHaloAlpha > 1) {
+            noStroke();
+            fill(this.toLocalColor(seqHoldHaloColor, seqHoldHaloAlpha));
+            if (shapeType === "square") {
+                rectMode(CENTER);
+                rect(x - OFFSET, y - OFFSET, R * seqHoldHaloScale, R * seqHoldHaloScale, R * 0.24);
+            } else {
+                circle(x - OFFSET, y - OFFSET, R * seqHoldHaloScale);
+            }
+        }
+
+        if (seqAttackHaloAlpha > 1) {
+            noStroke();
+            fill(this.toLocalColor(fillColor, seqAttackHaloAlpha));
+            if (shapeType === "square") {
+                rectMode(CENTER);
+                rect(x - OFFSET, y - OFFSET, R * seqAttackHaloScale, R * seqAttackHaloScale, R * 0.24);
+            } else {
+                circle(x - OFFSET, y - OFFSET, R * seqAttackHaloScale);
+            }
         }
 
         // 2. Fond

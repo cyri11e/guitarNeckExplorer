@@ -22,6 +22,11 @@ class TRRecTablature extends UIComponent {
         this._guitar = null;
         this._instrument = null;
         this._lcd2 = null;
+        this._harmonyDetector = null;
+        this._stepPulseByGlobalStep = new Map();
+        this._lastHighlightedGlobalStep = null;
+
+        this.showChordNames = cfg.showChordNames ?? true;
 
         this.maxEditableFret = cfg.maxEditableFret ?? 24;
     }
@@ -44,18 +49,12 @@ class TRRecTablature extends UIComponent {
         if (!this._lcd2) {
             this._lcd2 = this.app.components.find(c => c.name === "lcd2") || null;
         }
-    }
 
-    _getStringLabels() {
-        const tuning = this._instrument?.tuning;
-        if (!Array.isArray(tuning) || tuning.length === 0) {
-            return ["e", "B", "G", "D", "A", "E"];
+        if (!this._harmonyDetector && this.app?.theory) {
+            this._harmonyDetector = new HarmonyDetector(this.app.theory);
+        } else if (this._harmonyDetector && this.app?.theory) {
+            this._harmonyDetector.theory = this.app.theory;
         }
-
-        // Instrument tuning is low->high, tablature is rendered high->low.
-        return [...tuning]
-            .reverse()
-            .map(t => String(t?.name ?? "?").replace(/[0-9]/g, ""));
     }
 
     _getPadCount() {
@@ -148,16 +147,30 @@ class TRRecTablature extends UIComponent {
 
     _getStepChordName(stepData) {
         if (!stepData || stepData.etat !== 1) return "";
+        if (!this._harmonyDetector || !this._instrument) return "";
 
-        const snapshotIndex = Number(stepData.itemIndex);
-        if (!Number.isInteger(snapshotIndex)) return "";
+        const noteList = [];
+        const stringMap = this._stepToStringMap(stepData);
+        if (!stringMap || stringMap.size === 0) return "";
 
-        const snapshots = Array.isArray(this._guitar?.snapshots) ? this._guitar.snapshots : [];
-        if (snapshotIndex < 0 || snapshotIndex >= snapshots.length) return "";
+        for (const [stringNumber, fret] of stringMap.entries()) {
+            noteList.push({ string: stringNumber, fret });
+        }
 
-        const snap = snapshots[snapshotIndex] || null;
-        const harmonyName = this._normalizeAccidentals(snap?.harmonyName || "");
-        return harmonyName;
+        const extracted = this._harmonyDetector.extractFromFrettedNotes(noteList, this._instrument);
+        const analysis = this._harmonyDetector.analyzePitchClassSet(
+            extracted.pcs,
+            this.app?.theory?.hasRoot?.() ? this.app.theory.root : null,
+            extracted.bassPc,
+            { noteCount: extracted.noteCount }
+        );
+
+        return this._normalizeAccidentals(analysis?.chord?.symbol || "");
+    }
+
+    _toggleChordNames() {
+        this.showChordNames = !this.showChordNames;
+        this.invalidate();
     }
 
     _buildSnapshotStringMap(snapshot) {
@@ -227,6 +240,19 @@ class TRRecTablature extends UIComponent {
         };
     }
 
+    _isChordLabelBandHit(mx, my, layout) {
+        if (!layout) return false;
+
+        const bandTop = layout.gridY - layout.rowH * 1.7;
+        const bandBottom = layout.gridY - layout.rowH * 0.72;
+        return (
+            mx >= layout.gridX &&
+            mx <= layout.gridX + layout.gridW &&
+            my >= bandTop &&
+            my <= bandBottom
+        );
+    }
+
     _selectSubMeasure(stepRef) {
         const tr = this._trRec;
         if (!tr || !stepRef) return;
@@ -269,6 +295,11 @@ class TRRecTablature extends UIComponent {
 
         const mx = evt.x;
         const my = evt.y;
+
+        if (evt.button === LEFT && this._isChordLabelBandHit(mx, my, layout)) {
+            this._toggleChordNames();
+            return true;
+        }
 
         if (mx < layout.gridX || mx > layout.gridX + layout.gridW) return true;
         if (my < layout.gridY - layout.rowH * 0.5 || my > layout.gridY + layout.gridH + layout.rowH * 0.5) return true;
@@ -313,37 +344,56 @@ class TRRecTablature extends UIComponent {
         const rowH = layout.rowH;
         const fretTextSize = this.h * 0.085;
 
-        const stringLabels = this._getStringLabels();
+        let highlightedGlobalStep = null;
+        for (let step = 0; step < totalSteps; step++) {
+            const ref = this._resolveStepAt(step);
+            if (ref?.step?.highlight) {
+                highlightedGlobalStep = ref.globalStep;
+                break;
+            }
+        }
+
+        if (Number.isInteger(highlightedGlobalStep) && highlightedGlobalStep !== this._lastHighlightedGlobalStep) {
+            this._stepPulseByGlobalStep.set(highlightedGlobalStep, 1);
+        }
+        this._lastHighlightedGlobalStep = highlightedGlobalStep;
+
+        let hasActivePulse = false;
+        for (const [globalStep, value] of this._stepPulseByGlobalStep.entries()) {
+            const next = value * 0.82;
+            if (next <= 0.02) {
+                this._stepPulseByGlobalStep.delete(globalStep);
+                continue;
+            }
+            this._stepPulseByGlobalStep.set(globalStep, next);
+            hasActivePulse = true;
+        }
 
         noStroke();
         fill(30);
         textAlign(LEFT, CENTER);
         textSize(this.h * 0.09);
 
-        const currentMeasure = Number.isFinite(tr.measureIndex) ? tr.measureIndex : 0;
-        const subtitle = `TAB seq ${currentMeasure + 1} / ${Math.max(1, (tr.measures || []).length)}`;
-        text(subtitle, this.x + this.w * 0.03, this.y + this.h * 0.08);
-
         for (let i = 0; i < stringCount; i++) {
             const y = gridY + i * rowH;
             stroke(40, 40, 40, 200);
             strokeWeight(max(1, this.h * 0.006));
             line(gridX, y, gridX + gridW, y);
-
-            noStroke();
-            fill(35);
-            textAlign(RIGHT, CENTER);
-            textSize(this.h * 0.082);
-            const label = stringLabels[i] ?? "?";
-            text(label, gridX - this.w * 0.015, y);
         }
 
-        for (let bar = 0; bar <= visibleBarCount; bar++) {
-            const x = gridX + bar * this.stepsPerBar * stepW;
-            stroke(20, 20, 20, 220);
-            strokeWeight(max(1, this.h * 0.008));
-            line(x, gridY - this.h * 0.02, x, gridY + gridH + this.h * 0.01);
+        stroke(20, 20, 20, 220);
+        strokeWeight(max(1, this.h * 0.008));
+        line(gridX, gridY - this.h * 0.02, gridX, gridY + gridH + this.h * 0.01);
+        line(gridX + gridW, gridY - this.h * 0.02, gridX + gridW, gridY + gridH + this.h * 0.01);
+
+        if (visibleBarCount > 4) {
+            const previewX = gridX + (visibleBarCount - 1) * this.stepsPerBar * stepW;
+            stroke(120, 120, 120, 190);
+            strokeWeight(max(1, this.h * 0.005));
+            line(previewX, gridY - this.h * 0.016, previewX, gridY + gridH + this.h * 0.008);
         }
+
+        let lastChordName = "";
 
         for (let step = 0; step < totalSteps; step++) {
             const x = gridX + step * stepW;
@@ -353,6 +403,10 @@ class TRRecTablature extends UIComponent {
             const s = stepRef.step;
             const isMuted = s?.etat === 2;
             const isHighlighted = !!s?.highlight;
+            const stepFlash = constrain(Number(s?.flash) || 0, 0, 1.5);
+            const flashPulse = constrain(stepFlash / 1.5, 0, 1);
+            const replayPulse = constrain(this._stepPulseByGlobalStep.get(stepRef.globalStep) || 0, 0, 1);
+            const pulse = max(flashPulse, replayPulse);
 
             if (isMuted) {
                 noStroke();
@@ -366,13 +420,20 @@ class TRRecTablature extends UIComponent {
                 rect(x + stepW * 0.04, gridY - this.h * 0.012, stepW * 0.92, gridH + this.h * 0.024, this.h * 0.012);
             }
 
+            if (pulse > 0.01) {
+                noStroke();
+                fill(255, 230, 110, 120 * pulse);
+                rect(x + stepW * 0.02, gridY - this.h * 0.016, stepW * 0.96, gridH + this.h * 0.032, this.h * 0.014);
+            }
+
             const stringMap = this._stepToStringMap(s);
             if (!stringMap || stringMap.size === 0) continue;
 
-            const stepChordName = this._getStepChordName(s);
-            if (stepChordName) {
+            const stepChordName = this.showChordNames ? this._getStepChordName(s) : "";
+            if (stepChordName && stepChordName !== lastChordName) {
+                lastChordName = stepChordName;
                 const chordX = x + stepW * 0.5;
-                const chordY = gridY - rowH * 1.18;
+                const chordY = gridY - rowH * 1.42;
 
                 textAlign(CENTER, CENTER);
                 textSize(this.h * 0.115);
@@ -404,7 +465,9 @@ class TRRecTablature extends UIComponent {
                 const bubbleY = y - bubbleH * 0.5;
 
                 noStroke();
-                fill(isHighlighted ? color(255, 236, 130) : color(244, 244, 244));
+                const baseColor = isHighlighted ? color(255, 236, 130) : color(244, 244, 244);
+                const pulseColor = color(255, 228, 95);
+                fill(lerpColor(baseColor, pulseColor, pulse));
                 rect(bubbleX, bubbleY, bubbleW, bubbleH, bubbleH * 0.28);
 
                 stroke(25, 25, 25, 150);
@@ -416,18 +479,8 @@ class TRRecTablature extends UIComponent {
             }
         }
 
-        if (visibleBarCount > 4) {
-            const anticipationX = gridX + (visibleBarCount - 1) * this.stepsPerBar * stepW;
-            noFill();
-            stroke(150, 150, 150, 150);
-            strokeWeight(max(1, this.h * 0.004));
-            rect(
-                anticipationX + stepW * 0.08,
-                gridY - this.h * 0.01,
-                this.stepsPerBar * stepW - stepW * 0.16,
-                gridH + this.h * 0.02,
-                this.h * 0.012
-            );
+        if (hasActivePulse) {
+            this.invalidate();
         }
     }
 }

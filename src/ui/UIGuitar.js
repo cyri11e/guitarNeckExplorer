@@ -1433,13 +1433,30 @@ fromScreen(x, y) {
         for (const n of targetList) {
             const key = `${n.string}:${n.fret}`;
             const existing = currentMap.get(key);
+            const isSequenceReplay = popInAnimType === "popSeq";
 
             if (existing) {
                 existing.displayMode = this._normalizeDisplayMode(n.displayMode ?? existing.displayMode);
+                if (isSequenceReplay) {
+                    existing.seqHoldPulse = true;
+                    existing.seqHoldPulseStart = now;
+                    existing.seqHoldPulseFrequency = 16;
+                    existing.seqHoldPulseAlphaMin = 45;
+                    existing.seqHoldPulseAlphaMax = 190;
+                    existing.seqHoldPulseScale = 0.34;
+                } else {
+                    delete existing.seqHoldPulse;
+                    delete existing.seqHoldPulseStart;
+                    delete existing.seqHoldPulseFrequency;
+                    delete existing.seqHoldPulseAlphaMin;
+                    delete existing.seqHoldPulseAlphaMax;
+                    delete existing.seqHoldPulseScale;
+                }
+
                 if (replayExisting) {
-                    // Ne ré-animer que si la note ne vient PAS du pad précédent
+                    // En séquence, chaque step est une réattaque: rejouer l'anim même si la note est identique.
                     const wasInPreviousPad = prevMap.has(key);
-                    if (!wasInPreviousPad) {
+                    if (isSequenceReplay || !wasInPreviousPad) {
                         existing.animStart = now;
                         existing.animDuration = popInDuration;
                         existing.animType = popInAnimType;
@@ -1453,7 +1470,13 @@ fromScreen(x, y) {
                     string: n.string,
                     animStart: now,
                     animDuration: popInDuration,
-                    animType: popInAnimType
+                    animType: popInAnimType,
+                    seqHoldPulse: isSequenceReplay,
+                    seqHoldPulseStart: isSequenceReplay ? now : undefined,
+                    seqHoldPulseFrequency: isSequenceReplay ? 16 : undefined,
+                    seqHoldPulseAlphaMin: isSequenceReplay ? 45 : undefined,
+                    seqHoldPulseAlphaMax: isSequenceReplay ? 190 : undefined,
+                    seqHoldPulseScale: isSequenceReplay ? 0.34 : undefined
                 });
             }
         }
@@ -1512,6 +1535,41 @@ fromScreen(x, y) {
             popOutDuration,
             this.previousPadNotesSelected
         );
+
+        const clearSeqHoldPulse = (list) => {
+            if (!Array.isArray(list)) return;
+            for (const n of list) {
+                if (!n) continue;
+                delete n.seqHoldPulse;
+                delete n.seqHoldPulseStart;
+                delete n.seqHoldPulseFrequency;
+                delete n.seqHoldPulseAlphaMin;
+                delete n.seqHoldPulseAlphaMax;
+                delete n.seqHoldPulseScale;
+            }
+        };
+
+        if (isSequenceProfile) {
+            const now = millis();
+            const applySeqHoldPulse = (list) => {
+                if (!Array.isArray(list)) return;
+                for (const n of list) {
+                    if (!n) continue;
+                    n.seqHoldPulse = true;
+                    if (!Number.isFinite(n.seqHoldPulseStart)) n.seqHoldPulseStart = now;
+                    n.seqHoldPulseFrequency = Number.isFinite(n.seqHoldPulseFrequency) ? n.seqHoldPulseFrequency : 16;
+                    n.seqHoldPulseAlphaMin = Number.isFinite(n.seqHoldPulseAlphaMin) ? n.seqHoldPulseAlphaMin : 45;
+                    n.seqHoldPulseAlphaMax = Number.isFinite(n.seqHoldPulseAlphaMax) ? n.seqHoldPulseAlphaMax : 190;
+                    n.seqHoldPulseScale = Number.isFinite(n.seqHoldPulseScale) ? n.seqHoldPulseScale : 0.34;
+                }
+            };
+
+            applySeqHoldPulse(this.pinnedNotes);
+            applySeqHoldPulse(this.selectedNotes);
+        } else {
+            clearSeqHoldPulse(this.pinnedNotes);
+            clearSeqHoldPulse(this.selectedNotes);
+        }
 
         // Mise à jour de l'historique du pad pour la prochaine transition
         this.previousPadNotesPinned = prevPinned;

@@ -320,6 +320,24 @@ function applyTRRecImportPayload(components, payload) {
 function stopTRRecPlayback(components) {
     const bpm = components.find(c => c.name === "bpmCtrl");
     const playBtn = components.find(c => c.name === "playBtn");
+    const guitar = components.find(c => c.name === "guitar1");
+
+    const clearSeqHoldPulse = (list) => {
+        if (!Array.isArray(list)) return;
+        for (const n of list) {
+            if (!n) continue;
+            delete n.seqHoldPulse;
+            delete n.seqHoldPulseStart;
+            delete n.seqHoldPulseFrequency;
+            delete n.seqHoldPulseAlphaMin;
+            delete n.seqHoldPulseAlphaMax;
+            delete n.seqHoldPulseScale;
+        }
+    };
+
+    clearSeqHoldPulse(guitar?.pinnedNotes);
+    clearSeqHoldPulse(guitar?.selectedNotes);
+    guitar?.invalidate?.();
 
     if (bpm) {
         bpm.isPlaying = false;
@@ -1279,7 +1297,7 @@ guitar.invalidate();
     const index = guitar.snapshots.length + 1;
     let title = `${index}`;
 
-    // priorité : dernière pinned → dernière selected → root
+    // priorité : dernière selected → dernière pinned → root
     let mainLabel = null;
 
     const getLabel = (n) => {
@@ -1289,11 +1307,11 @@ guitar.invalidate();
         return lbl.base + lbl.alt;
     };
 
-    if (hasPinned) {
-        mainLabel = getLabel(guitar.pinnedNotes[guitar.pinnedNotes.length - 1]);
-    }
     if (!mainLabel && hasSelected) {
         mainLabel = getLabel(guitar.selectedNotes[guitar.selectedNotes.length - 1]);
+    }
+    if (!mainLabel && hasPinned) {
+        mainLabel = getLabel(guitar.pinnedNotes[guitar.pinnedNotes.length - 1]);
     }
     if (!mainLabel && hasRoot) {
         const lbl = guitar.theory.getNoteLabel(guitar.theory.root, guitar.displayMode);
@@ -1313,13 +1331,17 @@ guitar.invalidate();
         title += ` - marked`;
     }
 
+    const snapshotPinnedNotes = hasSelected
+        ? deepClone(guitar.selectedNotes)
+        : deepClone(guitar.pinnedNotes);
+
     // -----------------------------------------
     // 2) Création du snapshot
     // -----------------------------------------
     const snap = {
         title,
-        pinnedNotes: deepClone(guitar.pinnedNotes),
-        selectedNotes: deepClone(guitar.selectedNotes),
+        pinnedNotes: snapshotPinnedNotes,
+        selectedNotes: [],
         root: hasRoot ? guitar.theory.root : null,
         markerSegments: deepClone(guitar.markerSegments),
         harmonyName: String(guitar.selectionHarmonyName || "").trim() || null
@@ -1735,6 +1757,24 @@ guitar.invalidate();
         bpm.ledPhase = 0;
         resetTRRecPosition(tr, loopMode);
     } else if (tr) {
+        const guitar = components.find(c => c.name === "guitar1");
+        const clearSeqHoldPulse = (list) => {
+            if (!Array.isArray(list)) return;
+            for (const n of list) {
+                if (!n) continue;
+                delete n.seqHoldPulse;
+                delete n.seqHoldPulseStart;
+                delete n.seqHoldPulseFrequency;
+                delete n.seqHoldPulseAlphaMin;
+                delete n.seqHoldPulseAlphaMax;
+                delete n.seqHoldPulseScale;
+            }
+        };
+
+        clearSeqHoldPulse(guitar?.pinnedNotes);
+        clearSeqHoldPulse(guitar?.selectedNotes);
+        guitar?.invalidate?.();
+
         tr.playIndex = 0;
 
         if (Array.isArray(tr.states)) {
@@ -1865,7 +1905,10 @@ guitar.invalidate();
     });
 
     // --- LCD2 ---
-    lcd2.state = snapshotIndex;
+    // On met à jour l'affichage sans passer par le setter (qui déclencherait
+    // la règle lcd2 → applySnapshotAnimated sans animProfile:"sequence",
+    // ce qui effacerait seqHoldPulse immédiatement après qu'on vient de le poser).
+    lcd2._index = Number.isFinite(snapshotIndex) ? lcd2.wrap(snapshotIndex) : lcd2._index;
     lcd2.invalidate();
 }
 

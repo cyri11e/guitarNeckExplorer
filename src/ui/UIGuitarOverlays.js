@@ -269,6 +269,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
     drawNoteList(list, opts = {}) {
         const g = this.g;
         const app = g.app;
+        let needsHoldPulseFrame = false;
 
         const {
             fillColor = "#ffffff",
@@ -323,6 +324,20 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 }
             }
 
+            const holdPulseActive = !!n.seqHoldPulse;
+            if (holdPulseActive) {
+                animOpts.holdPulse = {
+                    active: true,
+                    startedAt: n.seqHoldPulseStart ?? millis(),
+                    frequency: n.seqHoldPulseFrequency ?? 16,
+                    alphaMin: n.seqHoldPulseAlphaMin ?? 45,
+                    alphaMax: n.seqHoldPulseAlphaMax ?? 190,
+                    scale: n.seqHoldPulseScale ?? 0.34,
+                    color: color(255, 255, 255)
+                };
+                needsHoldPulseFrame = true;
+            }
+
             this.drawNote(pos.x, pos.y, {
                 fillColor,
                 strokeColor,
@@ -333,6 +348,10 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 bottomRightLabelColor: color(76, 255, 0),
                 ...animOpts
             });
+        }
+
+        if (needsHoldPulseFrame) {
+            g.invalidate();
         }
     }
 
@@ -352,6 +371,7 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
         const g = this.g;
         const app = g.app;
         const degreeMap = this._buildChordDegreeMap(g.selectedNotes || []);
+        let needsHoldPulseFrame = false;
 
         for (let n of (g.selectedNotes || [])) {
             const inFretRange = n.fret >= 0 && n.fret <= g.fretCount;
@@ -393,6 +413,20 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 }
             }
 
+            const holdPulseActive = !!n.seqHoldPulse;
+            if (holdPulseActive) {
+                animOpts.holdPulse = {
+                    active: true,
+                    startedAt: n.seqHoldPulseStart ?? millis(),
+                    frequency: n.seqHoldPulseFrequency ?? 16,
+                    alphaMin: n.seqHoldPulseAlphaMin ?? 45,
+                    alphaMax: n.seqHoldPulseAlphaMax ?? 190,
+                    scale: n.seqHoldPulseScale ?? 0.34,
+                    color: color(255, 255, 255)
+                };
+                needsHoldPulseFrame = true;
+            }
+
             let selectionCornerPulse = 0;
             if (n.selectionPulseStart) {
                 const pulseElapsed = millis() - n.selectionPulseStart;
@@ -419,6 +453,10 @@ this.noteRenderer = new NoteRenderer(this.g, this.style);
                 bottomRightLabelColor: color(76, 255, 0),
                 ...animOpts
             });
+        }
+
+        if (needsHoldPulseFrame) {
+            g.invalidate();
         }
     }
 
@@ -1646,6 +1684,7 @@ const list = this._getDispatchedIntervalList(
         g.selectionHarmonyName = selectedAnalysis?.chord
             ? String(baseSimpleName || "")
             : "";
+
         const lineNameText = showRomanBlock
             ? `${baseSimpleName} (${selectedRomanDegree})`
             : baseSimpleName;
@@ -1654,13 +1693,6 @@ const list = this._getDispatchedIntervalList(
         if (overlayInfo.fullName) leftHudParts.push(overlayInfo.fullName);
         if (overlayInfo.details && overlayInfo.details.trim()) leftHudParts.push(overlayInfo.details.trim());
         const lineDetailsText = leftHudParts.join(' • ');
-
-        if (!lineNameText) return;
-        
-        // Get X position from min fret (leftmost)
-        const leftAnchorFret = Math.max(0, minFret - 1);
-        const pos = g.toScreen(leftAnchorFret, 3);  // Decale d'une frette vers la gauche
-        let overlayX = pos?.x || g.x;
 
         push();
         const textUnit = 12 * overlayScale;
@@ -1675,16 +1707,16 @@ const list = this._getDispatchedIntervalList(
         const nameH = textAscent() + textDescent();
 
         textSize(detailsTextSize);
-        const detailsW = textWidth(lineDetailsText);
-        const detailsH = textAscent() + textDescent();
 
         const rightW = nameW + blockPadX * 2;
-
         const rightPadTop = blockPadY;
         const rightPadBottom = blockPadY;
         const totalH = rightPadTop + nameH + rightPadBottom;
         const totalW = rightW;
 
+        const leftAnchorFret = Math.max(0, minFret - 1);
+        const pos = g.toScreen(leftAnchorFret, 3);
+        let overlayX = pos?.x || g.x;
         overlayX = Math.max(g.x, Math.min(overlayX, g.x + g.w - totalW));
 
         const rightX = overlayX;

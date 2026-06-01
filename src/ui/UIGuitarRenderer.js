@@ -142,6 +142,75 @@ class GuitarRenderer {
         }
     }
 
+    drawSequenceStringPulse() {
+        const g = this.g;
+        const notes = [
+            ...(g.pinnedNotes || []),
+            ...(g.selectedNotes || [])
+        ];
+
+        const activeByString = new Map();
+        for (const n of notes) {
+            if (!n?.seqHoldPulse) continue;
+            if (!Number.isFinite(n.string) || n.string < 1 || n.string > g.strings.length) continue;
+            activeByString.set(n.string, n);
+        }
+
+        if (activeByString.size === 0) return;
+
+        const now = millis();
+
+        push();
+        noFill();
+        strokeCap(ROUND);
+
+        for (const [stringNumber, note] of activeByString.entries()) {
+            const s = g.strings[stringNumber - 1];
+            if (!s) continue;
+
+            const pos = g.toScreen?.(note.fret, note.string) || null;
+
+            const startedAt = Number.isFinite(note.seqHoldPulseStart) ? note.seqHoldPulseStart : now;
+            const freq = Number.isFinite(note.seqHoldPulseFrequency) ? note.seqHoldPulseFrequency : 16;
+            const t = (now - startedAt) / 1000;
+            const osc = (Math.sin(t * freq * TWO_PI) + 1) * 0.5;
+            const pulse = Math.pow(osc, 0.55);
+
+            const alpha = lerp(55, 255, pulse);
+            const weight = lerp(max(1, s.h * 0.16), max(1.5, s.h * 0.34), pulse);
+            const glowWeight = weight * 1.7;
+            const y = s.y + s.h * 0.5;
+            const noteRadius = this.g.getThickness() * 0.17;
+            const x1 = pos ? max(pos.x + noteRadius * 0.9, s.x) : s.x;
+            const x2 = s.x + s.w;
+            const jitterBase = Math.sin(t * freq * TWO_PI * 1.75 + stringNumber * 1.31);
+            const jitter = jitterBase * (s.h * 0.045 * pulse);
+
+            if (x1 >= x2) continue;
+
+            // halo principal, blanc pur
+            stroke(255, alpha);
+            strokeWeight(glowWeight);
+            line(x1 + jitter, y, x2 + jitter, y);
+
+            // vibration subtile: trois traits rapides autour du centre
+            const vibAmp = s.h * 0.16 * pulse;
+            stroke(255, alpha * 0.65);
+            strokeWeight(weight * 0.72);
+            line(x1 + jitter * 0.6, y - vibAmp, x2 + jitter * 0.6, y - vibAmp);
+            line(x1 - jitter * 0.45, y + vibAmp, x2 - jitter * 0.45, y + vibAmp);
+
+            stroke(255, alpha * 0.45);
+            strokeWeight(weight * 0.5);
+            line(x1 - jitter * 0.25, y, x2 - jitter * 0.25, y);
+        }
+
+        pop();
+
+        // Maintenir la boucle d'animation indépendamment des overlays de notes.
+        this.g.invalidate();
+    }
+
     drawInlays() {
         const t = this.g.getThickness();
 
@@ -233,6 +302,7 @@ class GuitarRenderer {
         this.drawStringShadows();
         this.drawFrets();
         this.drawStrings();
+        this.drawSequenceStringPulse();
         this.drawOpenStringLabels();
     }
 }

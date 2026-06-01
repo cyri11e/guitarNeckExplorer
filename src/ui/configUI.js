@@ -539,7 +539,7 @@ trRecTabPanel: {
     xp: 30,
     yp: 30,
     sp: 22,
-    aspectRatio: 3.4,
+    aspectRatio: 6.2,
     children: ["trRecTab"]
 },
 
@@ -548,7 +548,7 @@ trRecTab: {
     xp: 0,
     yp: 0,
     sp: 100,
-    aspectRatio: 3.4,
+    aspectRatio: 4.2,
     stepsPerBar: 4,
     visibleBars: 5,
     description: "Tablature sequenceur"
