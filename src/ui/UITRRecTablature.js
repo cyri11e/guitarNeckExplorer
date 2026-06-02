@@ -25,6 +25,7 @@ class TRRecTablature extends UIComponent {
         this._harmonyDetector = null;
         this._stepPulseByGlobalStep = new Map();
         this._lastHighlightedGlobalStep = null;
+        this._manualCursorGlobalStep = null;
 
         this.showChordNames = cfg.showChordNames ?? true;
 
@@ -107,6 +108,51 @@ class TRRecTablature extends UIComponent {
             step,
             exists: Array.isArray(measure)
         };
+    }
+
+    _resolveGlobalStep(globalStep) {
+        const tr = this._trRec;
+        if (!tr || !Number.isFinite(globalStep)) return null;
+
+        const padCount = this._getPadCount();
+        const measures = Array.isArray(tr.measures) ? tr.measures : [];
+
+        const measureIndex = Math.floor(globalStep / padCount);
+        const stepIndex = ((globalStep % padCount) + padCount) % padCount;
+        const measure = measures[measureIndex] || null;
+        const step = Array.isArray(measure) ? (measure[stepIndex] || null) : null;
+
+        return {
+            measureIndex,
+            stepIndex,
+            globalStep,
+            step,
+            exists: Array.isArray(measure)
+        };
+    }
+
+    _stepHasPlayableNotes(stepData) {
+        if (!stepData || stepData.etat !== 1) return false;
+        const map = this._stepToStringMap(stepData);
+        return !!(map && map.size > 0);
+    }
+
+    _findActiveCursorGlobalStep(highlightedGlobalStep) {
+        if (!Number.isInteger(highlightedGlobalStep)) return null;
+
+        let globalStep = highlightedGlobalStep;
+        while (globalStep >= 0) {
+            const ref = this._resolveGlobalStep(globalStep);
+            if (!ref || !ref.exists) return null;
+
+            const stepData = ref.step;
+            if (stepData?.etat === 2) return null;
+            if (this._stepHasPlayableNotes(stepData)) return globalStep;
+
+            globalStep -= 1;
+        }
+
+        return null;
     }
 
     _tabFretsToMap(tabFrets) {
@@ -215,7 +261,7 @@ class TRRecTablature extends UIComponent {
         // Plus d'air en partie haute + lignes un peu plus compactes verticalement.
         const padTop = this.h * 0.40;
         const padBottom = this.h * 0.09;
-        const padLeft = this.w * 0.075;
+        const padLeft = this.w * 0.03;
         const padRight = this.w * 0.03;
 
         const gridX = this.x + padLeft;
@@ -253,9 +299,246 @@ class TRRecTablature extends UIComponent {
         );
     }
 
+    _isTopMarkerBandHit(mx, my, layout) {
+        if (!layout) return false;
+
+        const bandTop = layout.gridY - layout.rowH * 0.68;
+        const bandBottom = layout.gridY - layout.rowH * 0.12;
+        return (
+            mx >= layout.gridX &&
+            mx <= layout.gridX + layout.gridW &&
+            my >= bandTop &&
+            my <= bandBottom
+        );
+    }
+
+    _normalizeTopMarker(value) {
+        if (value === "PM" || value === "^") return value;
+        return null;
+    }
+
+    _cycleTopMarker(stepData) {
+        if (!stepData || typeof stepData !== "object") return;
+
+        const current = this._normalizeTopMarker(stepData.topMarker);
+        if (current == null) {
+            stepData.topMarker = "PM";
+            return;
+        }
+
+        if (current === "PM") {
+            stepData.topMarker = "^";
+            return;
+        }
+
+        stepData.topMarker = null;
+    }
+
+    _normalizeNoteFx(value) {
+        if (value === "bendQuarter" || value === "bendHalf" || value === "bendFull" || value === "slide" || value === "slidePrev" || value === "hammer" || value === "pull") return value;
+        return null;
+    }
+
+    _getStepNoteFx(stepData, stringNumber) {
+        if (!stepData || !Number.isFinite(stringNumber)) return null;
+        return this._normalizeNoteFx(stepData?.noteFx?.[String(stringNumber)]);
+    }
+
+    _getStepFxMentions(stepData) {
+        if (!stepData || typeof stepData.noteFx !== "object" || !stepData.noteFx) return [];
+
+        let hasBend = false;
+        let hasSlide = false;
+        let hasHammer = false;
+        let hasPull = false;
+        for (const rawFx of Object.values(stepData.noteFx)) {
+            const fx = this._normalizeNoteFx(rawFx);
+            if (fx === "bendQuarter" || fx === "bendHalf" || fx === "bendFull") hasBend = true;
+            if (fx === "slide" || fx === "slidePrev") hasSlide = true;
+            if (fx === "hammer") hasHammer = true;
+            if (fx === "pull") hasPull = true;
+        }
+
+        const out = [];
+        if (hasBend) out.push("b");
+        if (hasSlide) out.push("sl.");
+        if (hasHammer) out.push("H");
+        if (hasPull) out.push("P");
+        return out;
+    }
+
+    _setStepNoteFx(stepData, stringNumber, fx) {
+        if (!stepData || !Number.isFinite(stringNumber)) return;
+
+        const safeFx = this._normalizeNoteFx(fx);
+        if (!stepData.noteFx || typeof stepData.noteFx !== "object") {
+            stepData.noteFx = {};
+        }
+
+        if (!safeFx) {
+            delete stepData.noteFx[String(stringNumber)];
+            if (Object.keys(stepData.noteFx).length === 0) {
+                stepData.noteFx = null;
+            }
+            return;
+        }
+
+        stepData.noteFx[String(stringNumber)] = safeFx;
+    }
+
+    _cycleStepNoteFx(stepData, stringNumber) {
+        const current = this._getStepNoteFx(stepData, stringNumber);
+        const order = [null, "bendQuarter", "bendHalf", "bendFull", "slide", "hammer"];
+        const idx = order.indexOf(current);
+        const next = order[(idx + 1) % order.length];
+        this._setStepNoteFx(stepData, stringNumber, next);
+    }
+
+    _toggleStepPullFx(stepData, stringNumber) {
+        const current = this._getStepNoteFx(stepData, stringNumber);
+        this._setStepNoteFx(stepData, stringNumber, current === "pull" ? null : "pull");
+    }
+
+    _drawHeldArc(startX, endX, anchorY) {
+        const arcCenterX = (startX + endX) * 0.5;
+        const arcWidth = max(4, abs(endX - startX) * 1.02);
+        const arcHeight = max(this.h * 0.035, this.h * 0.052);
+        const arcCenterY = anchorY - arcHeight * 0.02;
+
+        noFill();
+        stroke(32, 32, 32, 220);
+        strokeWeight(max(1.1, this.h * 0.0034));
+        arc(arcCenterX, arcCenterY, arcWidth, arcHeight, PI, TWO_PI);
+    }
+
+    _getBubbleRectForNote(layout, stepX, stringNumber, fret) {
+        const rowIndex = layout.stringCount - stringNumber;
+        if (rowIndex < 0 || rowIndex >= layout.stringCount) return null;
+
+        const y = layout.gridY + rowIndex * layout.rowH;
+        const fretText = String(max(0, Math.round(fret)));
+        const fretTextSize = this.h * 0.085;
+
+        textSize(fretTextSize);
+        const bubbleW = max(layout.stepW * 0.64, textWidth(fretText) + this.h * 0.08);
+        const bubbleH = max(layout.rowH * 0.82, fretTextSize * 1.38);
+        const bubbleX = stepX + (layout.stepW - bubbleW) * 0.5;
+        const bubbleY = y - bubbleH * 0.5;
+
+        return {
+            rowIndex,
+            y,
+            bubbleX,
+            bubbleY,
+            bubbleW,
+            bubbleH,
+            centerX: bubbleX + bubbleW * 0.5,
+            centerY: y,
+            leftX: bubbleX,
+            rightX: bubbleX + bubbleW
+        };
+    }
+
+    _findNextPlayableStepOnString(globalStep, stringNumber) {
+        if (!Number.isInteger(globalStep) || !Number.isFinite(stringNumber)) return null;
+
+        const tr = this._trRec;
+        const measures = Array.isArray(tr?.measures) ? tr.measures : [];
+        const padCount = this._getPadCount();
+        const maxGlobal = measures.length * padCount - 1;
+
+        for (let g = globalStep + 1; g <= maxGlobal; g++) {
+            const ref = this._resolveGlobalStep(g);
+            if (!ref || !ref.exists) break;
+
+            if (ref.step?.etat === 2) break;
+
+            const map = this._stepToStringMap(ref.step);
+            if (map && map.has(stringNumber)) {
+                return {
+                    globalStep: g,
+                    fret: map.get(stringNumber)
+                };
+            }
+        }
+
+        return null;
+    }
+
+    _findPreviousPlayableStepOnString(globalStep, stringNumber) {
+        if (!Number.isInteger(globalStep) || !Number.isFinite(stringNumber)) return null;
+
+        const tr = this._trRec;
+        const measures = Array.isArray(tr?.measures) ? tr.measures : [];
+        const padCount = this._getPadCount();
+
+        for (let g = globalStep - 1; g >= 0; g--) {
+            const ref = this._resolveGlobalStep(g);
+            if (!ref || !ref.exists) break;
+
+            if (ref.step?.etat === 2) break;
+
+            const map = this._stepToStringMap(ref.step);
+            if (map && map.has(stringNumber)) {
+                return {
+                    globalStep: g,
+                    fret: map.get(stringNumber)
+                };
+            }
+        }
+
+        return null;
+    }
+
+    _tryHandleNoteFxClick(mx, my, layout, stepRef, col) {
+        if (!layout || !stepRef) return false;
+
+        const stringMap = this._stepToStringMap(stepRef.step);
+        if (!stringMap || stringMap.size === 0) return false;
+
+        const stepX = layout.gridX + col * layout.stepW;
+
+        for (let stringNumber = layout.stringCount; stringNumber >= 1; stringNumber--) {
+            if (!stringMap.has(stringNumber)) continue;
+
+            const fret = stringMap.get(stringNumber);
+            const bubble = this._getBubbleRectForNote(layout, stepX, stringNumber, fret);
+            if (!bubble) continue;
+
+            const insideBubble = (
+                mx >= bubble.bubbleX &&
+                mx <= bubble.bubbleX + bubble.bubbleW &&
+                my >= bubble.bubbleY &&
+                my <= bubble.bubbleY + bubble.bubbleH
+            );
+
+            if (!insideBubble) continue;
+
+            const isRightSide = mx >= bubble.bubbleX + bubble.bubbleW * 0.58;
+            const isLeftSide = mx <= bubble.bubbleX + bubble.bubbleW * 0.42;
+
+            if (isLeftSide) {
+                this._toggleStepPullFx(stepRef.step, stringNumber);
+            } else if (isRightSide) {
+                this._cycleStepNoteFx(stepRef.step, stringNumber);
+            } else {
+                return false;
+            }
+
+            this._manualCursorGlobalStep = stepRef.globalStep;
+            this.invalidate();
+            this._trRec?.invalidate?.();
+            return true;
+        }
+
+        return false;
+    }
+
     _selectSubMeasure(stepRef) {
         const tr = this._trRec;
         if (!tr || !stepRef) return;
+
+        this._manualCursorGlobalStep = stepRef.globalStep;
 
         if (typeof tr.setMeasureIndex === "function" && tr.measureIndex !== stepRef.measureIndex) {
             tr.setMeasureIndex(stepRef.measureIndex);
@@ -301,6 +584,34 @@ class TRRecTablature extends UIComponent {
             return true;
         }
 
+        if (evt.button === LEFT && this._isTopMarkerBandHit(mx, my, layout)) {
+            const col = Math.floor((mx - layout.gridX) / layout.stepW);
+            if (!Number.isFinite(col) || col < 0 || col >= layout.totalSteps) return true;
+
+            const stepRef = this._resolveStepAt(col);
+            if (!stepRef || !stepRef.exists) return true;
+
+            const trMeasures = Array.isArray(tr.measures) ? tr.measures : [];
+            const measure = trMeasures[stepRef.measureIndex];
+            if (!Array.isArray(measure)) return true;
+
+            if (!measure[stepRef.stepIndex]) {
+                measure[stepRef.stepIndex] = (typeof tr.createEmptyStep === "function")
+                    ? tr.createEmptyStep()
+                    : { etat: 0, highlight: false, flash: 0, item: null, itemIndex: null, tabFrets: null, topMarker: null, noteFx: null };
+            }
+
+            this._cycleTopMarker(measure[stepRef.stepIndex]);
+
+            if (tr.measureIndex === stepRef.measureIndex) {
+                tr.states = measure;
+            }
+
+            tr.invalidate?.();
+            this.invalidate();
+            return true;
+        }
+
         if (mx < layout.gridX || mx > layout.gridX + layout.gridW) return true;
         if (my < layout.gridY - layout.rowH * 0.5 || my > layout.gridY + layout.gridH + layout.rowH * 0.5) return true;
 
@@ -309,6 +620,11 @@ class TRRecTablature extends UIComponent {
 
         const stepRef = this._resolveStepAt(col);
         if (!stepRef) return true;
+
+        if (evt.button === LEFT && this._tryHandleNoteFxClick(mx, my, layout, stepRef, col)) {
+            return true;
+        }
+
         this._selectSubMeasure(stepRef);
         return true;
     }
@@ -353,10 +669,16 @@ class TRRecTablature extends UIComponent {
             }
         }
 
+        const sourceCursorGlobalStep = Number.isInteger(highlightedGlobalStep)
+            ? highlightedGlobalStep
+            : (Number.isInteger(this._manualCursorGlobalStep) ? this._manualCursorGlobalStep : null);
+
         if (Number.isInteger(highlightedGlobalStep) && highlightedGlobalStep !== this._lastHighlightedGlobalStep) {
             this._stepPulseByGlobalStep.set(highlightedGlobalStep, 1);
+            this._manualCursorGlobalStep = null;
         }
         this._lastHighlightedGlobalStep = highlightedGlobalStep;
+        const activeCursorGlobalStep = this._findActiveCursorGlobalStep(sourceCursorGlobalStep);
 
         let hasActivePulse = false;
         for (const [globalStep, value] of this._stepPulseByGlobalStep.entries()) {
@@ -394,6 +716,7 @@ class TRRecTablature extends UIComponent {
         }
 
         let lastChordName = "";
+        const drawnLegatoArcs = new Set();
 
         for (let step = 0; step < totalSteps; step++) {
             const x = gridX + step * stepW;
@@ -403,10 +726,13 @@ class TRRecTablature extends UIComponent {
             const s = stepRef.step;
             const isMuted = s?.etat === 2;
             const isHighlighted = !!s?.highlight;
+            const isActiveCursorStep = stepRef.globalStep === activeCursorGlobalStep;
             const stepFlash = constrain(Number(s?.flash) || 0, 0, 1.5);
             const flashPulse = constrain(stepFlash / 1.5, 0, 1);
             const replayPulse = constrain(this._stepPulseByGlobalStep.get(stepRef.globalStep) || 0, 0, 1);
             const pulse = max(flashPulse, replayPulse);
+            const stepTopMarker = this._normalizeTopMarker(s?.topMarker);
+            const stepFxMentions = this._getStepFxMentions(s);
 
             if (isMuted) {
                 noStroke();
@@ -414,7 +740,7 @@ class TRRecTablature extends UIComponent {
                 rect(x + stepW * 0.07, gridY - this.h * 0.008, stepW * 0.86, gridH + this.h * 0.016, this.h * 0.01);
             }
 
-            if (isHighlighted) {
+            if (isActiveCursorStep) {
                 noStroke();
                 fill(255, 205, 40, 120);
                 rect(x + stepW * 0.04, gridY - this.h * 0.012, stepW * 0.92, gridH + this.h * 0.024, this.h * 0.012);
@@ -424,6 +750,18 @@ class TRRecTablature extends UIComponent {
                 noStroke();
                 fill(255, 230, 110, 120 * pulse);
                 rect(x + stepW * 0.02, gridY - this.h * 0.016, stepW * 0.96, gridH + this.h * 0.032, this.h * 0.014);
+            }
+
+            const topMentions = [];
+            if (stepTopMarker) topMentions.push(stepTopMarker);
+            if (stepFxMentions.length > 0) topMentions.push(...stepFxMentions);
+
+            if (topMentions.length > 0) {
+                noStroke();
+                fill(isActiveCursorStep ? 25 : 35);
+                textAlign(CENTER, CENTER);
+                textSize(this.h * 0.08);
+                text(topMentions.join(" "), x + stepW * 0.5, gridY - rowH * 0.38);
             }
 
             const stringMap = this._stepToStringMap(s);
@@ -463,19 +801,153 @@ class TRRecTablature extends UIComponent {
                 const bubbleH = max(rowH * 0.82, fretTextSize * 1.38);
                 const bubbleX = x + (stepW - bubbleW) * 0.5;
                 const bubbleY = y - bubbleH * 0.5;
+                const noteFx = this._getStepNoteFx(s, stringNumber);
+
+                if (noteFx === "hammer") {
+                    const nextOnString = this._findNextPlayableStepOnString(stepRef.globalStep, stringNumber);
+                    if (nextOnString) {
+                        const nextWindowCol = nextOnString.globalStep - this._getWindowStartGlobalStep();
+                        if (nextWindowCol >= 0 && nextWindowCol < totalSteps) {
+                            const nextX = gridX + nextWindowCol * stepW;
+                            const nextBubble = this._getBubbleRectForNote(layout, nextX, stringNumber, nextOnString.fret);
+
+                            if (nextBubble) {
+                                const arcKey = `${stepRef.globalStep}:${nextOnString.globalStep}:${stringNumber}:${noteFx}`;
+                                if (!drawnLegatoArcs.has(arcKey)) {
+                                    const arcAnchorY = min(bubbleY, nextBubble.bubbleY) - this.h * 0.012;
+                                    this._drawHeldArc(
+                                        bubbleX + bubbleW * 0.5,
+                                        nextBubble.bubbleX + nextBubble.bubbleW * 0.5,
+                                        arcAnchorY
+                                    );
+                                    drawnLegatoArcs.add(arcKey);
+                                }
+                            }
+                        }
+                    }
+                } else if (noteFx === "pull") {
+                    const prevOnString = this._findPreviousPlayableStepOnString(stepRef.globalStep, stringNumber);
+                    if (prevOnString) {
+                        const prevWindowCol = prevOnString.globalStep - this._getWindowStartGlobalStep();
+                        if (prevWindowCol >= 0 && prevWindowCol < totalSteps) {
+                            const prevX = gridX + prevWindowCol * stepW;
+                            const prevBubble = this._getBubbleRectForNote(layout, prevX, stringNumber, prevOnString.fret);
+
+                            if (prevBubble) {
+                                const arcKey = `${prevOnString.globalStep}:${stepRef.globalStep}:${stringNumber}:pull`;
+                                if (!drawnLegatoArcs.has(arcKey)) {
+                                    const arcAnchorY = min(bubbleY, prevBubble.bubbleY) - this.h * 0.012;
+                                    this._drawHeldArc(
+                                        prevBubble.bubbleX + prevBubble.bubbleW * 0.5,
+                                        bubbleX + bubbleW * 0.5,
+                                        arcAnchorY
+                                    );
+                                    drawnLegatoArcs.add(arcKey);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 noStroke();
-                const baseColor = isHighlighted ? color(255, 236, 130) : color(244, 244, 244);
+                const baseColor = isActiveCursorStep ? color(20, 20, 20) : (isHighlighted ? color(255, 236, 130) : color(244, 244, 244));
                 const pulseColor = color(255, 228, 95);
-                fill(lerpColor(baseColor, pulseColor, pulse));
+                const bubbleColor = isActiveCursorStep ? baseColor : lerpColor(baseColor, pulseColor, pulse);
+                fill(bubbleColor);
                 rect(bubbleX, bubbleY, bubbleW, bubbleH, bubbleH * 0.28);
 
                 stroke(25, 25, 25, 150);
                 strokeWeight(max(1, this.h * 0.0025));
-                fill(20);
+                fill(isActiveCursorStep ? 255 : 20);
                 textAlign(CENTER, CENTER);
                 textSize(fretTextSize);
                 text(fretText, x + stepW * 0.5, y + rowH * 0.01);
+
+                if (noteFx === "bendQuarter" || noteFx === "bendHalf" || noteFx === "bendFull") {
+                    const bendStartX = bubbleX + bubbleW * 0.83;
+                    const bendStartY = y + bubbleH * 0.06;
+                    const arcRadius = stepW * 0.42;
+                    const arcSweep = HALF_PI;
+                    const arcSegments = 12;
+
+                    const bendEndX = bendStartX + arcRadius * sin(arcSweep);
+                    const bendEndY = bendStartY - arcRadius * (1 - cos(arcSweep));
+
+                    noFill();
+                    stroke(30, 30, 30, 230);
+                    strokeWeight(max(1, this.h * 0.003));
+                    beginShape();
+                    for (let i = 0; i <= arcSegments; i++) {
+                        const t = arcSweep * (i / arcSegments);
+                        const vx = bendStartX + arcRadius * sin(t);
+                        const vy = bendStartY - arcRadius * (1 - cos(t));
+                        vertex(vx, vy);
+                    }
+                    endShape();
+
+                    const headW = stepW * 0.09;
+                    const headH = rowH * 0.22;
+                    line(bendEndX, bendEndY, bendEndX - headW, bendEndY + headH);
+                    line(bendEndX, bendEndY, bendEndX + headW, bendEndY + headH);
+
+                    noStroke();
+                    fill(25);
+                    textAlign(CENTER, CENTER);
+                    textSize(this.h * 0.052);
+                    text(noteFx === "bendQuarter" ? "1/4" : (noteFx === "bendHalf" ? "1/2" : "1"), bendEndX, bendEndY - rowH * 0.17);
+                } else if (noteFx === "slide") {
+                    const nextOnString = this._findNextPlayableStepOnString(stepRef.globalStep, stringNumber);
+                    if (nextOnString) {
+                        const nextWindowCol = nextOnString.globalStep - this._getWindowStartGlobalStep();
+                        if (nextWindowCol >= 0 && nextWindowCol < totalSteps) {
+                            const nextX = gridX + nextWindowCol * stepW;
+                            const nextBubble = this._getBubbleRectForNote(layout, nextX, stringNumber, nextOnString.fret);
+
+                            if (nextBubble) {
+                                const isUpMove = Number(nextOnString.fret) >= Number(fret);
+                                stroke(35, 35, 35, 210);
+                                strokeWeight(max(1.8, this.h * 0.0056));
+                                noFill();
+
+                                const slideStartX = bubbleX + bubbleW;
+                                const slideStartY = isUpMove
+                                    ? (bubbleY + bubbleH)
+                                    : (bubbleY + bubbleH * 0.35);
+                                const slideEndX = nextBubble.bubbleX;
+                                const rawEndY = isUpMove
+                                    ? nextBubble.bubbleY
+                                    : (nextBubble.bubbleY + nextBubble.bubbleH * 0.65);
+                                const slideEndY = isUpMove
+                                    ? lerp(rawEndY, slideStartY, 0.33)
+                                    : lerp(rawEndY, slideStartY, 0.52);
+
+                                line(slideStartX, slideStartY, slideEndX, slideEndY);
+
+                                const arcKey = `${stepRef.globalStep}:${nextOnString.globalStep}:${stringNumber}:slide`;
+                                if (!drawnLegatoArcs.has(arcKey)) {
+                                    const arcAnchorY = min(slideStartY, slideEndY) - this.h * 0.014;
+                                    this._drawHeldArc(
+                                        bubbleX + bubbleW * 0.5,
+                                        nextBubble.bubbleX + nextBubble.bubbleW * 0.5,
+                                        arcAnchorY
+                                    );
+                                    drawnLegatoArcs.add(arcKey);
+                                }
+                            }
+                        }
+                    } else {
+                        // slide out: pas de note suivante, on prolonge vers la droite
+                        stroke(35, 35, 35, 210);
+                        strokeWeight(max(1.8, this.h * 0.0056));
+                        noFill();
+
+                        const slideStartX = bubbleX + bubbleW;
+                        const slideStartY = bubbleY + bubbleH * 0.68;
+                        const slideEndX = min(gridX + gridW - stepW * 0.08, slideStartX + stepW * 0.75);
+                        const slideEndY = slideStartY - rowH * 0.22;
+                        line(slideStartX, slideStartY, slideEndX, slideEndY);
+                    }
+                }
             }
         }
 

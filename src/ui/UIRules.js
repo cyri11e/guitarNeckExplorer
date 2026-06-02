@@ -36,6 +36,27 @@ function sanitizeTabFrets(tabFrets) {
     return Object.keys(out).length > 0 ? out : null;
 }
 
+function sanitizeStepTopMarker(marker) {
+    if (marker === "PM" || marker === "^") return marker;
+    return null;
+}
+
+function sanitizeStepNoteFx(noteFx) {
+    if (!noteFx || typeof noteFx !== "object") return null;
+
+    const out = {};
+    for (const [k, v] of Object.entries(noteFx)) {
+        const stringNumber = Number(k);
+        if (!Number.isFinite(stringNumber) || stringNumber < 1 || stringNumber > 6) continue;
+
+        if (v === "bendQuarter" || v === "bendHalf" || v === "bendFull" || v === "slide" || v === "slidePrev" || v === "hammer" || v === "pull") {
+            out[String(stringNumber)] = v;
+        }
+    }
+
+    return Object.keys(out).length > 0 ? out : null;
+}
+
 function buildSnapshotFromTabFrets(tabFrets) {
     const safeTabFrets = sanitizeTabFrets(tabFrets);
     const selectedNotes = [];
@@ -117,12 +138,14 @@ function queueSnapshotInNextFreeTRRecSlot(trRec, snapshotIndex, snapshotTitle) {
     const measure = trRec.measures[targetMeasure];
     const step = typeof trRec.createEmptyStep === "function"
         ? trRec.createEmptyStep()
-        : { etat: 0, highlight: false, flash: 0, item: null, itemIndex: null, tabFrets: null };
+        : { etat: 0, highlight: false, flash: 0, item: null, itemIndex: null, tabFrets: null, topMarker: null, noteFx: null };
 
     step.etat = 1;
     step.item = snapshotTitle;
     step.itemIndex = snapshotIndex;
     step.tabFrets = null;
+    step.topMarker = null;
+    step.noteFx = null;
     measure[targetStep] = step;
 
     if (targetMeasure === trRec.measureIndex) {
@@ -136,6 +159,7 @@ function queueSnapshotInNextFreeTRRecSlot(trRec, snapshotIndex, snapshotTitle) {
 function createTRRecExportPayload(components) {
     const guitar = components.find(c => c.name === "guitar1");
     const trRec = components.find(c => c.name === "trRecPads");
+    const bpm = components.find(c => c.name === "bpmCtrl");
     if (!guitar || !trRec) return null;
 
     const measures = Array.isArray(trRec.measures) ? trRec.measures : [];
@@ -161,6 +185,16 @@ function createTRRecExportPayload(components) {
                 out.tabFrets = tabFrets;
             }
 
+            const topMarker = sanitizeStepTopMarker(step?.topMarker);
+            if (topMarker) {
+                out.topMarker = topMarker;
+            }
+
+            const noteFx = sanitizeStepNoteFx(step?.noteFx);
+            if (noteFx) {
+                out.noteFx = noteFx;
+            }
+
             if (itemIndex == null && step?.item != null) {
                 out.item = String(step.item);
             }
@@ -183,6 +217,7 @@ function createTRRecExportPayload(components) {
         version: TRREC_EXPORT_VERSION,
         exportedAt: new Date().toISOString(),
         padCount: trRec.padCount,
+        bpm: Number.isFinite(bpm?.value) ? bpm.value : null,
         sequence,
         dependencies
     };
@@ -249,6 +284,7 @@ function applyTRRecImportPayload(components, payload) {
     const guitar = components.find(c => c.name === "guitar1");
     const trRec = components.find(c => c.name === "trRecPads");
     const lcd2 = components.find(c => c.name === "lcd2");
+    const bpm = components.find(c => c.name === "bpmCtrl");
     if (!guitar || !trRec || !lcd2) {
         throw new Error("missing-components");
     }
@@ -301,6 +337,8 @@ function applyTRRecImportPayload(components, payload) {
                 ? lcd2.items[newItemIndex]
                 : (raw.item ?? null);
             step.tabFrets = sanitizeTabFrets(raw.tabFrets);
+            step.topMarker = sanitizeStepTopMarker(raw.topMarker);
+            step.noteFx = sanitizeStepNoteFx(raw.noteFx);
 
             return step;
         });
@@ -313,6 +351,10 @@ function applyTRRecImportPayload(components, payload) {
     trRec.setMeasureIndex(0);
     trRec.playIndex = 0;
     trRec.invalidate();
+
+    if (bpm && Number.isFinite(payload?.bpm)) {
+        bpm.setValue(payload.bpm);
+    }
 
     guitar.invalidate();
 }

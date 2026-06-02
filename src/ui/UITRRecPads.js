@@ -47,7 +47,9 @@ class TRRecPads extends UIComponent {
             flash: 0,
             item: null,
             itemIndex: null,
-            tabFrets: null
+            tabFrets: null,
+            topMarker: null,
+            noteFx: null
         };
     }
 
@@ -59,6 +61,33 @@ class TRRecPads extends UIComponent {
         return value === 2 ? 2 : (value === 1 ? 1 : 0);
     }
 
+    _normalizeTopMarker(value) {
+        if (value === "PM" || value === "^") return value;
+        return null;
+    }
+
+    _normalizeNoteFxValue(value) {
+        if (value === "bendQuarter" || value === "bendHalf" || value === "bendFull" || value === "slide" || value === "slidePrev" || value === "hammer" || value === "pull") return value;
+        return null;
+    }
+
+    _sanitizeNoteFxMap(noteFx) {
+        if (!noteFx || typeof noteFx !== "object") return null;
+
+        const out = {};
+        for (const [k, v] of Object.entries(noteFx)) {
+            const stringNumber = Number(k);
+            if (!Number.isFinite(stringNumber) || stringNumber < 1 || stringNumber > 6) continue;
+
+            const fx = this._normalizeNoteFxValue(v);
+            if (!fx) continue;
+
+            out[String(stringNumber)] = fx;
+        }
+
+        return Object.keys(out).length > 0 ? out : null;
+    }
+
     _cloneStepData(step) {
         return {
             ...this.createEmptyStep(),
@@ -67,7 +96,9 @@ class TRRecPads extends UIComponent {
             itemIndex: step?.itemIndex ?? null,
             tabFrets: (step?.tabFrets && typeof step.tabFrets === "object")
                 ? JSON.parse(JSON.stringify(step.tabFrets))
-                : null
+                : null,
+            topMarker: this._normalizeTopMarker(step?.topMarker),
+            noteFx: this._sanitizeNoteFxMap(step?.noteFx)
         };
     }
 
@@ -195,7 +226,9 @@ class TRRecPads extends UIComponent {
             ...this.createEmptyStep(),
             etat: src[i]?.etat === 2 ? 2 : (src[i]?.etat === 1 ? 1 : 0),
             item: src[i]?.item ?? null,
-            itemIndex: src[i]?.itemIndex ?? null
+            itemIndex: src[i]?.itemIndex ?? null,
+            topMarker: this._normalizeTopMarker(src[i]?.topMarker),
+            noteFx: this._sanitizeNoteFxMap(src[i]?.noteFx)
         }));
 
         const insertAt = this.measureIndex + 1;
@@ -309,7 +342,9 @@ this.onChange?.({
             itemIndex: arr[i]?.itemIndex ?? null,
             tabFrets: (arr[i]?.tabFrets && typeof arr[i].tabFrets === "object")
                 ? JSON.parse(JSON.stringify(arr[i].tabFrets))
-                : null
+                : null,
+            topMarker: this._normalizeTopMarker(arr[i]?.topMarker),
+            noteFx: this._sanitizeNoteFxMap(arr[i]?.noteFx)
         }));
 
         if (!this.measures || this.measures.length === 0) {
