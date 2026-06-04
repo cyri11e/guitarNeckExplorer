@@ -439,6 +439,24 @@ class TRRecTablature extends UIComponent {
         };
     }
 
+    _getFretTextBounds(centerX, centerY, fretText, fretTextSize) {
+        textSize(fretTextSize);
+
+        const textW = textWidth(fretText);
+        const textH = max(1, textAscent() + textDescent());
+
+        return {
+            left: centerX - textW * 0.5,
+            right: centerX + textW * 0.5,
+            top: centerY - textH * 0.5,
+            bottom: centerY + textH * 0.5,
+            centerX,
+            centerY,
+            width: textW,
+            height: textH
+        };
+    }
+
     _findNextPlayableStepOnString(globalStep, stringNumber) {
         if (!Number.isInteger(globalStep) || !Number.isFinite(stringNumber)) return null;
 
@@ -856,6 +874,110 @@ class TRRecTablature extends UIComponent {
                 fill(bubbleColor);
                 rect(bubbleX, bubbleY, bubbleW, bubbleH, bubbleH * 0.28);
 
+                const fretCenterX = x + stepW * 0.5;
+                const fretCenterY = y + rowH * 0.01;
+                const fretBounds = this._getFretTextBounds(fretCenterX, fretCenterY, fretText, fretTextSize);
+
+                if (noteFx === "slide") {
+                    const nextOnString = this._findNextPlayableStepOnString(stepRef.globalStep, stringNumber);
+                    if (nextOnString) {
+                        const nextWindowCol = nextOnString.globalStep - this._getWindowStartGlobalStep();
+                        if (nextWindowCol >= 0 && nextWindowCol < totalSteps) {
+                            const nextX = gridX + nextWindowCol * stepW;
+                            const nextBubble = this._getBubbleRectForNote(layout, nextX, stringNumber, nextOnString.fret);
+
+                            if (nextBubble) {
+                                const nextFretText = String(max(0, Math.round(nextOnString.fret)));
+                                const nextFretCenterX = nextX + stepW * 0.5;
+                                const nextFretCenterY = nextBubble.centerY;
+                                const nextFretBounds = this._getFretTextBounds(nextFretCenterX, nextFretCenterY, nextFretText, fretTextSize);
+
+                                const isUpMove = Number(nextOnString.fret) >= Number(fret);
+                                stroke(35, 35, 35, 220);
+                                strokeWeight(max(1.8, this.h * 0.0056));
+                                noFill();
+
+                                const slideStartX = fretBounds.right;
+                                const slideStartY = isUpMove ? fretBounds.bottom : fretBounds.top;
+                                const slideEndX = nextFretBounds.left;
+                                const slideEndY = isUpMove ? nextFretBounds.top : nextFretBounds.bottom;
+
+                                line(slideStartX, slideStartY, slideEndX, slideEndY);
+
+                                const arcKey = `${stepRef.globalStep}:${nextOnString.globalStep}:${stringNumber}:slide`;
+                                if (!drawnLegatoArcs.has(arcKey)) {
+                                    const arcAnchorY = min(slideStartY, slideEndY) - this.h * 0.014;
+                                    this._drawHeldArc(
+                                        fretBounds.centerX,
+                                        nextFretBounds.centerX,
+                                        arcAnchorY
+                                    );
+                                    drawnLegatoArcs.add(arcKey);
+                                }
+                            }
+                        }
+                    } else {
+                        stroke(35, 35, 35, 210);
+                        strokeWeight(max(1.8, this.h * 0.0056));
+                        noFill();
+
+                        const slideStartX = fretBounds.right;
+                        const slideStartY = fretBounds.centerY;
+                        const slideEndX = min(gridX + gridW - stepW * 0.08, slideStartX + stepW * 0.75);
+                        const slideEndY = fretBounds.centerY - rowH * 0.12;
+                        line(slideStartX, slideStartY, slideEndX, slideEndY);
+                    }
+                } else if (noteFx === "slidePrev") {
+                    const prevOnString = this._findPreviousPlayableStepOnString(stepRef.globalStep, stringNumber);
+                    if (prevOnString) {
+                        const prevWindowCol = prevOnString.globalStep - this._getWindowStartGlobalStep();
+                        if (prevWindowCol >= 0 && prevWindowCol < totalSteps) {
+                            const prevX = gridX + prevWindowCol * stepW;
+                            const prevBubble = this._getBubbleRectForNote(layout, prevX, stringNumber, prevOnString.fret);
+
+                            if (prevBubble) {
+                                const prevFretText = String(max(0, Math.round(prevOnString.fret)));
+                                const prevFretCenterX = prevX + stepW * 0.5;
+                                const prevFretCenterY = prevBubble.centerY;
+                                const prevFretBounds = this._getFretTextBounds(prevFretCenterX, prevFretCenterY, prevFretText, fretTextSize);
+
+                                const isUpMove = Number(fret) >= Number(prevOnString.fret);
+                                stroke(35, 35, 35, 220);
+                                strokeWeight(max(1.8, this.h * 0.0056));
+                                noFill();
+
+                                const slideStartX = fretBounds.left;
+                                const slideStartY = isUpMove ? fretBounds.bottom : fretBounds.top;
+                                const slideEndX = prevFretBounds.right;
+                                const slideEndY = isUpMove ? prevFretBounds.top : prevFretBounds.bottom;
+
+                                line(slideStartX, slideStartY, slideEndX, slideEndY);
+
+                                const arcKey = `${prevOnString.globalStep}:${stepRef.globalStep}:${stringNumber}:slidePrev`;
+                                if (!drawnLegatoArcs.has(arcKey)) {
+                                    const arcAnchorY = min(slideStartY, slideEndY) - this.h * 0.014;
+                                    this._drawHeldArc(
+                                        prevFretBounds.centerX,
+                                        fretBounds.centerX,
+                                        arcAnchorY
+                                    );
+                                    drawnLegatoArcs.add(arcKey);
+                                }
+                            }
+                        }
+                    } else {
+                        stroke(35, 35, 35, 210);
+                        strokeWeight(max(1.8, this.h * 0.0056));
+                        noFill();
+
+                        const slideStartX = fretBounds.left;
+                        const slideStartY = fretBounds.centerY;
+                        const slideEndX = max(gridX + stepW * 0.08, slideStartX - stepW * 0.75);
+                        const slideEndY = fretBounds.centerY + rowH * 0.12;
+                        line(slideStartX, slideStartY, slideEndX, slideEndY);
+                    }
+                }
+
                 stroke(25, 25, 25, 150);
                 strokeWeight(max(1, this.h * 0.0025));
                 fill(isActiveCursorStep ? 255 : 20);
@@ -895,58 +1017,6 @@ class TRRecTablature extends UIComponent {
                     textAlign(CENTER, CENTER);
                     textSize(this.h * 0.052);
                     text(noteFx === "bendQuarter" ? "1/4" : (noteFx === "bendHalf" ? "1/2" : "1"), bendEndX, bendEndY - rowH * 0.17);
-                } else if (noteFx === "slide") {
-                    const nextOnString = this._findNextPlayableStepOnString(stepRef.globalStep, stringNumber);
-                    if (nextOnString) {
-                        const nextWindowCol = nextOnString.globalStep - this._getWindowStartGlobalStep();
-                        if (nextWindowCol >= 0 && nextWindowCol < totalSteps) {
-                            const nextX = gridX + nextWindowCol * stepW;
-                            const nextBubble = this._getBubbleRectForNote(layout, nextX, stringNumber, nextOnString.fret);
-
-                            if (nextBubble) {
-                                const isUpMove = Number(nextOnString.fret) >= Number(fret);
-                                stroke(35, 35, 35, 210);
-                                strokeWeight(max(1.8, this.h * 0.0056));
-                                noFill();
-
-                                const slideStartX = bubbleX + bubbleW;
-                                const slideStartY = isUpMove
-                                    ? (bubbleY + bubbleH)
-                                    : (bubbleY + bubbleH * 0.35);
-                                const slideEndX = nextBubble.bubbleX;
-                                const rawEndY = isUpMove
-                                    ? nextBubble.bubbleY
-                                    : (nextBubble.bubbleY + nextBubble.bubbleH * 0.65);
-                                const slideEndY = isUpMove
-                                    ? lerp(rawEndY, slideStartY, 0.33)
-                                    : lerp(rawEndY, slideStartY, 0.52);
-
-                                line(slideStartX, slideStartY, slideEndX, slideEndY);
-
-                                const arcKey = `${stepRef.globalStep}:${nextOnString.globalStep}:${stringNumber}:slide`;
-                                if (!drawnLegatoArcs.has(arcKey)) {
-                                    const arcAnchorY = min(slideStartY, slideEndY) - this.h * 0.014;
-                                    this._drawHeldArc(
-                                        bubbleX + bubbleW * 0.5,
-                                        nextBubble.bubbleX + nextBubble.bubbleW * 0.5,
-                                        arcAnchorY
-                                    );
-                                    drawnLegatoArcs.add(arcKey);
-                                }
-                            }
-                        }
-                    } else {
-                        // slide out: pas de note suivante, on prolonge vers la droite
-                        stroke(35, 35, 35, 210);
-                        strokeWeight(max(1.8, this.h * 0.0056));
-                        noFill();
-
-                        const slideStartX = bubbleX + bubbleW;
-                        const slideStartY = bubbleY + bubbleH * 0.68;
-                        const slideEndX = min(gridX + gridW - stepW * 0.08, slideStartX + stepW * 0.75);
-                        const slideEndY = slideStartY - rowH * 0.22;
-                        line(slideStartX, slideStartY, slideEndX, slideEndY);
-                    }
                 }
             }
         }
